@@ -1,0 +1,183 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>hotspot Sdiff src/share/vm/memory </title>
+</head><body id="SUNWwebrev">
+<center><a href='../../../../src/share/vm/logging/logTag.hpp.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/share/vm/oops/oop.hpp.sdiff.html' target='_top'>next &gt</a></center>
+<h2>src/share/vm/memory/filemap.cpp</h2>
+<a class="print" href="javascript:print()">Print this page</a>
+<pre></pre>
+
+<table><tr valign="top">
+<td><pre>
+
+</pre><hr></hr><pre>
+ 246         bytes += name_bytes;
+ 247         log_info(class, path)("add main shared path (%s) %s", (cpe-&gt;is_jar_file() ? "jar" : "dir"), name);
+ 248       } else {
+ 249         SharedClassPathEntry* ent = shared_classpath(cur_entry);
+ 250         if (cpe-&gt;is_jar_file()) {
+ 251           struct stat st;
+ 252           if (os::stat(name, &amp;st) != 0) {
+ 253             // The file/dir must exist, or it would not have been added
+ 254             // into ClassLoader::classpath_entry().
+ 255             //
+ 256             // If we can't access a jar file in the boot path, then we can't
+ 257             // make assumptions about where classes get loaded from.
+ 258             FileMapInfo::fail_stop("Unable to open jar file %s.", name);
+ 259           }
+ 260 
+ 261           EXCEPTION_MARK; // The following call should never throw, but would exit VM on error.
+ 262           SharedClassUtil::update_shared_classpath(cpe, ent, st.st_mtime, st.st_size, THREAD);
+ 263         } else {
+ 264           struct stat st;
+ 265           if (os::stat(name, &amp;st) == 0) {
+<span class="changed"> 266             if ((st.st_mode &amp; S_IFDIR) == S_IFDIR) {</span>
+ 267               if (!os::dir_is_empty(name)) {
+ 268                 ClassLoader::exit_with_path_failure(
+ 269                   "Cannot have non-empty directory in archived classpaths", name);
+ 270               }
+ 271               ent-&gt;_filesize = -1;
+ 272             }
+ 273           }
+ 274           if (ent-&gt;_filesize == 0) {
+ 275             // unknown
+ 276             ent-&gt;_filesize = -2;
+ 277           }
+ 278         }
+ 279         ent-&gt;_name = strptr;
+ 280         if (strptr + name_bytes &lt;= strptr_max) {
+ 281           strncpy(strptr, name, (size_t)name_bytes); // name_bytes includes trailing 0.
+ 282           strptr += name_bytes;
+ 283         } else {
+ 284           assert(0, "miscalculated buffer size");
+ 285         }
+ 286       }
+
+</pre><hr></hr>
+</pre></td><td><pre>
+
+</pre><hr></hr><pre>
+ 246         bytes += name_bytes;
+ 247         log_info(class, path)("add main shared path (%s) %s", (cpe-&gt;is_jar_file() ? "jar" : "dir"), name);
+ 248       } else {
+ 249         SharedClassPathEntry* ent = shared_classpath(cur_entry);
+ 250         if (cpe-&gt;is_jar_file()) {
+ 251           struct stat st;
+ 252           if (os::stat(name, &amp;st) != 0) {
+ 253             // The file/dir must exist, or it would not have been added
+ 254             // into ClassLoader::classpath_entry().
+ 255             //
+ 256             // If we can't access a jar file in the boot path, then we can't
+ 257             // make assumptions about where classes get loaded from.
+ 258             FileMapInfo::fail_stop("Unable to open jar file %s.", name);
+ 259           }
+ 260 
+ 261           EXCEPTION_MARK; // The following call should never throw, but would exit VM on error.
+ 262           SharedClassUtil::update_shared_classpath(cpe, ent, st.st_mtime, st.st_size, THREAD);
+ 263         } else {
+ 264           struct stat st;
+ 265           if (os::stat(name, &amp;st) == 0) {
+<span class="changed"> 266             if ((st.st_mode &amp; S_IFMT) == S_IFDIR) {</span>
+ 267               if (!os::dir_is_empty(name)) {
+ 268                 ClassLoader::exit_with_path_failure(
+ 269                   "Cannot have non-empty directory in archived classpaths", name);
+ 270               }
+ 271               ent-&gt;_filesize = -1;
+ 272             }
+ 273           }
+ 274           if (ent-&gt;_filesize == 0) {
+ 275             // unknown
+ 276             ent-&gt;_filesize = -2;
+ 277           }
+ 278         }
+ 279         ent-&gt;_name = strptr;
+ 280         if (strptr + name_bytes &lt;= strptr_max) {
+ 281           strncpy(strptr, name, (size_t)name_bytes); // name_bytes includes trailing 0.
+ 282           strptr += name_bytes;
+ 283         } else {
+ 284           assert(0, "miscalculated buffer size");
+ 285         }
+ 286       }
+
+</pre><hr></hr>
+</pre></td>
+</tr></table>
+<center><a href='../../../../src/share/vm/logging/logTag.hpp.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/share/vm/oops/oop.hpp.sdiff.html' target='_top'>next &gt</a></center>
+</body></html>

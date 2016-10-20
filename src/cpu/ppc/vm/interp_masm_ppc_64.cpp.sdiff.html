@@ -1,0 +1,187 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>hotspot Sdiff src/cpu/ppc/vm </title>
+</head><body id="SUNWwebrev">
+<center><a href='../../../../src/cpu/ppc/vm/assembler_ppc.inline.hpp.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/cpu/ppc/vm/ppc.ad.sdiff.html' target='_top'>next &gt</a></center>
+<h2>src/cpu/ppc/vm/interp_masm_ppc_64.cpp</h2>
+<a class="print" href="javascript:print()">Print this page</a>
+<pre></pre>
+
+<table><tr valign="top">
+<td><pre>
+
+</pre><hr></hr><pre>
+ 244 void InterpreterMacroAssembler::pop_f(FloatRegister f) {
+ 245   lfsu(f, Interpreter::stackElementSize, R15_esp);
+ 246 }
+ 247 
+ 248 void InterpreterMacroAssembler::pop_d(FloatRegister f) {
+ 249   lfd(f, Interpreter::stackElementSize, R15_esp);
+ 250   addi(R15_esp, R15_esp, 2 * Interpreter::stackElementSize);
+ 251 }
+ 252 
+ 253 void InterpreterMacroAssembler::push_i(Register r) {
+ 254   stw(r, 0, R15_esp);
+ 255   addi(R15_esp, R15_esp, - Interpreter::stackElementSize );
+ 256 }
+ 257 
+ 258 void InterpreterMacroAssembler::push_ptr(Register r) {
+ 259   std(r, 0, R15_esp);
+ 260   addi(R15_esp, R15_esp, - Interpreter::stackElementSize );
+ 261 }
+ 262 
+ 263 void InterpreterMacroAssembler::push_l(Register r) {
+
+
+
+ 264   std(r, - Interpreter::stackElementSize, R15_esp);
+ 265   addi(R15_esp, R15_esp, - 2 * Interpreter::stackElementSize );
+ 266 }
+ 267 
+ 268 void InterpreterMacroAssembler::push_f(FloatRegister f) {
+ 269   stfs(f, 0, R15_esp);
+ 270   addi(R15_esp, R15_esp, - Interpreter::stackElementSize );
+ 271 }
+ 272 
+ 273 void InterpreterMacroAssembler::push_d(FloatRegister f)   {
+ 274   stfd(f, - Interpreter::stackElementSize, R15_esp);
+ 275   addi(R15_esp, R15_esp, - 2 * Interpreter::stackElementSize );
+ 276 }
+ 277 
+ 278 void InterpreterMacroAssembler::push_2ptrs(Register first, Register second) {
+ 279   std(first, 0, R15_esp);
+ 280   std(second, -Interpreter::stackElementSize, R15_esp);
+ 281   addi(R15_esp, R15_esp, - 2 * Interpreter::stackElementSize );
+ 282 }
+ 283 
+
+</pre><hr></hr>
+</pre></td><td><pre>
+
+</pre><hr></hr><pre>
+ 244 void InterpreterMacroAssembler::pop_f(FloatRegister f) {
+ 245   lfsu(f, Interpreter::stackElementSize, R15_esp);
+ 246 }
+ 247 
+ 248 void InterpreterMacroAssembler::pop_d(FloatRegister f) {
+ 249   lfd(f, Interpreter::stackElementSize, R15_esp);
+ 250   addi(R15_esp, R15_esp, 2 * Interpreter::stackElementSize);
+ 251 }
+ 252 
+ 253 void InterpreterMacroAssembler::push_i(Register r) {
+ 254   stw(r, 0, R15_esp);
+ 255   addi(R15_esp, R15_esp, - Interpreter::stackElementSize );
+ 256 }
+ 257 
+ 258 void InterpreterMacroAssembler::push_ptr(Register r) {
+ 259   std(r, 0, R15_esp);
+ 260   addi(R15_esp, R15_esp, - Interpreter::stackElementSize );
+ 261 }
+ 262 
+ 263 void InterpreterMacroAssembler::push_l(Register r) {
+<span class="new"> 264   // Clear unused slot.</span>
+<span class="new"> 265   load_const_optimized(R0, 0L);</span>
+<span class="new"> 266   std(R0, 0, R15_esp);</span>
+ 267   std(r, - Interpreter::stackElementSize, R15_esp);
+ 268   addi(R15_esp, R15_esp, - 2 * Interpreter::stackElementSize );
+ 269 }
+ 270 
+ 271 void InterpreterMacroAssembler::push_f(FloatRegister f) {
+ 272   stfs(f, 0, R15_esp);
+ 273   addi(R15_esp, R15_esp, - Interpreter::stackElementSize );
+ 274 }
+ 275 
+ 276 void InterpreterMacroAssembler::push_d(FloatRegister f)   {
+ 277   stfd(f, - Interpreter::stackElementSize, R15_esp);
+ 278   addi(R15_esp, R15_esp, - 2 * Interpreter::stackElementSize );
+ 279 }
+ 280 
+ 281 void InterpreterMacroAssembler::push_2ptrs(Register first, Register second) {
+ 282   std(first, 0, R15_esp);
+ 283   std(second, -Interpreter::stackElementSize, R15_esp);
+ 284   addi(R15_esp, R15_esp, - 2 * Interpreter::stackElementSize );
+ 285 }
+ 286 
+
+</pre><hr></hr>
+</pre></td>
+</tr></table>
+<center><a href='../../../../src/cpu/ppc/vm/assembler_ppc.inline.hpp.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/cpu/ppc/vm/ppc.ad.sdiff.html' target='_top'>next &gt</a></center>
+</body></html>

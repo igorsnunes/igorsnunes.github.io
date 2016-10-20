@@ -1,0 +1,12 @@
+--- old/src/cpu/ppc/vm/interp_masm_ppc_64.cpp	2016-10-20 11:02:19.208101154 -0200
++++ new/src/cpu/ppc/vm/interp_masm_ppc_64.cpp	2016-10-20 11:02:19.144101218 -0200
+@@ -261,6 +261,9 @@
+ }
+ 
+ void InterpreterMacroAssembler::push_l(Register r) {
++  // Clear unused slot.
++  load_const_optimized(R0, 0L);
++  std(R0, 0, R15_esp);
+   std(r, - Interpreter::stackElementSize, R15_esp);
+   addi(R15_esp, R15_esp, - 2 * Interpreter::stackElementSize );
+ }

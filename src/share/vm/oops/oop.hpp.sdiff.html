@@ -1,0 +1,183 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>hotspot Sdiff src/share/vm/oops </title>
+</head><body id="SUNWwebrev">
+<center><a href='../../../../src/share/vm/memory/filemap.cpp.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/share/vm/oops/oop.inline.hpp.sdiff.html' target='_top'>next &gt</a></center>
+<h2>src/share/vm/oops/oop.hpp</h2>
+<a class="print" href="javascript:print()">Print this page</a>
+<pre></pre>
+
+<table><tr valign="top">
+<td><pre>
+
+</pre><hr></hr><pre>
+  66   } _metadata;
+  67 
+  68   // Fast access to barrier set. Must be initialized.
+  69   static BarrierSet* _bs;
+  70 
+  71  public:
+  72   markOop  mark()      const { return _mark; }
+  73   markOop* mark_addr() const { return (markOop*) &amp;_mark; }
+  74 
+  75   void set_mark(volatile markOop m) { _mark = m; }
+  76 
+  77   inline void release_set_mark(markOop m);
+  78   inline markOop cas_set_mark(markOop new_mark, markOop old_mark);
+  79 
+  80   // Used only to re-initialize the mark word (e.g., of promoted
+  81   // objects during a GC) -- requires a valid klass pointer
+  82   inline void init_mark();
+  83 
+  84   inline Klass* klass() const;
+  85   inline Klass* klass_or_null() const volatile;
+
+  86   inline Klass** klass_addr();
+  87   inline narrowKlass* compressed_klass_addr();
+  88 
+  89   inline void set_klass(Klass* k);
+  90   inline void release_set_klass(Klass* k);
+  91 
+  92   // For klass field compression
+  93   inline int klass_gap() const;
+  94   inline void set_klass_gap(int z);
+  95   // For when the klass pointer is being used as a linked list "next" field.
+  96   inline void set_klass_to_list_ptr(oop k);
+  97   inline oop list_ptr_from_klass();
+  98 
+  99   // size of object header, aligned to platform wordSize
+ 100   static int header_size() { return sizeof(oopDesc)/HeapWordSize; }
+ 101 
+ 102   // Returns whether this is an instance of k or an instance of a subclass of k
+ 103   inline bool is_a(Klass* k) const;
+ 104 
+ 105   // Returns the actual oop size of the object
+
+</pre><hr></hr>
+</pre></td><td><pre>
+
+</pre><hr></hr><pre>
+  66   } _metadata;
+  67 
+  68   // Fast access to barrier set. Must be initialized.
+  69   static BarrierSet* _bs;
+  70 
+  71  public:
+  72   markOop  mark()      const { return _mark; }
+  73   markOop* mark_addr() const { return (markOop*) &amp;_mark; }
+  74 
+  75   void set_mark(volatile markOop m) { _mark = m; }
+  76 
+  77   inline void release_set_mark(markOop m);
+  78   inline markOop cas_set_mark(markOop new_mark, markOop old_mark);
+  79 
+  80   // Used only to re-initialize the mark word (e.g., of promoted
+  81   // objects during a GC) -- requires a valid klass pointer
+  82   inline void init_mark();
+  83 
+  84   inline Klass* klass() const;
+  85   inline Klass* klass_or_null() const volatile;
+<span class="new">  86   inline Klass* klass_or_null_acquire() const volatile;</span>
+  87   inline Klass** klass_addr();
+  88   inline narrowKlass* compressed_klass_addr();
+  89 
+  90   inline void set_klass(Klass* k);
+  91   inline void release_set_klass(Klass* k);
+  92 
+  93   // For klass field compression
+  94   inline int klass_gap() const;
+  95   inline void set_klass_gap(int z);
+  96   // For when the klass pointer is being used as a linked list "next" field.
+  97   inline void set_klass_to_list_ptr(oop k);
+  98   inline oop list_ptr_from_klass();
+  99 
+ 100   // size of object header, aligned to platform wordSize
+ 101   static int header_size() { return sizeof(oopDesc)/HeapWordSize; }
+ 102 
+ 103   // Returns whether this is an instance of k or an instance of a subclass of k
+ 104   inline bool is_a(Klass* k) const;
+ 105 
+ 106   // Returns the actual oop size of the object
+
+</pre><hr></hr>
+</pre></td>
+</tr></table>
+<center><a href='../../../../src/share/vm/memory/filemap.cpp.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/share/vm/oops/oop.inline.hpp.sdiff.html' target='_top'>next &gt</a></center>
+</body></html>

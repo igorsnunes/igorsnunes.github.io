@@ -1,0 +1,235 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>hotspot Udiff src/share/vm/prims/stackwalk.cpp</title>
+
+<style type="text/css" media="screen">
+span.new {
+    color: blue;
+    font-weight: normal;
+}
+</style>
+
+</head>
+<body id="SUNWwebrev">
+<center><a href='../../../../src/share/vm/oops/oop.inline.hpp.udiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/share/vm/runtime/globals.hpp.udiff.html' target='_top'>next &gt</a></center>
+<h2>src/share/vm/prims/stackwalk.cpp</h2>
+        <a class="print" href="javascript:print()">Print this page</a>
+<pre></pre>
+        <pre>
+</pre><hr /><pre>
+<span class="newmarker">@@ -24,10 +24,11 @@</span>
+ 
+ #include "precompiled.hpp"
+ #include "classfile/javaClasses.hpp"
+ #include "classfile/javaClasses.inline.hpp"
+ #include "classfile/vmSymbols.hpp"
+<span class="new">+#include "logging/log.hpp"</span>
+ #include "memory/oopFactory.hpp"
+ #include "oops/oop.inline.hpp"
+ #include "oops/objArrayOop.inline.hpp"
+ #include "prims/stackwalk.hpp"
+ #include "runtime/globals.hpp"
+</pre><hr /><pre>
+<span class="newmarker">@@ -103,14 +104,12 @@</span>
+ //
+ int StackWalk::fill_in_frames(jlong mode, BaseFrameStream&amp; stream,
+                               int max_nframes, int start_index,
+                               objArrayHandle  frames_array,
+                               int&amp; end_index, TRAPS) {
+<span class="removed">-  if (TraceStackWalk) {</span>
+<span class="removed">-    tty-&gt;print_cr("fill_in_frames limit=%d start=%d frames length=%d",</span>
+<span class="new">+  log_debug(stackwalk)("fill_in_frames limit=%d start=%d frames length=%d",</span>
+                   max_nframes, start_index, frames_array-&gt;length());
+<span class="removed">-  }</span>
+   assert(max_nframes &gt; 0, "invalid max_nframes");
+   assert(start_index + max_nframes &lt;= frames_array-&gt;length(), "oob");
+ 
+   int frames_decoded = 0;
+   for (; !stream.at_end(); stream.next()) {
+</pre><hr /><pre>
+<span class="newmarker">@@ -120,22 +119,28 @@</span>
+ 
+     // skip hidden frames for default StackWalker option (i.e. SHOW_HIDDEN_FRAMES
+     // not set) and when StackWalker::getCallerClass is called
+     if (!ShowHiddenFrames &amp;&amp; (skip_hidden_frames(mode) || get_caller_class(mode))) {
+       if (method-&gt;is_hidden()) {
+<span class="removed">-        if (TraceStackWalk) {</span>
+<span class="removed">-          tty-&gt;print("  hidden method: "); method-&gt;print_short_name();</span>
+<span class="removed">-          tty-&gt;print("\n");</span>
+<span class="new">+        if (log_is_enabled(Debug, stackwalk)) {</span>
+<span class="new">+          ResourceMark rm(THREAD);</span>
+<span class="new">+          outputStream* st = Log(stackwalk)::debug_stream();</span>
+<span class="new">+          st-&gt;print("  hidden method: ");</span>
+<span class="new">+          method-&gt;print_short_name(st);</span>
+<span class="new">+          st-&gt;cr();</span>
+         }
+         continue;
+       }
+     }
+ 
+     int index = end_index++;
+<span class="removed">-    if (TraceStackWalk) {</span>
+<span class="removed">-      tty-&gt;print("  %d: frame method: ", index); method-&gt;print_short_name();</span>
+<span class="removed">-      tty-&gt;print_cr(" bci=%d", stream.bci());</span>
+<span class="new">+    if (log_is_enabled(Debug, stackwalk)) {</span>
+<span class="new">+      ResourceMark rm(THREAD);</span>
+<span class="new">+      outputStream* st = Log(stackwalk)::debug_stream();</span>
+<span class="new">+      st-&gt;print("  %d: frame method: ", index);</span>
+<span class="new">+      method-&gt;print_short_name(st);</span>
+<span class="new">+      st-&gt;print_cr(" bci=%d", stream.bci());</span>
+     }
+ 
+     if (!need_method_info(mode) &amp;&amp; get_caller_class(mode) &amp;&amp;
+           index == start_index &amp;&amp; method-&gt;caller_sensitive()) {
+       ResourceMark rm(THREAD);
+</pre><hr /><pre>
+<span class="newmarker">@@ -315,14 +320,12 @@</span>
+                     int skip_frames, int frame_count, int start_index,
+                     objArrayHandle frames_array,
+                     TRAPS) {
+   ResourceMark rm(THREAD);
+   JavaThread* jt = (JavaThread*)THREAD;
+<span class="removed">-  if (TraceStackWalk) {</span>
+<span class="removed">-    tty-&gt;print_cr("Start walking: mode " JLONG_FORMAT " skip %d frames batch size %d",</span>
+<span class="new">+  log_debug(stackwalk)("Start walking: mode " JLONG_FORMAT " skip %d frames batch size %d",</span>
+                   mode, skip_frames, frame_count);
+<span class="removed">-  }</span>
+ 
+   if (frames_array.is_null()) {
+     THROW_MSG_(vmSymbols::java_lang_NullPointerException(), "frames_array is NULL", NULL);
+   }
+ 
+</pre><hr /><pre>
+<span class="newmarker">@@ -353,21 +356,29 @@</span>
+       if (ik != stackWalker_klass &amp;&amp;
+             ik != abstractStackWalker_klass &amp;&amp; ik-&gt;super() != abstractStackWalker_klass)  {
+         break;
+       }
+ 
+<span class="removed">-      if (TraceStackWalk) {</span>
+<span class="removed">-        tty-&gt;print("  skip "); stream.method()-&gt;print_short_name(); tty-&gt;print("\n");</span>
+<span class="new">+      if (log_is_enabled(Debug, stackwalk)) {</span>
+<span class="new">+        ResourceMark rm(THREAD);</span>
+<span class="new">+        outputStream* st = Log(stackwalk)::debug_stream();</span>
+<span class="new">+        st-&gt;print("  skip ");</span>
+<span class="new">+        stream.method()-&gt;print_short_name(st);</span>
+<span class="new">+        st-&gt;cr();</span>
+       }
+       stream.next();
+     }
+ 
+     // stack frame has been traversed individually and resume stack walk
+     // from the stack frame at depth == skip_frames.
+     for (int n=0; n &lt; skip_frames &amp;&amp; !stream.at_end(); stream.next(), n++) {
+<span class="removed">-      if (TraceStackWalk) {</span>
+<span class="removed">-        tty-&gt;print("  skip "); stream.method()-&gt;print_short_name(); tty-&gt;cr();</span>
+<span class="new">+      if (log_is_enabled(Debug, stackwalk)) {</span>
+<span class="new">+        ResourceMark rm(THREAD);</span>
+<span class="new">+        outputStream* st = Log(stackwalk)::debug_stream();</span>
+<span class="new">+        st-&gt;print("  skip ");</span>
+<span class="new">+        stream.method()-&gt;print_short_name(st);</span>
+<span class="new">+        st-&gt;cr();</span>
+       }
+     }
+   }
+ 
+   int end_index = start_index;
+</pre><hr /><pre>
+<span class="newmarker">@@ -436,14 +447,13 @@</span>
+ 
+   if (frames_array.is_null()) {
+     THROW_MSG_(vmSymbols::java_lang_NullPointerException(), "frames_array is NULL", 0L);
+   }
+ 
+<span class="removed">-  if (TraceStackWalk) {</span>
+<span class="removed">-    tty-&gt;print_cr("StackWalk::fetchNextBatch frame_count %d existing_stream " PTR_FORMAT " start %d frames %d",</span>
+<span class="new">+  log_debug(stackwalk)("StackWalk::fetchNextBatch frame_count %d existing_stream "</span>
+<span class="new">+                       PTR_FORMAT " start %d frames %d",</span>
+                   frame_count, p2i(existing_stream), start_index, frames_array-&gt;length());
+<span class="removed">-  }</span>
+   int end_index = start_index;
+   if (frame_count &lt;= 0) {
+     return end_index;        // No operation.
+   }
+ 
+</pre>
+<center><a href='../../../../src/share/vm/oops/oop.inline.hpp.udiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/share/vm/runtime/globals.hpp.udiff.html' target='_top'>next &gt</a></center>
+</body></html>
+

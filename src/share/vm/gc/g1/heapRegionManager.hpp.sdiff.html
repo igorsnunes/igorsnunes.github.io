@@ -1,0 +1,187 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>hotspot Sdiff src/share/vm/gc/g1 </title>
+</head><body id="SUNWwebrev">
+<center><a href='../../../../../src/share/vm/gc/g1/heapRegionManager.cpp.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../../index.html' target='_top'>index</a> <a href='../../../../../src/share/vm/logging/logFileOutput.cpp.sdiff.html' target='_top'>next &gt</a></center>
+<h2>src/share/vm/gc/g1/heapRegionManager.hpp</h2>
+<a class="print" href="javascript:print()">Print this page</a>
+<pre></pre>
+
+<table><tr valign="top">
+<td><pre>
+
+</pre><hr></hr><pre>
+ 244 
+ 245   // Uncommit up to num_regions_to_remove regions that are completely free.
+ 246   // Return the actual number of uncommitted regions.
+ 247   uint shrink_by(uint num_regions_to_remove);
+ 248 
+ 249   // Uncommit a number of regions starting at the specified index, which must be available,
+ 250   // empty, and free.
+ 251   void shrink_at(uint index, size_t num_regions);
+ 252 
+ 253   void verify();
+ 254 
+ 255   // Do some sanity checking.
+ 256   void verify_optional() PRODUCT_RETURN;
+ 257 };
+ 258 
+ 259 // The HeapRegionClaimer is used during parallel iteration over heap regions,
+ 260 // allowing workers to claim heap regions, gaining exclusive rights to these regions.
+ 261 class HeapRegionClaimer : public StackObj {
+ 262   uint  _n_workers;
+ 263   uint  _n_regions;
+<span class="changed"> 264   uint* _claims;</span>
+ 265 
+ 266   static const uint Unclaimed = 0;
+ 267   static const uint Claimed   = 1;
+ 268 
+ 269  public:
+ 270   HeapRegionClaimer(uint n_workers);
+ 271   ~HeapRegionClaimer();
+ 272 
+ 273   inline uint n_regions() const {
+ 274     return _n_regions;
+ 275   }
+ 276 
+ 277   // Calculate the starting region for given worker so
+ 278   // that they do not all start from the same region.
+ 279   uint start_region_for_worker(uint worker_id) const;
+ 280 
+ 281   // Check if region has been claimed with this HRClaimer.
+ 282   bool is_region_claimed(uint region_index) const;
+ 283 
+ 284   // Claim the given region, returns true if successfully claimed.
+ 285   bool claim_region(uint region_index);
+ 286 };
+ 287 #endif // SHARE_VM_GC_G1_HEAPREGIONMANAGER_HPP
+<span class="removed"> 288 </span>
+</pre></td><td><pre>
+
+</pre><hr></hr><pre>
+ 244 
+ 245   // Uncommit up to num_regions_to_remove regions that are completely free.
+ 246   // Return the actual number of uncommitted regions.
+ 247   uint shrink_by(uint num_regions_to_remove);
+ 248 
+ 249   // Uncommit a number of regions starting at the specified index, which must be available,
+ 250   // empty, and free.
+ 251   void shrink_at(uint index, size_t num_regions);
+ 252 
+ 253   void verify();
+ 254 
+ 255   // Do some sanity checking.
+ 256   void verify_optional() PRODUCT_RETURN;
+ 257 };
+ 258 
+ 259 // The HeapRegionClaimer is used during parallel iteration over heap regions,
+ 260 // allowing workers to claim heap regions, gaining exclusive rights to these regions.
+ 261 class HeapRegionClaimer : public StackObj {
+ 262   uint           _n_workers;
+ 263   uint           _n_regions;
+<span class="changed"> 264   volatile uint* _claims;</span>
+ 265 
+ 266   static const uint Unclaimed = 0;
+ 267   static const uint Claimed   = 1;
+ 268 
+ 269  public:
+ 270   HeapRegionClaimer(uint n_workers);
+ 271   ~HeapRegionClaimer();
+ 272 
+ 273   inline uint n_regions() const {
+ 274     return _n_regions;
+ 275   }
+ 276 
+ 277   // Calculate the starting region for given worker so
+ 278   // that they do not all start from the same region.
+ 279   uint start_region_for_worker(uint worker_id) const;
+ 280 
+ 281   // Check if region has been claimed with this HRClaimer.
+ 282   bool is_region_claimed(uint region_index) const;
+ 283 
+ 284   // Claim the given region, returns true if successfully claimed.
+ 285   bool claim_region(uint region_index);
+ 286 };
+ 287 #endif // SHARE_VM_GC_G1_HEAPREGIONMANAGER_HPP
+
+</pre></td>
+</tr></table>
+<center><a href='../../../../../src/share/vm/gc/g1/heapRegionManager.cpp.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../../index.html' target='_top'>index</a> <a href='../../../../../src/share/vm/logging/logFileOutput.cpp.sdiff.html' target='_top'>next &gt</a></center>
+</body></html>

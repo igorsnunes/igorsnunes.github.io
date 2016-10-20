@@ -1,0 +1,30 @@
+--- old/src/share/vm/gc/g1/g1IHOPControl.hpp	2016-10-20 11:02:24.824095538 -0200
++++ new/src/share/vm/gc/g1/g1IHOPControl.hpp	2016-10-20 11:02:24.760095602 -0200
+@@ -1,5 +1,5 @@
+ /*
+- * Copyright (c) 2015, Oracle and/or its affiliates. All rights reserved.
++ * Copyright (c) 2015, 2016, Oracle and/or its affiliates. All rights reserved.
+  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+  *
+  * This code is free software; you can redistribute it and/or modify it
+@@ -99,10 +99,6 @@
+    assert(marking_length_s > 0.0, "Marking length must be larger than zero but is %.3f", marking_length_s);
+     _last_marking_length_s = marking_length_s;
+   }
+-
+-#ifndef PRODUCT
+-  static void test();
+-#endif
+ };
+ 
+ // This algorithm tries to return a concurrent mark starting occupancy value that
+@@ -148,9 +144,6 @@
+ 
+   virtual void print();
+   virtual void send_trace_event(G1NewTracer* tracer);
+-#ifndef PRODUCT
+-  static void test();
+-#endif
+ };
+ 
+ #endif // SHARE_VM_GC_G1_G1IHOPCONTROL_HPP

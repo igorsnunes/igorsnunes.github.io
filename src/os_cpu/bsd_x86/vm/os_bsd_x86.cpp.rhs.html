@@ -1,0 +1,1263 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+    <script type="text/javascript" src="../../../../ancnav.js"></script>
+    </head>
+    <body id="SUNWwebrev" onkeypress="keypress(event);">
+    <a name="0"></a>
+    <pre></pre><hr></hr>
+<pre>
+   1 /*
+   2  * Copyright (c) 1999, 2016, Oracle and/or its affiliates. All rights reserved.
+   3  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+   4  *
+   5  * This code is free software; you can redistribute it and/or modify it
+   6  * under the terms of the GNU General Public License version 2 only, as
+   7  * published by the Free Software Foundation.
+   8  *
+   9  * This code is distributed in the hope that it will be useful, but WITHOUT
+  10  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+  11  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+  12  * version 2 for more details (a copy is included in the LICENSE file that
+  13  * accompanied this code).
+  14  *
+  15  * You should have received a copy of the GNU General Public License version
+  16  * 2 along with this work; if not, write to the Free Software Foundation,
+  17  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+  18  *
+  19  * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+  20  * or visit www.oracle.com if you need additional information or have any
+  21  * questions.
+  22  *
+  23  */
+  24 
+  25 // no precompiled headers
+  26 #include "asm/macroAssembler.hpp"
+  27 #include "classfile/classLoader.hpp"
+  28 #include "classfile/systemDictionary.hpp"
+  29 #include "classfile/vmSymbols.hpp"
+  30 #include "code/codeCache.hpp"
+  31 #include "code/icBuffer.hpp"
+  32 #include "code/vtableStubs.hpp"
+  33 #include "interpreter/interpreter.hpp"
+  34 #include "jvm_bsd.h"
+  35 #include "memory/allocation.inline.hpp"
+  36 #include "os_share_bsd.hpp"
+  37 #include "prims/jniFastGetField.hpp"
+  38 #include "prims/jvm.h"
+  39 #include "prims/jvm_misc.hpp"
+  40 #include "runtime/arguments.hpp"
+  41 #include "runtime/extendedPC.hpp"
+  42 #include "runtime/frame.inline.hpp"
+  43 #include "runtime/interfaceSupport.hpp"
+  44 #include "runtime/java.hpp"
+  45 #include "runtime/javaCalls.hpp"
+  46 #include "runtime/mutexLocker.hpp"
+  47 #include "runtime/osThread.hpp"
+  48 #include "runtime/sharedRuntime.hpp"
+  49 #include "runtime/stubRoutines.hpp"
+  50 #include "runtime/thread.inline.hpp"
+  51 #include "runtime/timer.hpp"
+  52 #include "utilities/events.hpp"
+  53 #include "utilities/vmError.hpp"
+  54 
+  55 // put OS-includes here
+  56 # include &lt;sys/types.h&gt;
+  57 # include &lt;sys/mman.h&gt;
+  58 # include &lt;pthread.h&gt;
+  59 # include &lt;signal.h&gt;
+  60 # include &lt;errno.h&gt;
+  61 # include &lt;dlfcn.h&gt;
+  62 # include &lt;stdlib.h&gt;
+  63 # include &lt;stdio.h&gt;
+  64 # include &lt;unistd.h&gt;
+  65 # include &lt;sys/resource.h&gt;
+  66 # include &lt;pthread.h&gt;
+  67 # include &lt;sys/stat.h&gt;
+  68 # include &lt;sys/time.h&gt;
+  69 # include &lt;sys/utsname.h&gt;
+  70 # include &lt;sys/socket.h&gt;
+  71 # include &lt;sys/wait.h&gt;
+  72 # include &lt;pwd.h&gt;
+  73 # include &lt;poll.h&gt;
+  74 #ifndef __OpenBSD__
+  75 # include &lt;ucontext.h&gt;
+  76 #endif
+  77 
+  78 #if !defined(__APPLE__) &amp;&amp; !defined(__NetBSD__)
+  79 # include &lt;pthread_np.h&gt;
+  80 #endif
+  81 
+  82 // needed by current_stack_region() workaround for Mavericks
+  83 #if defined(__APPLE__)
+  84 # include &lt;errno.h&gt;
+  85 # include &lt;sys/types.h&gt;
+  86 # include &lt;sys/sysctl.h&gt;
+  87 # define DEFAULT_MAIN_THREAD_STACK_PAGES 2048
+  88 # define OS_X_10_9_0_KERNEL_MAJOR_VERSION 13
+  89 #endif
+  90 
+  91 #ifdef AMD64
+  92 #define SPELL_REG_SP "rsp"
+  93 #define SPELL_REG_FP "rbp"
+  94 #else
+  95 #define SPELL_REG_SP "esp"
+  96 #define SPELL_REG_FP "ebp"
+  97 #endif // AMD64
+  98 
+  99 #ifdef __FreeBSD__
+ 100 # define context_trapno uc_mcontext.mc_trapno
+ 101 # ifdef AMD64
+ 102 #  define context_pc uc_mcontext.mc_rip
+ 103 #  define context_sp uc_mcontext.mc_rsp
+ 104 #  define context_fp uc_mcontext.mc_rbp
+ 105 #  define context_rip uc_mcontext.mc_rip
+ 106 #  define context_rsp uc_mcontext.mc_rsp
+ 107 #  define context_rbp uc_mcontext.mc_rbp
+ 108 #  define context_rax uc_mcontext.mc_rax
+ 109 #  define context_rbx uc_mcontext.mc_rbx
+ 110 #  define context_rcx uc_mcontext.mc_rcx
+ 111 #  define context_rdx uc_mcontext.mc_rdx
+ 112 #  define context_rsi uc_mcontext.mc_rsi
+ 113 #  define context_rdi uc_mcontext.mc_rdi
+ 114 #  define context_r8  uc_mcontext.mc_r8
+ 115 #  define context_r9  uc_mcontext.mc_r9
+ 116 #  define context_r10 uc_mcontext.mc_r10
+ 117 #  define context_r11 uc_mcontext.mc_r11
+ 118 #  define context_r12 uc_mcontext.mc_r12
+ 119 #  define context_r13 uc_mcontext.mc_r13
+ 120 #  define context_r14 uc_mcontext.mc_r14
+ 121 #  define context_r15 uc_mcontext.mc_r15
+ 122 #  define context_flags uc_mcontext.mc_flags
+ 123 #  define context_err uc_mcontext.mc_err
+ 124 # else
+ 125 #  define context_pc uc_mcontext.mc_eip
+ 126 #  define context_sp uc_mcontext.mc_esp
+ 127 #  define context_fp uc_mcontext.mc_ebp
+ 128 #  define context_eip uc_mcontext.mc_eip
+ 129 #  define context_esp uc_mcontext.mc_esp
+ 130 #  define context_eax uc_mcontext.mc_eax
+ 131 #  define context_ebx uc_mcontext.mc_ebx
+ 132 #  define context_ecx uc_mcontext.mc_ecx
+ 133 #  define context_edx uc_mcontext.mc_edx
+ 134 #  define context_ebp uc_mcontext.mc_ebp
+ 135 #  define context_esi uc_mcontext.mc_esi
+ 136 #  define context_edi uc_mcontext.mc_edi
+ 137 #  define context_eflags uc_mcontext.mc_eflags
+ 138 #  define context_trapno uc_mcontext.mc_trapno
+ 139 # endif
+ 140 #endif
+ 141 
+ 142 #ifdef __APPLE__
+ 143 # if __DARWIN_UNIX03 &amp;&amp; (MAC_OS_X_VERSION_MAX_ALLOWED &gt;= MAC_OS_X_VERSION_10_5)
+ 144   // 10.5 UNIX03 member name prefixes
+ 145   #define DU3_PREFIX(s, m) __ ## s.__ ## m
+ 146 # else
+ 147   #define DU3_PREFIX(s, m) s ## . ## m
+ 148 # endif
+ 149 
+ 150 # ifdef AMD64
+ 151 #  define context_pc context_rip
+ 152 #  define context_sp context_rsp
+ 153 #  define context_fp context_rbp
+ 154 #  define context_rip uc_mcontext-&gt;DU3_PREFIX(ss,rip)
+ 155 #  define context_rsp uc_mcontext-&gt;DU3_PREFIX(ss,rsp)
+ 156 #  define context_rax uc_mcontext-&gt;DU3_PREFIX(ss,rax)
+ 157 #  define context_rbx uc_mcontext-&gt;DU3_PREFIX(ss,rbx)
+ 158 #  define context_rcx uc_mcontext-&gt;DU3_PREFIX(ss,rcx)
+ 159 #  define context_rdx uc_mcontext-&gt;DU3_PREFIX(ss,rdx)
+ 160 #  define context_rbp uc_mcontext-&gt;DU3_PREFIX(ss,rbp)
+ 161 #  define context_rsi uc_mcontext-&gt;DU3_PREFIX(ss,rsi)
+ 162 #  define context_rdi uc_mcontext-&gt;DU3_PREFIX(ss,rdi)
+ 163 #  define context_r8  uc_mcontext-&gt;DU3_PREFIX(ss,r8)
+ 164 #  define context_r9  uc_mcontext-&gt;DU3_PREFIX(ss,r9)
+ 165 #  define context_r10 uc_mcontext-&gt;DU3_PREFIX(ss,r10)
+ 166 #  define context_r11 uc_mcontext-&gt;DU3_PREFIX(ss,r11)
+ 167 #  define context_r12 uc_mcontext-&gt;DU3_PREFIX(ss,r12)
+ 168 #  define context_r13 uc_mcontext-&gt;DU3_PREFIX(ss,r13)
+ 169 #  define context_r14 uc_mcontext-&gt;DU3_PREFIX(ss,r14)
+ 170 #  define context_r15 uc_mcontext-&gt;DU3_PREFIX(ss,r15)
+ 171 #  define context_flags uc_mcontext-&gt;DU3_PREFIX(ss,rflags)
+ 172 #  define context_trapno uc_mcontext-&gt;DU3_PREFIX(es,trapno)
+ 173 #  define context_err uc_mcontext-&gt;DU3_PREFIX(es,err)
+ 174 # else
+ 175 #  define context_pc context_eip
+ 176 #  define context_sp context_esp
+ 177 #  define context_fp context_ebp
+ 178 #  define context_eip uc_mcontext-&gt;DU3_PREFIX(ss,eip)
+ 179 #  define context_esp uc_mcontext-&gt;DU3_PREFIX(ss,esp)
+ 180 #  define context_eax uc_mcontext-&gt;DU3_PREFIX(ss,eax)
+ 181 #  define context_ebx uc_mcontext-&gt;DU3_PREFIX(ss,ebx)
+ 182 #  define context_ecx uc_mcontext-&gt;DU3_PREFIX(ss,ecx)
+ 183 #  define context_edx uc_mcontext-&gt;DU3_PREFIX(ss,edx)
+ 184 #  define context_ebp uc_mcontext-&gt;DU3_PREFIX(ss,ebp)
+ 185 #  define context_esi uc_mcontext-&gt;DU3_PREFIX(ss,esi)
+ 186 #  define context_edi uc_mcontext-&gt;DU3_PREFIX(ss,edi)
+ 187 #  define context_eflags uc_mcontext-&gt;DU3_PREFIX(ss,eflags)
+ 188 #  define context_trapno uc_mcontext-&gt;DU3_PREFIX(es,trapno)
+ 189 # endif
+ 190 #endif
+ 191 
+ 192 #ifdef __OpenBSD__
+ 193 # define context_trapno sc_trapno
+ 194 # ifdef AMD64
+ 195 #  define context_pc sc_rip
+ 196 #  define context_sp sc_rsp
+ 197 #  define context_fp sc_rbp
+ 198 #  define context_rip sc_rip
+ 199 #  define context_rsp sc_rsp
+ 200 #  define context_rbp sc_rbp
+ 201 #  define context_rax sc_rax
+ 202 #  define context_rbx sc_rbx
+ 203 #  define context_rcx sc_rcx
+ 204 #  define context_rdx sc_rdx
+ 205 #  define context_rsi sc_rsi
+ 206 #  define context_rdi sc_rdi
+ 207 #  define context_r8  sc_r8
+ 208 #  define context_r9  sc_r9
+ 209 #  define context_r10 sc_r10
+ 210 #  define context_r11 sc_r11
+ 211 #  define context_r12 sc_r12
+ 212 #  define context_r13 sc_r13
+ 213 #  define context_r14 sc_r14
+ 214 #  define context_r15 sc_r15
+ 215 #  define context_flags sc_rflags
+ 216 #  define context_err sc_err
+ 217 # else
+ 218 #  define context_pc sc_eip
+ 219 #  define context_sp sc_esp
+ 220 #  define context_fp sc_ebp
+ 221 #  define context_eip sc_eip
+ 222 #  define context_esp sc_esp
+ 223 #  define context_eax sc_eax
+ 224 #  define context_ebx sc_ebx
+ 225 #  define context_ecx sc_ecx
+ 226 #  define context_edx sc_edx
+ 227 #  define context_ebp sc_ebp
+ 228 #  define context_esi sc_esi
+ 229 #  define context_edi sc_edi
+ 230 #  define context_eflags sc_eflags
+ 231 #  define context_trapno sc_trapno
+ 232 # endif
+ 233 #endif
+ 234 
+ 235 #ifdef __NetBSD__
+ 236 # define context_trapno uc_mcontext.__gregs[_REG_TRAPNO]
+ 237 # ifdef AMD64
+ 238 #  define __register_t __greg_t
+ 239 #  define context_pc uc_mcontext.__gregs[_REG_RIP]
+ 240 #  define context_sp uc_mcontext.__gregs[_REG_URSP]
+ 241 #  define context_fp uc_mcontext.__gregs[_REG_RBP]
+ 242 #  define context_rip uc_mcontext.__gregs[_REG_RIP]
+ 243 #  define context_rsp uc_mcontext.__gregs[_REG_URSP]
+ 244 #  define context_rax uc_mcontext.__gregs[_REG_RAX]
+ 245 #  define context_rbx uc_mcontext.__gregs[_REG_RBX]
+ 246 #  define context_rcx uc_mcontext.__gregs[_REG_RCX]
+ 247 #  define context_rdx uc_mcontext.__gregs[_REG_RDX]
+ 248 #  define context_rbp uc_mcontext.__gregs[_REG_RBP]
+ 249 #  define context_rsi uc_mcontext.__gregs[_REG_RSI]
+ 250 #  define context_rdi uc_mcontext.__gregs[_REG_RDI]
+ 251 #  define context_r8  uc_mcontext.__gregs[_REG_R8]
+ 252 #  define context_r9  uc_mcontext.__gregs[_REG_R9]
+ 253 #  define context_r10 uc_mcontext.__gregs[_REG_R10]
+ 254 #  define context_r11 uc_mcontext.__gregs[_REG_R11]
+ 255 #  define context_r12 uc_mcontext.__gregs[_REG_R12]
+ 256 #  define context_r13 uc_mcontext.__gregs[_REG_R13]
+ 257 #  define context_r14 uc_mcontext.__gregs[_REG_R14]
+ 258 #  define context_r15 uc_mcontext.__gregs[_REG_R15]
+ 259 #  define context_flags uc_mcontext.__gregs[_REG_RFL]
+ 260 #  define context_err uc_mcontext.__gregs[_REG_ERR]
+ 261 # else
+ 262 #  define context_pc uc_mcontext.__gregs[_REG_EIP]
+ 263 #  define context_sp uc_mcontext.__gregs[_REG_UESP]
+ 264 #  define context_fp uc_mcontext.__gregs[_REG_EBP]
+ 265 #  define context_eip uc_mcontext.__gregs[_REG_EIP]
+ 266 #  define context_esp uc_mcontext.__gregs[_REG_UESP]
+ 267 #  define context_eax uc_mcontext.__gregs[_REG_EAX]
+ 268 #  define context_ebx uc_mcontext.__gregs[_REG_EBX]
+ 269 #  define context_ecx uc_mcontext.__gregs[_REG_ECX]
+ 270 #  define context_edx uc_mcontext.__gregs[_REG_EDX]
+ 271 #  define context_ebp uc_mcontext.__gregs[_REG_EBP]
+ 272 #  define context_esi uc_mcontext.__gregs[_REG_ESI]
+ 273 #  define context_edi uc_mcontext.__gregs[_REG_EDI]
+ 274 #  define context_eflags uc_mcontext.__gregs[_REG_EFL]
+ 275 #  define context_trapno uc_mcontext.__gregs[_REG_TRAPNO]
+ 276 # endif
+ 277 #endif
+ 278 
+ 279 address os::current_stack_pointer() {
+ 280 #if defined(__clang__) || defined(__llvm__)
+ 281   register void *esp;
+ 282   __asm__("mov %%"SPELL_REG_SP", %0":"=r"(esp));
+ 283   return (address) esp;
+ 284 #elif defined(SPARC_WORKS)
+ 285   register void *esp;
+ 286   __asm__("mov %%"SPELL_REG_SP", %0":"=r"(esp));
+ 287   return (address) ((char*)esp + sizeof(long)*2);
+ 288 #else
+ 289   register void *esp __asm__ (SPELL_REG_SP);
+ 290   return (address) esp;
+ 291 #endif
+ 292 }
+ 293 
+ 294 char* os::non_memory_address_word() {
+ 295   // Must never look like an address returned by reserve_memory,
+ 296   // even in its subfields (as defined by the CPU immediate fields,
+ 297   // if the CPU splits constants across multiple instructions).
+ 298 
+ 299   return (char*) -1;
+ 300 }
+ 301 
+ 302 void os::initialize_thread(Thread* thr) {
+ 303 // Nothing to do.
+ 304 }
+ 305 
+ 306 address os::Bsd::ucontext_get_pc(const ucontext_t * uc) {
+ 307   return (address)uc-&gt;context_pc;
+ 308 }
+ 309 
+ 310 void os::Bsd::ucontext_set_pc(ucontext_t * uc, address pc) {
+ 311   uc-&gt;context_pc = (intptr_t)pc ;
+ 312 }
+ 313 
+ 314 intptr_t* os::Bsd::ucontext_get_sp(const ucontext_t * uc) {
+ 315   return (intptr_t*)uc-&gt;context_sp;
+ 316 }
+ 317 
+ 318 intptr_t* os::Bsd::ucontext_get_fp(const ucontext_t * uc) {
+ 319   return (intptr_t*)uc-&gt;context_fp;
+ 320 }
+ 321 
+ 322 // For Forte Analyzer AsyncGetCallTrace profiling support - thread
+ 323 // is currently interrupted by SIGPROF.
+ 324 // os::Solaris::fetch_frame_from_ucontext() tries to skip nested signal
+ 325 // frames. Currently we don't do that on Bsd, so it's the same as
+ 326 // os::fetch_frame_from_context().
+ 327 // This method is also used for stack overflow signal handling.
+ 328 ExtendedPC os::Bsd::fetch_frame_from_ucontext(Thread* thread,
+ 329   const ucontext_t* uc, intptr_t** ret_sp, intptr_t** ret_fp) {
+ 330 
+ 331   assert(thread != NULL, "just checking");
+ 332   assert(ret_sp != NULL, "just checking");
+ 333   assert(ret_fp != NULL, "just checking");
+ 334 
+ 335   return os::fetch_frame_from_context(uc, ret_sp, ret_fp);
+ 336 }
+ 337 
+ 338 ExtendedPC os::fetch_frame_from_context(const void* ucVoid,
+ 339                     intptr_t** ret_sp, intptr_t** ret_fp) {
+ 340 
+ 341   ExtendedPC  epc;
+ 342   const ucontext_t* uc = (const ucontext_t*)ucVoid;
+ 343 
+ 344   if (uc != NULL) {
+ 345     epc = ExtendedPC(os::Bsd::ucontext_get_pc(uc));
+ 346     if (ret_sp) *ret_sp = os::Bsd::ucontext_get_sp(uc);
+ 347     if (ret_fp) *ret_fp = os::Bsd::ucontext_get_fp(uc);
+ 348   } else {
+ 349     // construct empty ExtendedPC for return value checking
+ 350     epc = ExtendedPC(NULL);
+ 351     if (ret_sp) *ret_sp = (intptr_t *)NULL;
+ 352     if (ret_fp) *ret_fp = (intptr_t *)NULL;
+ 353   }
+ 354 
+ 355   return epc;
+ 356 }
+ 357 
+ 358 frame os::fetch_frame_from_context(const void* ucVoid) {
+ 359   intptr_t* sp;
+ 360   intptr_t* fp;
+ 361   ExtendedPC epc = fetch_frame_from_context(ucVoid, &amp;sp, &amp;fp);
+ 362   return frame(sp, fp, epc.pc());
+ 363 }
+ 364 
+ 365 frame os::fetch_frame_from_ucontext(Thread* thread, void* ucVoid) {
+ 366   intptr_t* sp;
+ 367   intptr_t* fp;
+ 368   ExtendedPC epc = os::Bsd::fetch_frame_from_ucontext(thread, (ucontext_t*)ucVoid, &amp;sp, &amp;fp);
+ 369   return frame(sp, fp, epc.pc());
+ 370 }
+ 371 
+ 372 bool os::Bsd::get_frame_at_stack_banging_point(JavaThread* thread, ucontext_t* uc, frame* fr) {
+ 373   address pc = (address) os::Bsd::ucontext_get_pc(uc);
+ 374   if (Interpreter::contains(pc)) {
+ 375     // interpreter performs stack banging after the fixed frame header has
+ 376     // been generated while the compilers perform it before. To maintain
+ 377     // semantic consistency between interpreted and compiled frames, the
+ 378     // method returns the Java sender of the current frame.
+ 379     *fr = os::fetch_frame_from_ucontext(thread, uc);
+ 380     if (!fr-&gt;is_first_java_frame()) {
+<a name="1" id="anc1"></a><span class="changed"> 381       // get_frame_at_stack_banging_point() is only called when we</span>
+<span class="changed"> 382       // have well defined stacks so java_sender() calls do not need</span>
+<span class="changed"> 383       // to assert safe_for_sender() first.</span>
+ 384       *fr = fr-&gt;java_sender();
+ 385     }
+ 386   } else {
+ 387     // more complex code with compiled code
+ 388     assert(!Interpreter::contains(pc), "Interpreted methods should have been handled above");
+ 389     CodeBlob* cb = CodeCache::find_blob(pc);
+ 390     if (cb == NULL || !cb-&gt;is_nmethod() || cb-&gt;is_frame_complete_at(pc)) {
+ 391       // Not sure where the pc points to, fallback to default
+ 392       // stack overflow handling
+ 393       return false;
+ 394     } else {
+ 395       *fr = os::fetch_frame_from_ucontext(thread, uc);
+ 396       // in compiled code, the stack banging is performed just after the return pc
+ 397       // has been pushed on the stack
+ 398       *fr = frame(fr-&gt;sp() + 1, fr-&gt;fp(), (address)*(fr-&gt;sp()));
+ 399       if (!fr-&gt;is_java_frame()) {
+<a name="2" id="anc2"></a><span class="changed"> 400         // See java_sender() comment above.</span>
+ 401         *fr = fr-&gt;java_sender();
+ 402       }
+ 403     }
+ 404   }
+ 405   assert(fr-&gt;is_java_frame(), "Safety check");
+ 406   return true;
+ 407 }
+ 408 
+ 409 // By default, gcc always save frame pointer (%ebp/%rbp) on stack. It may get
+ 410 // turned off by -fomit-frame-pointer,
+ 411 frame os::get_sender_for_C_frame(frame* fr) {
+ 412   return frame(fr-&gt;sender_sp(), fr-&gt;link(), fr-&gt;sender_pc());
+ 413 }
+ 414 
+ 415 intptr_t* _get_previous_fp() {
+ 416 #if defined(SPARC_WORKS) || defined(__clang__) || defined(__llvm__)
+ 417   register intptr_t **ebp;
+ 418   __asm__("mov %%"SPELL_REG_FP", %0":"=r"(ebp));
+ 419 #else
+ 420   register intptr_t **ebp __asm__ (SPELL_REG_FP);
+ 421 #endif
+ 422   // ebp is for this frame (_get_previous_fp). We want the ebp for the
+ 423   // caller of os::current_frame*(), so go up two frames. However, for
+ 424   // optimized builds, _get_previous_fp() will be inlined, so only go
+ 425   // up 1 frame in that case.
+ 426 #ifdef _NMT_NOINLINE_
+ 427   return **(intptr_t***)ebp;
+ 428 #else
+ 429   return *ebp;
+ 430 #endif
+ 431 }
+ 432 
+ 433 
+ 434 frame os::current_frame() {
+ 435   intptr_t* fp = _get_previous_fp();
+ 436   frame myframe((intptr_t*)os::current_stack_pointer(),
+ 437                 (intptr_t*)fp,
+ 438                 CAST_FROM_FN_PTR(address, os::current_frame));
+ 439   if (os::is_first_C_frame(&amp;myframe)) {
+ 440     // stack is not walkable
+ 441     return frame();
+ 442   } else {
+ 443     return os::get_sender_for_C_frame(&amp;myframe);
+ 444   }
+ 445 }
+ 446 
+ 447 // Utility functions
+ 448 
+ 449 // From IA32 System Programming Guide
+ 450 enum {
+ 451   trap_page_fault = 0xE
+ 452 };
+ 453 
+ 454 extern "C" JNIEXPORT int
+ 455 JVM_handle_bsd_signal(int sig,
+ 456                         siginfo_t* info,
+ 457                         void* ucVoid,
+ 458                         int abort_if_unrecognized) {
+ 459   ucontext_t* uc = (ucontext_t*) ucVoid;
+ 460 
+ 461   Thread* t = Thread::current_or_null_safe();
+ 462 
+ 463   // Must do this before SignalHandlerMark, if crash protection installed we will longjmp away
+ 464   // (no destructors can be run)
+ 465   os::WatcherThreadCrashProtection::check_crash_protection(sig, t);
+ 466 
+ 467   SignalHandlerMark shm(t);
+ 468 
+ 469   // Note: it's not uncommon that JNI code uses signal/sigset to install
+ 470   // then restore certain signal handler (e.g. to temporarily block SIGPIPE,
+ 471   // or have a SIGILL handler when detecting CPU type). When that happens,
+ 472   // JVM_handle_bsd_signal() might be invoked with junk info/ucVoid. To
+ 473   // avoid unnecessary crash when libjsig is not preloaded, try handle signals
+ 474   // that do not require siginfo/ucontext first.
+ 475 
+ 476   if (sig == SIGPIPE || sig == SIGXFSZ) {
+ 477     // allow chained handler to go first
+ 478     if (os::Bsd::chained_handler(sig, info, ucVoid)) {
+ 479       return true;
+ 480     } else {
+ 481       // Ignoring SIGPIPE/SIGXFSZ - see bugs 4229104 or 6499219
+ 482       return true;
+ 483     }
+ 484   }
+ 485 
+ 486   JavaThread* thread = NULL;
+ 487   VMThread* vmthread = NULL;
+ 488   if (os::Bsd::signal_handlers_are_installed) {
+ 489     if (t != NULL ){
+ 490       if(t-&gt;is_Java_thread()) {
+ 491         thread = (JavaThread*)t;
+ 492       }
+ 493       else if(t-&gt;is_VM_thread()){
+ 494         vmthread = (VMThread *)t;
+ 495       }
+ 496     }
+ 497   }
+ 498 /*
+ 499   NOTE: does not seem to work on bsd.
+ 500   if (info == NULL || info-&gt;si_code &lt;= 0 || info-&gt;si_code == SI_NOINFO) {
+ 501     // can't decode this kind of signal
+ 502     info = NULL;
+ 503   } else {
+ 504     assert(sig == info-&gt;si_signo, "bad siginfo");
+ 505   }
+ 506 */
+ 507   // decide if this trap can be handled by a stub
+ 508   address stub = NULL;
+ 509 
+ 510   address pc          = NULL;
+ 511 
+ 512   //%note os_trap_1
+ 513   if (info != NULL &amp;&amp; uc != NULL &amp;&amp; thread != NULL) {
+ 514     pc = (address) os::Bsd::ucontext_get_pc(uc);
+ 515 
+ 516     if (StubRoutines::is_safefetch_fault(pc)) {
+ 517       os::Bsd::ucontext_set_pc(uc, StubRoutines::continuation_for_safefetch_fault(pc));
+ 518       return 1;
+ 519     }
+ 520 
+ 521     // Handle ALL stack overflow variations here
+ 522     if (sig == SIGSEGV || sig == SIGBUS) {
+ 523       address addr = (address) info-&gt;si_addr;
+ 524 
+ 525       // check if fault address is within thread stack
+ 526       if (thread-&gt;on_local_stack(addr)) {
+ 527         // stack overflow
+ 528         if (thread-&gt;in_stack_yellow_reserved_zone(addr)) {
+ 529           if (thread-&gt;thread_state() == _thread_in_Java) {
+ 530             if (thread-&gt;in_stack_reserved_zone(addr)) {
+ 531               frame fr;
+ 532               if (os::Bsd::get_frame_at_stack_banging_point(thread, uc, &amp;fr)) {
+ 533                 assert(fr.is_java_frame(), "Must be a Java frame");
+ 534                 frame activation = SharedRuntime::look_for_reserved_stack_annotated_method(thread, fr);
+ 535                 if (activation.sp() != NULL) {
+ 536                   thread-&gt;disable_stack_reserved_zone();
+ 537                   if (activation.is_interpreted_frame()) {
+ 538                     thread-&gt;set_reserved_stack_activation((address)(
+ 539                       activation.fp() + frame::interpreter_frame_initial_sp_offset));
+ 540                   } else {
+ 541                     thread-&gt;set_reserved_stack_activation((address)activation.unextended_sp());
+ 542                   }
+ 543                   return 1;
+ 544                 }
+ 545               }
+ 546             }
+ 547             // Throw a stack overflow exception.  Guard pages will be reenabled
+ 548             // while unwinding the stack.
+ 549             thread-&gt;disable_stack_yellow_reserved_zone();
+ 550             stub = SharedRuntime::continuation_for_implicit_exception(thread, pc, SharedRuntime::STACK_OVERFLOW);
+ 551           } else {
+ 552             // Thread was in the vm or native code.  Return and try to finish.
+ 553             thread-&gt;disable_stack_yellow_reserved_zone();
+ 554             return 1;
+ 555           }
+ 556         } else if (thread-&gt;in_stack_red_zone(addr)) {
+ 557           // Fatal red zone violation.  Disable the guard pages and fall through
+ 558           // to handle_unexpected_exception way down below.
+ 559           thread-&gt;disable_stack_red_zone();
+ 560           tty-&gt;print_raw_cr("An irrecoverable stack overflow has occurred.");
+ 561         }
+ 562       }
+ 563     }
+ 564 
+ 565     if ((sig == SIGSEGV || sig == SIGBUS) &amp;&amp; VM_Version::is_cpuinfo_segv_addr(pc)) {
+ 566       // Verify that OS save/restore AVX registers.
+ 567       stub = VM_Version::cpuinfo_cont_addr();
+ 568     }
+ 569 
+ 570     // We test if stub is already set (by the stack overflow code
+ 571     // above) so it is not overwritten by the code that follows. This
+ 572     // check is not required on other platforms, because on other
+ 573     // platforms we check for SIGSEGV only or SIGBUS only, where here
+ 574     // we have to check for both SIGSEGV and SIGBUS.
+ 575     if (thread-&gt;thread_state() == _thread_in_Java &amp;&amp; stub == NULL) {
+ 576       // Java thread running in Java code =&gt; find exception handler if any
+ 577       // a fault inside compiled code, the interpreter, or a stub
+ 578 
+ 579       if ((sig == SIGSEGV || sig == SIGBUS) &amp;&amp; os::is_poll_address((address)info-&gt;si_addr)) {
+ 580         stub = SharedRuntime::get_poll_stub(pc);
+ 581 #if defined(__APPLE__)
+ 582       // 32-bit Darwin reports a SIGBUS for nearly all memory access exceptions.
+ 583       // 64-bit Darwin may also use a SIGBUS (seen with compressed oops).
+ 584       // Catching SIGBUS here prevents the implicit SIGBUS NULL check below from
+ 585       // being called, so only do so if the implicit NULL check is not necessary.
+ 586       } else if (sig == SIGBUS &amp;&amp; MacroAssembler::needs_explicit_null_check((intptr_t)info-&gt;si_addr)) {
+ 587 #else
+ 588       } else if (sig == SIGBUS /* &amp;&amp; info-&gt;si_code == BUS_OBJERR */) {
+ 589 #endif
+ 590         // BugId 4454115: A read from a MappedByteBuffer can fault
+ 591         // here if the underlying file has been truncated.
+ 592         // Do not crash the VM in such a case.
+ 593         CodeBlob* cb = CodeCache::find_blob_unsafe(pc);
+ 594         CompiledMethod* nm = (cb != NULL) ? cb-&gt;as_compiled_method_or_null() : NULL;
+ 595         if (nm != NULL &amp;&amp; nm-&gt;has_unsafe_access()) {
+ 596           address next_pc = Assembler::locate_next_instruction(pc);
+ 597           stub = SharedRuntime::handle_unsafe_access(thread, next_pc);
+ 598         }
+ 599       }
+ 600       else
+ 601 
+ 602 #ifdef AMD64
+ 603       if (sig == SIGFPE  &amp;&amp;
+ 604           (info-&gt;si_code == FPE_INTDIV || info-&gt;si_code == FPE_FLTDIV)) {
+ 605         stub =
+ 606           SharedRuntime::
+ 607           continuation_for_implicit_exception(thread,
+ 608                                               pc,
+ 609                                               SharedRuntime::
+ 610                                               IMPLICIT_DIVIDE_BY_ZERO);
+ 611 #ifdef __APPLE__
+ 612       } else if (sig == SIGFPE &amp;&amp; info-&gt;si_code == FPE_NOOP) {
+ 613         int op = pc[0];
+ 614 
+ 615         // Skip REX
+ 616         if ((pc[0] &amp; 0xf0) == 0x40) {
+ 617           op = pc[1];
+ 618         } else {
+ 619           op = pc[0];
+ 620         }
+ 621 
+ 622         // Check for IDIV
+ 623         if (op == 0xF7) {
+ 624           stub = SharedRuntime::continuation_for_implicit_exception(thread, pc, SharedRuntime:: IMPLICIT_DIVIDE_BY_ZERO);
+ 625         } else {
+ 626           // TODO: handle more cases if we are using other x86 instructions
+ 627           //   that can generate SIGFPE signal.
+ 628           tty-&gt;print_cr("unknown opcode 0x%X with SIGFPE.", op);
+ 629           fatal("please update this code.");
+ 630         }
+ 631 #endif /* __APPLE__ */
+ 632 
+ 633 #else
+ 634       if (sig == SIGFPE /* &amp;&amp; info-&gt;si_code == FPE_INTDIV */) {
+ 635         // HACK: si_code does not work on bsd 2.2.12-20!!!
+ 636         int op = pc[0];
+ 637         if (op == 0xDB) {
+ 638           // FIST
+ 639           // TODO: The encoding of D2I in i486.ad can cause an exception
+ 640           // prior to the fist instruction if there was an invalid operation
+ 641           // pending. We want to dismiss that exception. From the win_32
+ 642           // side it also seems that if it really was the fist causing
+ 643           // the exception that we do the d2i by hand with different
+ 644           // rounding. Seems kind of weird.
+ 645           // NOTE: that we take the exception at the NEXT floating point instruction.
+ 646           assert(pc[0] == 0xDB, "not a FIST opcode");
+ 647           assert(pc[1] == 0x14, "not a FIST opcode");
+ 648           assert(pc[2] == 0x24, "not a FIST opcode");
+ 649           return true;
+ 650         } else if (op == 0xF7) {
+ 651           // IDIV
+ 652           stub = SharedRuntime::continuation_for_implicit_exception(thread, pc, SharedRuntime::IMPLICIT_DIVIDE_BY_ZERO);
+ 653         } else {
+ 654           // TODO: handle more cases if we are using other x86 instructions
+ 655           //   that can generate SIGFPE signal on bsd.
+ 656           tty-&gt;print_cr("unknown opcode 0x%X with SIGFPE.", op);
+ 657           fatal("please update this code.");
+ 658         }
+ 659 #endif // AMD64
+ 660       } else if ((sig == SIGSEGV || sig == SIGBUS) &amp;&amp;
+ 661                !MacroAssembler::needs_explicit_null_check((intptr_t)info-&gt;si_addr)) {
+ 662           // Determination of interpreter/vtable stub/compiled code null exception
+ 663           stub = SharedRuntime::continuation_for_implicit_exception(thread, pc, SharedRuntime::IMPLICIT_NULL);
+ 664       }
+ 665     } else if (thread-&gt;thread_state() == _thread_in_vm &amp;&amp;
+ 666                sig == SIGBUS &amp;&amp; /* info-&gt;si_code == BUS_OBJERR &amp;&amp; */
+ 667                thread-&gt;doing_unsafe_access()) {
+ 668         address next_pc = Assembler::locate_next_instruction(pc);
+ 669         stub = SharedRuntime::handle_unsafe_access(thread, next_pc);
+ 670     }
+ 671 
+ 672     // jni_fast_Get&lt;Primitive&gt;Field can trap at certain pc's if a GC kicks in
+ 673     // and the heap gets shrunk before the field access.
+ 674     if ((sig == SIGSEGV) || (sig == SIGBUS)) {
+ 675       address addr = JNI_FastGetField::find_slowcase_pc(pc);
+ 676       if (addr != (address)-1) {
+ 677         stub = addr;
+ 678       }
+ 679     }
+ 680 
+ 681     // Check to see if we caught the safepoint code in the
+ 682     // process of write protecting the memory serialization page.
+ 683     // It write enables the page immediately after protecting it
+ 684     // so we can just return to retry the write.
+ 685     if ((sig == SIGSEGV || sig == SIGBUS) &amp;&amp;
+ 686         os::is_memory_serialize_page(thread, (address) info-&gt;si_addr)) {
+ 687       // Block current thread until the memory serialize page permission restored.
+ 688       os::block_on_serialize_page_trap();
+ 689       return true;
+ 690     }
+ 691   }
+ 692 
+ 693 #ifndef AMD64
+ 694   // Execution protection violation
+ 695   //
+ 696   // This should be kept as the last step in the triage.  We don't
+ 697   // have a dedicated trap number for a no-execute fault, so be
+ 698   // conservative and allow other handlers the first shot.
+ 699   //
+ 700   // Note: We don't test that info-&gt;si_code == SEGV_ACCERR here.
+ 701   // this si_code is so generic that it is almost meaningless; and
+ 702   // the si_code for this condition may change in the future.
+ 703   // Furthermore, a false-positive should be harmless.
+ 704   if (UnguardOnExecutionViolation &gt; 0 &amp;&amp;
+ 705       (sig == SIGSEGV || sig == SIGBUS) &amp;&amp;
+ 706       uc-&gt;context_trapno == trap_page_fault) {
+ 707     int page_size = os::vm_page_size();
+ 708     address addr = (address) info-&gt;si_addr;
+ 709     address pc = os::Bsd::ucontext_get_pc(uc);
+ 710     // Make sure the pc and the faulting address are sane.
+ 711     //
+ 712     // If an instruction spans a page boundary, and the page containing
+ 713     // the beginning of the instruction is executable but the following
+ 714     // page is not, the pc and the faulting address might be slightly
+ 715     // different - we still want to unguard the 2nd page in this case.
+ 716     //
+ 717     // 15 bytes seems to be a (very) safe value for max instruction size.
+ 718     bool pc_is_near_addr =
+ 719       (pointer_delta((void*) addr, (void*) pc, sizeof(char)) &lt; 15);
+ 720     bool instr_spans_page_boundary =
+ 721       (align_size_down((intptr_t) pc ^ (intptr_t) addr,
+ 722                        (intptr_t) page_size) &gt; 0);
+ 723 
+ 724     if (pc == addr || (pc_is_near_addr &amp;&amp; instr_spans_page_boundary)) {
+ 725       static volatile address last_addr =
+ 726         (address) os::non_memory_address_word();
+ 727 
+ 728       // In conservative mode, don't unguard unless the address is in the VM
+ 729       if (addr != last_addr &amp;&amp;
+ 730           (UnguardOnExecutionViolation &gt; 1 || os::address_is_in_vm(addr))) {
+ 731 
+ 732         // Set memory to RWX and retry
+ 733         address page_start =
+ 734           (address) align_size_down((intptr_t) addr, (intptr_t) page_size);
+ 735         bool res = os::protect_memory((char*) page_start, page_size,
+ 736                                       os::MEM_PROT_RWX);
+ 737 
+ 738         log_debug(os)("Execution protection violation "
+ 739                       "at " INTPTR_FORMAT
+ 740                       ", unguarding " INTPTR_FORMAT ": %s, errno=%d", p2i(addr),
+ 741                       p2i(page_start), (res ? "success" : "failed"), errno);
+ 742         stub = pc;
+ 743 
+ 744         // Set last_addr so if we fault again at the same address, we don't end
+ 745         // up in an endless loop.
+ 746         //
+ 747         // There are two potential complications here.  Two threads trapping at
+ 748         // the same address at the same time could cause one of the threads to
+ 749         // think it already unguarded, and abort the VM.  Likely very rare.
+ 750         //
+ 751         // The other race involves two threads alternately trapping at
+ 752         // different addresses and failing to unguard the page, resulting in
+ 753         // an endless loop.  This condition is probably even more unlikely than
+ 754         // the first.
+ 755         //
+ 756         // Although both cases could be avoided by using locks or thread local
+ 757         // last_addr, these solutions are unnecessary complication: this
+ 758         // handler is a best-effort safety net, not a complete solution.  It is
+ 759         // disabled by default and should only be used as a workaround in case
+ 760         // we missed any no-execute-unsafe VM code.
+ 761 
+ 762         last_addr = addr;
+ 763       }
+ 764     }
+ 765   }
+ 766 #endif // !AMD64
+ 767 
+ 768   if (stub != NULL) {
+ 769     // save all thread context in case we need to restore it
+ 770     if (thread != NULL) thread-&gt;set_saved_exception_pc(pc);
+ 771 
+ 772     os::Bsd::ucontext_set_pc(uc, stub);
+ 773     return true;
+ 774   }
+ 775 
+ 776   // signal-chaining
+ 777   if (os::Bsd::chained_handler(sig, info, ucVoid)) {
+ 778      return true;
+ 779   }
+ 780 
+ 781   if (!abort_if_unrecognized) {
+ 782     // caller wants another chance, so give it to him
+ 783     return false;
+ 784   }
+ 785 
+ 786   if (pc == NULL &amp;&amp; uc != NULL) {
+ 787     pc = os::Bsd::ucontext_get_pc(uc);
+ 788   }
+ 789 
+ 790   // unmask current signal
+ 791   sigset_t newset;
+ 792   sigemptyset(&amp;newset);
+ 793   sigaddset(&amp;newset, sig);
+ 794   sigprocmask(SIG_UNBLOCK, &amp;newset, NULL);
+ 795 
+ 796   VMError::report_and_die(t, sig, pc, info, ucVoid);
+ 797 
+ 798   ShouldNotReachHere();
+ 799   return false;
+ 800 }
+ 801 
+ 802 // From solaris_i486.s ported to bsd_i486.s
+ 803 extern "C" void fixcw();
+ 804 
+ 805 void os::Bsd::init_thread_fpu_state(void) {
+ 806 #ifndef AMD64
+ 807   // Set fpu to 53 bit precision. This happens too early to use a stub.
+ 808   fixcw();
+ 809 #endif // !AMD64
+ 810 }
+ 811 
+ 812 
+ 813 // Check that the bsd kernel version is 2.4 or higher since earlier
+ 814 // versions do not support SSE without patches.
+ 815 bool os::supports_sse() {
+ 816   return true;
+ 817 }
+ 818 
+ 819 bool os::is_allocatable(size_t bytes) {
+ 820 #ifdef AMD64
+ 821   // unused on amd64?
+ 822   return true;
+ 823 #else
+ 824 
+ 825   if (bytes &lt; 2 * G) {
+ 826     return true;
+ 827   }
+ 828 
+ 829   char* addr = reserve_memory(bytes, NULL);
+ 830 
+ 831   if (addr != NULL) {
+ 832     release_memory(addr, bytes);
+ 833   }
+ 834 
+ 835   return addr != NULL;
+ 836 #endif // AMD64
+ 837 }
+ 838 
+ 839 ////////////////////////////////////////////////////////////////////////////////
+ 840 // thread stack
+ 841 
+ 842 #ifdef AMD64
+ 843 size_t os::Posix::_compiler_thread_min_stack_allowed = 64 * K;
+ 844 size_t os::Posix::_java_thread_min_stack_allowed = 64 * K;
+ 845 size_t os::Posix::_vm_internal_thread_min_stack_allowed = 64 * K;
+ 846 #else
+ 847 size_t os::Posix::_compiler_thread_min_stack_allowed = (48 DEBUG_ONLY(+ 4)) * K;
+ 848 size_t os::Posix::_java_thread_min_stack_allowed = (48 DEBUG_ONLY(+ 4)) * K;
+ 849 size_t os::Posix::_vm_internal_thread_min_stack_allowed = (48 DEBUG_ONLY(+ 4)) * K;
+ 850 
+ 851 #ifdef __GNUC__
+ 852 #define GET_GS() ({int gs; __asm__ volatile("movw %%gs, %w0":"=q"(gs)); gs&amp;0xffff;})
+ 853 #endif
+ 854 
+ 855 #endif // AMD64
+ 856 
+ 857 // return default stack size for thr_type
+ 858 size_t os::Posix::default_stack_size(os::ThreadType thr_type) {
+ 859   // default stack size (compiler thread needs larger stack)
+ 860 #ifdef AMD64
+ 861   size_t s = (thr_type == os::compiler_thread ? 4 * M : 1 * M);
+ 862 #else
+ 863   size_t s = (thr_type == os::compiler_thread ? 2 * M : 512 * K);
+ 864 #endif // AMD64
+ 865   return s;
+ 866 }
+ 867 
+ 868 
+ 869 // Java thread:
+ 870 //
+ 871 //   Low memory addresses
+ 872 //    +------------------------+
+ 873 //    |                        |\  JavaThread created by VM does not have glibc
+ 874 //    |    glibc guard page    | - guard, attached Java thread usually has
+ 875 //    |                        |/  1 page glibc guard.
+ 876 // P1 +------------------------+ Thread::stack_base() - Thread::stack_size()
+ 877 //    |                        |\
+ 878 //    |  HotSpot Guard Pages   | - red and yellow pages
+ 879 //    |                        |/
+ 880 //    +------------------------+ JavaThread::stack_yellow_zone_base()
+ 881 //    |                        |\
+ 882 //    |      Normal Stack      | -
+ 883 //    |                        |/
+ 884 // P2 +------------------------+ Thread::stack_base()
+ 885 //
+ 886 // Non-Java thread:
+ 887 //
+ 888 //   Low memory addresses
+ 889 //    +------------------------+
+ 890 //    |                        |\
+ 891 //    |  glibc guard page      | - usually 1 page
+ 892 //    |                        |/
+ 893 // P1 +------------------------+ Thread::stack_base() - Thread::stack_size()
+ 894 //    |                        |\
+ 895 //    |      Normal Stack      | -
+ 896 //    |                        |/
+ 897 // P2 +------------------------+ Thread::stack_base()
+ 898 //
+ 899 // ** P1 (aka bottom) and size ( P2 = P1 - size) are the address and stack size returned from
+ 900 //    pthread_attr_getstack()
+ 901 
+ 902 static void current_stack_region(address * bottom, size_t * size) {
+ 903 #ifdef __APPLE__
+ 904   pthread_t self = pthread_self();
+ 905   void *stacktop = pthread_get_stackaddr_np(self);
+ 906   *size = pthread_get_stacksize_np(self);
+ 907   // workaround for OS X 10.9.0 (Mavericks)
+ 908   // pthread_get_stacksize_np returns 128 pages even though the actual size is 2048 pages
+ 909   if (pthread_main_np() == 1) {
+ 910     if ((*size) &lt; (DEFAULT_MAIN_THREAD_STACK_PAGES * (size_t)getpagesize())) {
+ 911       char kern_osrelease[256];
+ 912       size_t kern_osrelease_size = sizeof(kern_osrelease);
+ 913       int ret = sysctlbyname("kern.osrelease", kern_osrelease, &amp;kern_osrelease_size, NULL, 0);
+ 914       if (ret == 0) {
+ 915         // get the major number, atoi will ignore the minor amd micro portions of the version string
+ 916         if (atoi(kern_osrelease) &gt;= OS_X_10_9_0_KERNEL_MAJOR_VERSION) {
+ 917           *size = (DEFAULT_MAIN_THREAD_STACK_PAGES*getpagesize());
+ 918         }
+ 919       }
+ 920     }
+ 921   }
+ 922   *bottom = (address) stacktop - *size;
+ 923 #elif defined(__OpenBSD__)
+ 924   stack_t ss;
+ 925   int rslt = pthread_stackseg_np(pthread_self(), &amp;ss);
+ 926 
+ 927   if (rslt != 0)
+ 928     fatal("pthread_stackseg_np failed with err = %d", rslt);
+ 929 
+ 930   *bottom = (address)((char *)ss.ss_sp - ss.ss_size);
+ 931   *size   = ss.ss_size;
+ 932 #else
+ 933   pthread_attr_t attr;
+ 934 
+ 935   int rslt = pthread_attr_init(&amp;attr);
+ 936 
+ 937   // JVM needs to know exact stack location, abort if it fails
+ 938   if (rslt != 0)
+ 939     fatal("pthread_attr_init failed with err = %d", rslt);
+ 940 
+ 941   rslt = pthread_attr_get_np(pthread_self(), &amp;attr);
+ 942 
+ 943   if (rslt != 0)
+ 944     fatal("pthread_attr_get_np failed with err = %d", rslt);
+ 945 
+ 946   if (pthread_attr_getstackaddr(&amp;attr, (void **)bottom) != 0 ||
+ 947     pthread_attr_getstacksize(&amp;attr, size) != 0) {
+ 948     fatal("Can not locate current stack attributes!");
+ 949   }
+ 950 
+ 951   pthread_attr_destroy(&amp;attr);
+ 952 #endif
+ 953   assert(os::current_stack_pointer() &gt;= *bottom &amp;&amp;
+ 954          os::current_stack_pointer() &lt; *bottom + *size, "just checking");
+ 955 }
+ 956 
+ 957 address os::current_stack_base() {
+ 958   address bottom;
+ 959   size_t size;
+ 960   current_stack_region(&amp;bottom, &amp;size);
+ 961   return (bottom + size);
+ 962 }
+ 963 
+ 964 size_t os::current_stack_size() {
+ 965   // stack size includes normal stack and HotSpot guard pages
+ 966   address bottom;
+ 967   size_t size;
+ 968   current_stack_region(&amp;bottom, &amp;size);
+ 969   return size;
+ 970 }
+ 971 
+ 972 /////////////////////////////////////////////////////////////////////////////
+ 973 // helper functions for fatal error handler
+ 974 
+ 975 void os::print_context(outputStream *st, const void *context) {
+ 976   if (context == NULL) return;
+ 977 
+ 978   const ucontext_t *uc = (const ucontext_t*)context;
+ 979   st-&gt;print_cr("Registers:");
+ 980 #ifdef AMD64
+ 981   st-&gt;print(  "RAX=" INTPTR_FORMAT, uc-&gt;context_rax);
+ 982   st-&gt;print(", RBX=" INTPTR_FORMAT, uc-&gt;context_rbx);
+ 983   st-&gt;print(", RCX=" INTPTR_FORMAT, uc-&gt;context_rcx);
+ 984   st-&gt;print(", RDX=" INTPTR_FORMAT, uc-&gt;context_rdx);
+ 985   st-&gt;cr();
+ 986   st-&gt;print(  "RSP=" INTPTR_FORMAT, uc-&gt;context_rsp);
+ 987   st-&gt;print(", RBP=" INTPTR_FORMAT, uc-&gt;context_rbp);
+ 988   st-&gt;print(", RSI=" INTPTR_FORMAT, uc-&gt;context_rsi);
+ 989   st-&gt;print(", RDI=" INTPTR_FORMAT, uc-&gt;context_rdi);
+ 990   st-&gt;cr();
+ 991   st-&gt;print(  "R8 =" INTPTR_FORMAT, uc-&gt;context_r8);
+ 992   st-&gt;print(", R9 =" INTPTR_FORMAT, uc-&gt;context_r9);
+ 993   st-&gt;print(", R10=" INTPTR_FORMAT, uc-&gt;context_r10);
+ 994   st-&gt;print(", R11=" INTPTR_FORMAT, uc-&gt;context_r11);
+ 995   st-&gt;cr();
+ 996   st-&gt;print(  "R12=" INTPTR_FORMAT, uc-&gt;context_r12);
+ 997   st-&gt;print(", R13=" INTPTR_FORMAT, uc-&gt;context_r13);
+ 998   st-&gt;print(", R14=" INTPTR_FORMAT, uc-&gt;context_r14);
+ 999   st-&gt;print(", R15=" INTPTR_FORMAT, uc-&gt;context_r15);
+1000   st-&gt;cr();
+1001   st-&gt;print(  "RIP=" INTPTR_FORMAT, uc-&gt;context_rip);
+1002   st-&gt;print(", EFLAGS=" INTPTR_FORMAT, uc-&gt;context_flags);
+1003   st-&gt;print(", ERR=" INTPTR_FORMAT, uc-&gt;context_err);
+1004   st-&gt;cr();
+1005   st-&gt;print("  TRAPNO=" INTPTR_FORMAT, uc-&gt;context_trapno);
+1006 #else
+1007   st-&gt;print(  "EAX=" INTPTR_FORMAT, uc-&gt;context_eax);
+1008   st-&gt;print(", EBX=" INTPTR_FORMAT, uc-&gt;context_ebx);
+1009   st-&gt;print(", ECX=" INTPTR_FORMAT, uc-&gt;context_ecx);
+1010   st-&gt;print(", EDX=" INTPTR_FORMAT, uc-&gt;context_edx);
+1011   st-&gt;cr();
+1012   st-&gt;print(  "ESP=" INTPTR_FORMAT, uc-&gt;context_esp);
+1013   st-&gt;print(", EBP=" INTPTR_FORMAT, uc-&gt;context_ebp);
+1014   st-&gt;print(", ESI=" INTPTR_FORMAT, uc-&gt;context_esi);
+1015   st-&gt;print(", EDI=" INTPTR_FORMAT, uc-&gt;context_edi);
+1016   st-&gt;cr();
+1017   st-&gt;print(  "EIP=" INTPTR_FORMAT, uc-&gt;context_eip);
+1018   st-&gt;print(", EFLAGS=" INTPTR_FORMAT, uc-&gt;context_eflags);
+1019 #endif // AMD64
+1020   st-&gt;cr();
+1021   st-&gt;cr();
+1022 
+1023   intptr_t *sp = (intptr_t *)os::Bsd::ucontext_get_sp(uc);
+1024   st-&gt;print_cr("Top of Stack: (sp=" PTR_FORMAT ")", sp);
+1025   print_hex_dump(st, (address)sp, (address)(sp + 8*sizeof(intptr_t)), sizeof(intptr_t));
+1026   st-&gt;cr();
+1027 
+1028   // Note: it may be unsafe to inspect memory near pc. For example, pc may
+1029   // point to garbage if entry point in an nmethod is corrupted. Leave
+1030   // this at the end, and hope for the best.
+1031   address pc = os::Bsd::ucontext_get_pc(uc);
+1032   st-&gt;print_cr("Instructions: (pc=" PTR_FORMAT ")", pc);
+1033   print_hex_dump(st, pc - 32, pc + 32, sizeof(char));
+1034 }
+1035 
+1036 void os::print_register_info(outputStream *st, const void *context) {
+1037   if (context == NULL) return;
+1038 
+1039   const ucontext_t *uc = (const ucontext_t*)context;
+1040 
+1041   st-&gt;print_cr("Register to memory mapping:");
+1042   st-&gt;cr();
+1043 
+1044   // this is horrendously verbose but the layout of the registers in the
+1045   // context does not match how we defined our abstract Register set, so
+1046   // we can't just iterate through the gregs area
+1047 
+1048   // this is only for the "general purpose" registers
+1049 
+1050 #ifdef AMD64
+1051   st-&gt;print("RAX="); print_location(st, uc-&gt;context_rax);
+1052   st-&gt;print("RBX="); print_location(st, uc-&gt;context_rbx);
+1053   st-&gt;print("RCX="); print_location(st, uc-&gt;context_rcx);
+1054   st-&gt;print("RDX="); print_location(st, uc-&gt;context_rdx);
+1055   st-&gt;print("RSP="); print_location(st, uc-&gt;context_rsp);
+1056   st-&gt;print("RBP="); print_location(st, uc-&gt;context_rbp);
+1057   st-&gt;print("RSI="); print_location(st, uc-&gt;context_rsi);
+1058   st-&gt;print("RDI="); print_location(st, uc-&gt;context_rdi);
+1059   st-&gt;print("R8 ="); print_location(st, uc-&gt;context_r8);
+1060   st-&gt;print("R9 ="); print_location(st, uc-&gt;context_r9);
+1061   st-&gt;print("R10="); print_location(st, uc-&gt;context_r10);
+1062   st-&gt;print("R11="); print_location(st, uc-&gt;context_r11);
+1063   st-&gt;print("R12="); print_location(st, uc-&gt;context_r12);
+1064   st-&gt;print("R13="); print_location(st, uc-&gt;context_r13);
+1065   st-&gt;print("R14="); print_location(st, uc-&gt;context_r14);
+1066   st-&gt;print("R15="); print_location(st, uc-&gt;context_r15);
+1067 #else
+1068   st-&gt;print("EAX="); print_location(st, uc-&gt;context_eax);
+1069   st-&gt;print("EBX="); print_location(st, uc-&gt;context_ebx);
+1070   st-&gt;print("ECX="); print_location(st, uc-&gt;context_ecx);
+1071   st-&gt;print("EDX="); print_location(st, uc-&gt;context_edx);
+1072   st-&gt;print("ESP="); print_location(st, uc-&gt;context_esp);
+1073   st-&gt;print("EBP="); print_location(st, uc-&gt;context_ebp);
+1074   st-&gt;print("ESI="); print_location(st, uc-&gt;context_esi);
+1075   st-&gt;print("EDI="); print_location(st, uc-&gt;context_edi);
+1076 #endif // AMD64
+1077 
+1078   st-&gt;cr();
+1079 }
+1080 
+1081 void os::setup_fpu() {
+1082 #ifndef AMD64
+1083   address fpu_cntrl = StubRoutines::addr_fpu_cntrl_wrd_std();
+1084   __asm__ volatile (  "fldcw (%0)" :
+1085                       : "r" (fpu_cntrl) : "memory");
+1086 #endif // !AMD64
+1087 }
+1088 
+1089 #ifndef PRODUCT
+1090 void os::verify_stack_alignment() {
+1091 }
+1092 #endif
+1093 
+1094 int os::extra_bang_size_in_bytes() {
+1095   // JDK-8050147 requires the full cache line bang for x86.
+1096   return VM_Version::L1_line_size();
+1097 }
+<a name="3" id="anc3"></a><b style="font-size: large; color: red">--- EOF ---</b>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</pre><form name="eof"><input name="value" value="3" type="hidden" /></form></body></html>

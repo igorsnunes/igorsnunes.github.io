@@ -1,0 +1,351 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+    <script type="text/javascript" src="../ancnav.js"></script>
+    </head>
+    <body id="SUNWwebrev" onkeypress="keypress(event);">
+    <a name="0"></a>
+    <pre></pre><hr></hr>
+<pre>
+   1 #!echo "This is not a shell script"
+   2 #############################################################################
+   3 # 
+   4 # Copyright (c) 2006, 2007, Oracle and/or its affiliates. All rights reserved.
+   5 # DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+   6 #
+   7 # This code is free software; you can redistribute it and/or modify it
+   8 # under the terms of the GNU General Public License version 2 only, as
+   9 # published by the Free Software Foundation.
+  10 #
+  11 # This code is distributed in the hope that it will be useful, but WITHOUT
+  12 # ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+  13 # FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+  14 # version 2 for more details (a copy is included in the LICENSE file that
+  15 # accompanied this code).
+  16 #
+  17 # You should have received a copy of the GNU General Public License version
+  18 # 2 along with this work; if not, write to the Free Software Foundation,
+  19 # Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+  20 #
+  21 # Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+  22 # or visit www.oracle.com if you need additional information or have any
+  23 # questions.
+  24 # 
+  25 #############################################################################
+  26 
+  27 #############################################################################
+  28 #
+  29 # JPRT shell configuration for testing.
+  30 #
+  31 # Input environment variables:
+  32 #    Windows Only:
+  33 #      PATH
+  34 #      ROOTDIR
+  35 #
+  36 # Output variable settings:
+  37 #    make    Full path to GNU make
+  38 #
+  39 # Output environment variables:
+  40 #    PATH
+  41 #
+  42 #############################################################################
+  43 
+  44 #############################################################################
+  45 # Error
+  46 error() # message
+  47 {
+  48   echo "ERROR: $1"
+  49   exit 6
+  50 }
+  51 # Directory must exist
+  52 dirMustExist() # dir name
+  53 {
+  54   if [ ! -d "$1" ] ; then
+  55     error "Directory for $2 does not exist: $1"
+  56   fi
+  57 }
+  58 # File must exist
+  59 fileMustExist() # dir name
+  60 {
+  61   if [ ! -f "$1" ] ; then
+  62     error "File for $2 does not exist: $1"
+  63   fi
+  64 }
+  65 #############################################################################
+  66 
+  67 # Should be set by JPRT as the 3 basic inputs
+  68 slashjava="${ALT_SLASH_JAVA}"
+  69 if [ "${slashjava}" = "" ] ; then
+  70   slashjava=/java
+  71 fi
+  72 
+  73 # Check input
+  74 dirMustExist "${slashjava}"  ALT_SLASH_JAVA
+  75 
+  76 # Uses 'uname -s', but only expect SunOS or Linux, assume Windows otherwise.
+  77 osname=`uname -s`
+  78 case "${osname}" in
+  79   SunOS )
+  80     # SOLARIS: Sparc or X86
+  81     osarch=`uname -p`
+  82     if [ "${osarch}" = sparc ] ; then
+  83         solaris_arch=sparc
+  84     else
+  85         solaris_arch=i386
+  86     fi
+  87 
+  88     # Add basic solaris system paths
+<a name="1" id="anc1"></a><span class="changed">  89     path4sdk=/usr/bin</span>
+  90 
+  91     # Find GNU make
+<a name="2" id="anc2"></a><span class="changed">  92     make=/usr/bin/gmake</span>
+  93     if [ ! -f ${make} ] ; then
+<a name="3" id="anc3"></a><span class="changed">  94         make=/usr/gnu/bin/make</span>
+  95         if [ ! -f ${make} ] ; then
+  96             make=${slashjava}/devtools/${solaris_arch}/bin/gnumake
+  97         fi 
+  98     fi
+  99     fileMustExist "${make}" make
+ 100 
+ 101     # File creation mask
+ 102     umask 002
+ 103     ;;
+ 104 
+ 105   Linux | Darwin )
+ 106     # Add basic paths
+ 107     path4sdk=/usr/bin:/bin:/usr/sbin:/sbin
+ 108 
+ 109     # Find GNU make
+ 110     make=/usr/bin/make
+ 111     fileMustExist "${make}" make
+ 112 
+ 113     umask 002
+ 114     ;;
+ 115 
+ 116   FreeBSD | OpenBSD )
+ 117     # Add basic paths
+ 118     path4sdk=/usr/bin:/bin:/usr/sbin:/sbin
+ 119 
+ 120     # Find GNU make
+ 121     make=/usr/local/bin/gmake
+ 122     fileMustExist "${make}" make
+ 123 
+ 124     umask 002
+ 125     ;;
+ 126 
+ 127   NetBSD )
+ 128     # Add basic paths
+ 129     path4sdk=/usr/bin:/bin:/usr/sbin:/sbin
+ 130 
+ 131     # Find GNU make
+ 132     make=/usr/pkg/bin/gmake
+ 133     fileMustExist "${make}" make
+ 134 
+ 135     umask 002
+ 136     ;;
+ 137 
+ 138   * )
+ 139     # Windows: Differs on CYGWIN vs. MKS.
+ 140    
+ 141     # We need to determine if we are running a CYGWIN shell or an MKS shell
+ 142     #    (if uname isn't available, then it will be unix_toolset=unknown)
+ 143     unix_toolset=unknown
+ 144     if [ "`uname -a | fgrep Cygwin`" = "" -a -d "${ROOTDIR}" ] ; then
+ 145         # We kind of assume ROOTDIR is where MKS is and it's ok
+ 146         unix_toolset=MKS
+ 147         mkshome=`dosname -s "${ROOTDIR}"`
+ 148         # Most unix utilities are in the mksnt directory of ROOTDIR
+ 149         unixcommand_path="${mkshome}/mksnt"
+ 150         path4sdk="${unixcommand_path}"
+ 151         devtools_path="${slashjava}/devtools/win32/bin"
+ 152         path4sdk="${devtools_path};${path4sdk}"
+ 153         # Find GNU make
+ 154         make="${devtools_path}/gnumake.exe"
+ 155         fileMustExist "${make}" make
+ 156     elif [ "`uname -a | fgrep Cygwin`" != "" -a -f /bin/cygpath ] ; then
+ 157         # For CYGWIN, uname will have "Cygwin" in it, and /bin/cygpath should exist
+ 158         unix_toolset=CYGWIN
+ 159         # Most unix utilities are in the /usr/bin
+ 160         unixcommand_path="/usr/bin"
+ 161         path4sdk="${unixcommand_path}"
+ 162         # Find GNU make
+ 163         make="${unixcommand_path}/make.exe"
+ 164         fileMustExist "${make}" make
+ 165     else
+ 166       echo "WARNING: Cannot figure out if this is MKS or CYGWIN"
+ 167     fi
+ 168 
+ 169     
+ 170     # For windows, it's hard to know where the system is, so we just add this
+ 171     #    to PATH.
+ 172     slash_path="`echo ${path4sdk} | sed -e 's@\\\\@/@g' -e 's@//@/@g' -e 's@/$@@' -e 's@/;@;@g'`"
+ 173     path4sdk="${slash_path};${PATH}"
+ 174     
+ 175     # Convert path4sdk to cygwin style
+ 176     if [ "${unix_toolset}" = CYGWIN ] ; then
+ 177         path4sdk="`/usr/bin/cygpath -p ${path4sdk}`"
+ 178     fi
+ 179     ;;
+ 180 esac
+ 181 
+ 182 # Export PATH setting
+ 183 PATH="${path4sdk}"
+ 184 export PATH
+ 185 
+<a name="4" id="anc4"></a><b style="font-size: large; color: red">--- EOF ---</b>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</pre><form name="eof"><input name="value" value="4" type="hidden" /></form></body></html>

@@ -1,0 +1,20 @@
+--- old/src/share/vm/gc/g1/heapRegionManager.hpp	2016-10-20 11:02:26.756093606 -0200
++++ new/src/share/vm/gc/g1/heapRegionManager.hpp	2016-10-20 11:02:26.692093670 -0200
+@@ -259,9 +259,9 @@
+ // The HeapRegionClaimer is used during parallel iteration over heap regions,
+ // allowing workers to claim heap regions, gaining exclusive rights to these regions.
+ class HeapRegionClaimer : public StackObj {
+-  uint  _n_workers;
+-  uint  _n_regions;
+-  uint* _claims;
++  uint           _n_workers;
++  uint           _n_regions;
++  volatile uint* _claims;
+ 
+   static const uint Unclaimed = 0;
+   static const uint Claimed   = 1;
+@@ -285,4 +285,3 @@
+   bool claim_region(uint region_index);
+ };
+ #endif // SHARE_VM_GC_G1_HEAPREGIONMANAGER_HPP
+-

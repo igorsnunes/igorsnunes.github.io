@@ -1,0 +1,395 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>hotspot Sdiff src/share/vm/gc/g1 </title>
+</head><body id="SUNWwebrev">
+<center><a href='../../../../../src/share/vm/gc/g1/g1RemSet.cpp.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../../index.html' target='_top'>index</a> <a href='../../../../../src/share/vm/gc/g1/heapRegion.hpp.sdiff.html' target='_top'>next &gt</a></center>
+<h2>src/share/vm/gc/g1/heapRegion.cpp</h2>
+<a class="print" href="javascript:print()">Print this page</a>
+<pre></pre>
+
+<table><tr valign="top">
+<td><pre>
+
+</pre><hr></hr><pre>
+ 335     _next_top_at_mark_start = top();
+ 336     _next_marked_bytes = 0;
+ 337   } else if (during_conc_mark) {
+ 338     // During concurrent mark, all objects in the CSet (including
+ 339     // the ones we find to be self-forwarded) are implicitly live.
+ 340     // So all objects need to be above NTAMS.
+ 341     _next_top_at_mark_start = bottom();
+ 342     _next_marked_bytes = 0;
+ 343   }
+ 344 }
+ 345 
+ 346 void HeapRegion::note_self_forwarding_removal_end(bool during_initial_mark,
+ 347                                                   bool during_conc_mark,
+ 348                                                   size_t marked_bytes) {
+ 349   assert(marked_bytes &lt;= used(),
+ 350          "marked: " SIZE_FORMAT " used: " SIZE_FORMAT, marked_bytes, used());
+ 351   _prev_top_at_mark_start = top();
+ 352   _prev_marked_bytes = marked_bytes;
+ 353 }
+ 354 
+<span class="changed"> 355 HeapWord*</span>
+<span class="changed"> 356 HeapRegion::</span>
+<span class="changed"> 357 oops_on_card_seq_iterate_careful(MemRegion mr,</span>
+ 358                                  FilterOutOfRegionClosure* cl,
+<span class="removed"> 359                                  bool filter_young,</span>
+ 360                                  jbyte* card_ptr) {
+<span class="removed"> 361   // Currently, we should only have to clean the card if filter_young</span>
+<span class="removed"> 362   // is true and vice versa.</span>
+<span class="removed"> 363   if (filter_young) {</span>
+ 364     assert(card_ptr != NULL, "pre-condition");
+<span class="removed"> 365   } else {</span>
+<span class="removed"> 366     assert(card_ptr == NULL, "pre-condition");</span>
+<span class="removed"> 367   }</span>
+ 368   G1CollectedHeap* g1h = G1CollectedHeap::heap();
+ 369 
+ 370   // If we're within a stop-world GC, then we might look at a card in a
+ 371   // GC alloc region that extends onto a GC LAB, which may not be
+ 372   // parseable.  Stop such at the "scan_top" of the region.
+ 373   if (g1h-&gt;is_gc_active()) {
+ 374     mr = mr.intersection(MemRegion(bottom(), scan_top()));
+ 375   } else {
+ 376     mr = mr.intersection(used_region());
+ 377   }
+<span class="changed"> 378   if (mr.is_empty()) return NULL;</span>
+
+
+ 379   // Otherwise, find the obj that extends onto mr.start().
+ 380 
+ 381   // The intersection of the incoming mr (for the card) and the
+ 382   // allocated part of the region is non-empty. This implies that
+ 383   // we have actually allocated into this region. The code in
+ 384   // G1CollectedHeap.cpp that allocates a new region sets the
+ 385   // is_young tag on the region before allocating. Thus we
+ 386   // safely know if this region is young.
+<span class="changed"> 387   if (is_young() &amp;&amp; filter_young) {</span>
+<span class="changed"> 388     return NULL;</span>
+ 389   }
+ 390 
+<span class="removed"> 391   assert(!is_young(), "check value of filter_young");</span>
+<span class="removed"> 392 </span>
+ 393   // We can only clean the card here, after we make the decision that
+<span class="changed"> 394   // the card is not young. And we only clean the card if we have been</span>
+<span class="changed"> 395   // asked to (i.e., card_ptr != NULL).</span>
+<span class="changed"> 396   if (card_ptr != NULL) {</span>
+ 397     *card_ptr = CardTableModRefBS::clean_card_val();
+ 398     // We must complete this write before we do any of the reads below.
+ 399     OrderAccess::storeload();
+<span class="removed"> 400   }</span>
+ 401 
+ 402   // Cache the boundaries of the memory region in some const locals
+ 403   HeapWord* const start = mr.start();
+ 404   HeapWord* const end = mr.end();
+ 405 
+<span class="changed"> 406   // We used to use "block_start_careful" here.  But we're actually happy</span>
+<span class="changed"> 407   // to update the BOT while we do this...</span>
+ 408   HeapWord* cur = block_start(start);
+ 409   assert(cur &lt;= start, "Postcondition");
+ 410 
+ 411   oop obj;
+ 412 
+ 413   HeapWord* next = cur;
+ 414   do {
+ 415     cur = next;
+ 416     obj = oop(cur);
+ 417     if (obj-&gt;klass_or_null() == NULL) {
+ 418       // Ran into an unparseable point.
+<span class="changed"> 419       return cur;</span>
+
+
+ 420     }
+ 421     // Otherwise...
+ 422     next = cur + block_size(cur);
+ 423   } while (next &lt;= start);
+ 424 
+ 425   // If we finish the above loop...We have a parseable object that
+ 426   // begins on or before the start of the memory region, and ends
+ 427   // inside or spans the entire region.
+ 428   assert(cur &lt;= start, "Loop postcondition");
+ 429   assert(obj-&gt;klass_or_null() != NULL, "Loop postcondition");
+ 430 
+ 431   do {
+ 432     obj = oop(cur);
+ 433     assert((cur + block_size(cur)) &gt; (HeapWord*)obj, "Loop invariant");
+ 434     if (obj-&gt;klass_or_null() == NULL) {
+ 435       // Ran into an unparseable point.
+<span class="changed"> 436       return cur;</span>
+
+
+ 437     }
+ 438 
+ 439     // Advance the current pointer. "obj" still points to the object to iterate.
+ 440     cur = cur + block_size(cur);
+ 441 
+ 442     if (!g1h-&gt;is_obj_dead(obj)) {
+ 443       // Non-objArrays are sometimes marked imprecise at the object start. We
+ 444       // always need to iterate over them in full.
+ 445       // We only iterate over object arrays in full if they are completely contained
+ 446       // in the memory region.
+ 447       if (!obj-&gt;is_objArray() || (((HeapWord*)obj) &gt;= start &amp;&amp; cur &lt;= end)) {
+ 448         obj-&gt;oop_iterate(cl);
+ 449       } else {
+ 450         obj-&gt;oop_iterate(cl, mr);
+ 451       }
+ 452     }
+ 453   } while (cur &lt; end);
+ 454 
+<span class="changed"> 455   return NULL;</span>
+ 456 }
+ 457 
+ 458 // Code roots support
+ 459 
+ 460 void HeapRegion::add_strong_code_root(nmethod* nm) {
+ 461   HeapRegionRemSet* hrrs = rem_set();
+ 462   hrrs-&gt;add_strong_code_root(nm);
+ 463 }
+ 464 
+ 465 void HeapRegion::add_strong_code_root_locked(nmethod* nm) {
+ 466   assert_locked_or_safepoint(CodeCache_lock);
+ 467   HeapRegionRemSet* hrrs = rem_set();
+ 468   hrrs-&gt;add_strong_code_root_locked(nm);
+ 469 }
+ 470 
+ 471 void HeapRegion::remove_strong_code_root(nmethod* nm) {
+ 472   HeapRegionRemSet* hrrs = rem_set();
+ 473   hrrs-&gt;remove_strong_code_root(nm);
+ 474 }
+ 475 
+
+</pre><hr></hr>
+</pre></td><td><pre>
+
+</pre><hr></hr><pre>
+ 335     _next_top_at_mark_start = top();
+ 336     _next_marked_bytes = 0;
+ 337   } else if (during_conc_mark) {
+ 338     // During concurrent mark, all objects in the CSet (including
+ 339     // the ones we find to be self-forwarded) are implicitly live.
+ 340     // So all objects need to be above NTAMS.
+ 341     _next_top_at_mark_start = bottom();
+ 342     _next_marked_bytes = 0;
+ 343   }
+ 344 }
+ 345 
+ 346 void HeapRegion::note_self_forwarding_removal_end(bool during_initial_mark,
+ 347                                                   bool during_conc_mark,
+ 348                                                   size_t marked_bytes) {
+ 349   assert(marked_bytes &lt;= used(),
+ 350          "marked: " SIZE_FORMAT " used: " SIZE_FORMAT, marked_bytes, used());
+ 351   _prev_top_at_mark_start = top();
+ 352   _prev_marked_bytes = marked_bytes;
+ 353 }
+ 354 
+<span class="changed"> 355 bool HeapRegion::oops_on_card_seq_iterate_careful(MemRegion mr,</span>
+
+
+ 356                                                   FilterOutOfRegionClosure* cl,
+
+ 357                                                   jbyte* card_ptr) {
+
+
+
+ 358   assert(card_ptr != NULL, "pre-condition");
+
+
+
+ 359   G1CollectedHeap* g1h = G1CollectedHeap::heap();
+ 360 
+ 361   // If we're within a stop-world GC, then we might look at a card in a
+ 362   // GC alloc region that extends onto a GC LAB, which may not be
+ 363   // parseable.  Stop such at the "scan_top" of the region.
+ 364   if (g1h-&gt;is_gc_active()) {
+ 365     mr = mr.intersection(MemRegion(bottom(), scan_top()));
+ 366   } else {
+ 367     mr = mr.intersection(used_region());
+ 368   }
+<span class="changed"> 369   if (mr.is_empty()) {</span>
+<span class="changed"> 370     return true;</span>
+<span class="changed"> 371   }</span>
+ 372   // Otherwise, find the obj that extends onto mr.start().
+ 373 
+ 374   // The intersection of the incoming mr (for the card) and the
+ 375   // allocated part of the region is non-empty. This implies that
+ 376   // we have actually allocated into this region. The code in
+ 377   // G1CollectedHeap.cpp that allocates a new region sets the
+ 378   // is_young tag on the region before allocating. Thus we
+ 379   // safely know if this region is young.
+<span class="changed"> 380   if (is_young()) {</span>
+<span class="changed"> 381     return true;</span>
+ 382   }
+ 383 
+
+
+ 384   // We can only clean the card here, after we make the decision that
+<span class="changed"> 385   // the card is not young.</span>
+
+
+ 386   *card_ptr = CardTableModRefBS::clean_card_val();
+ 387   // We must complete this write before we do any of the reads below.
+ 388   OrderAccess::storeload();
+
+ 389 
+ 390   // Cache the boundaries of the memory region in some const locals
+ 391   HeapWord* const start = mr.start();
+ 392   HeapWord* const end = mr.end();
+ 393 
+<span class="changed"> 394   // Update BOT as needed while finding start of (potential) object.</span>
+
+ 395   HeapWord* cur = block_start(start);
+ 396   assert(cur &lt;= start, "Postcondition");
+ 397 
+ 398   oop obj;
+ 399 
+ 400   HeapWord* next = cur;
+ 401   do {
+ 402     cur = next;
+ 403     obj = oop(cur);
+ 404     if (obj-&gt;klass_or_null() == NULL) {
+ 405       // Ran into an unparseable point.
+<span class="changed"> 406       assert(!g1h-&gt;is_gc_active(),</span>
+<span class="changed"> 407              "Unparsable heap during GC at " PTR_FORMAT, p2i(cur));</span>
+<span class="changed"> 408       return false;</span>
+ 409     }
+ 410     // Otherwise...
+ 411     next = cur + block_size(cur);
+ 412   } while (next &lt;= start);
+ 413 
+ 414   // If we finish the above loop...We have a parseable object that
+ 415   // begins on or before the start of the memory region, and ends
+ 416   // inside or spans the entire region.
+ 417   assert(cur &lt;= start, "Loop postcondition");
+ 418   assert(obj-&gt;klass_or_null() != NULL, "Loop postcondition");
+ 419 
+ 420   do {
+ 421     obj = oop(cur);
+ 422     assert((cur + block_size(cur)) &gt; (HeapWord*)obj, "Loop invariant");
+ 423     if (obj-&gt;klass_or_null() == NULL) {
+ 424       // Ran into an unparseable point.
+<span class="changed"> 425       assert(!g1h-&gt;is_gc_active(),</span>
+<span class="changed"> 426              "Unparsable heap during GC at " PTR_FORMAT, p2i(cur));</span>
+<span class="changed"> 427       return false;</span>
+ 428     }
+ 429 
+ 430     // Advance the current pointer. "obj" still points to the object to iterate.
+ 431     cur = cur + block_size(cur);
+ 432 
+ 433     if (!g1h-&gt;is_obj_dead(obj)) {
+ 434       // Non-objArrays are sometimes marked imprecise at the object start. We
+ 435       // always need to iterate over them in full.
+ 436       // We only iterate over object arrays in full if they are completely contained
+ 437       // in the memory region.
+ 438       if (!obj-&gt;is_objArray() || (((HeapWord*)obj) &gt;= start &amp;&amp; cur &lt;= end)) {
+ 439         obj-&gt;oop_iterate(cl);
+ 440       } else {
+ 441         obj-&gt;oop_iterate(cl, mr);
+ 442       }
+ 443     }
+ 444   } while (cur &lt; end);
+ 445 
+<span class="changed"> 446   return true;</span>
+ 447 }
+ 448 
+ 449 // Code roots support
+ 450 
+ 451 void HeapRegion::add_strong_code_root(nmethod* nm) {
+ 452   HeapRegionRemSet* hrrs = rem_set();
+ 453   hrrs-&gt;add_strong_code_root(nm);
+ 454 }
+ 455 
+ 456 void HeapRegion::add_strong_code_root_locked(nmethod* nm) {
+ 457   assert_locked_or_safepoint(CodeCache_lock);
+ 458   HeapRegionRemSet* hrrs = rem_set();
+ 459   hrrs-&gt;add_strong_code_root_locked(nm);
+ 460 }
+ 461 
+ 462 void HeapRegion::remove_strong_code_root(nmethod* nm) {
+ 463   HeapRegionRemSet* hrrs = rem_set();
+ 464   hrrs-&gt;remove_strong_code_root(nm);
+ 465 }
+ 466 
+
+</pre><hr></hr>
+</pre></td>
+</tr></table>
+<center><a href='../../../../../src/share/vm/gc/g1/g1RemSet.cpp.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../../index.html' target='_top'>index</a> <a href='../../../../../src/share/vm/gc/g1/heapRegion.hpp.sdiff.html' target='_top'>next &gt</a></center>
+</body></html>

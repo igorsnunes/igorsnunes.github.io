@@ -1,0 +1,581 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+    <script type="text/javascript" src="../../../../../ancnav.js"></script>
+    </head>
+    <body id="SUNWwebrev" onkeypress="keypress(event);">
+    <a name="0"></a>
+    <pre></pre><hr></hr>
+<pre>
+   1 /*
+<a name="1" id="anc1"></a><span class="changed">   2  * Copyright (c) 2001, 2015, Oracle and/or its affiliates. All rights reserved.</span>
+   3  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+   4  *
+   5  * This code is free software; you can redistribute it and/or modify it
+   6  * under the terms of the GNU General Public License version 2 only, as
+   7  * published by the Free Software Foundation.
+   8  *
+   9  * This code is distributed in the hope that it will be useful, but WITHOUT
+  10  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+  11  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+  12  * version 2 for more details (a copy is included in the LICENSE file that
+  13  * accompanied this code).
+  14  *
+  15  * You should have received a copy of the GNU General Public License version
+  16  * 2 along with this work; if not, write to the Free Software Foundation,
+  17  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+  18  *
+  19  * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+  20  * or visit www.oracle.com if you need additional information or have any
+  21  * questions.
+  22  *
+  23  */
+  24 
+  25 #ifndef SHARE_VM_GC_CMS_PARNEWGENERATION_HPP
+  26 #define SHARE_VM_GC_CMS_PARNEWGENERATION_HPP
+  27 
+  28 #include "gc/cms/parOopClosures.hpp"
+  29 #include "gc/serial/defNewGeneration.hpp"
+  30 #include "gc/shared/copyFailedInfo.hpp"
+  31 #include "gc/shared/gcTrace.hpp"
+  32 #include "gc/shared/plab.hpp"
+  33 #include "gc/shared/preservedMarks.hpp"
+  34 #include "gc/shared/taskqueue.hpp"
+  35 #include "memory/padded.hpp"
+  36 
+  37 class ChunkArray;
+  38 class ParScanWithoutBarrierClosure;
+  39 class ParScanWithBarrierClosure;
+  40 class ParRootScanWithoutBarrierClosure;
+  41 class ParRootScanWithBarrierTwoGensClosure;
+  42 class ParEvacuateFollowersClosure;
+  43 class StrongRootsScope;
+  44 
+  45 // It would be better if these types could be kept local to the .cpp file,
+  46 // but they must be here to allow ParScanClosure::do_oop_work to be defined
+  47 // in genOopClosures.inline.hpp.
+  48 
+  49 typedef Padded&lt;OopTaskQueue&gt; ObjToScanQueue;
+  50 typedef GenericTaskQueueSet&lt;ObjToScanQueue, mtGC&gt; ObjToScanQueueSet;
+  51 
+  52 class ParKeepAliveClosure: public DefNewGeneration::KeepAliveClosure {
+  53  private:
+  54   ParScanWeakRefClosure* _par_cl;
+  55  protected:
+  56   template &lt;class T&gt; void do_oop_work(T* p);
+  57  public:
+  58   ParKeepAliveClosure(ParScanWeakRefClosure* cl);
+  59   virtual void do_oop(oop* p);
+  60   virtual void do_oop(narrowOop* p);
+  61 };
+  62 
+  63 // The state needed by thread performing parallel young-gen collection.
+  64 class ParScanThreadState {
+  65   friend class ParScanThreadStateSet;
+  66  private:
+  67   ObjToScanQueue *_work_queue;
+  68   Stack&lt;oop, mtGC&gt;* const _overflow_stack;
+  69   PreservedMarks* const _preserved_marks;
+  70 
+  71   PLAB _to_space_alloc_buffer;
+  72 
+  73   ParScanWithoutBarrierClosure         _to_space_closure; // scan_without_gc_barrier
+  74   ParScanWithBarrierClosure            _old_gen_closure; // scan_with_gc_barrier
+  75   ParRootScanWithoutBarrierClosure     _to_space_root_closure; // scan_root_without_gc_barrier
+  76   // Will be passed to process_roots to set its generation.
+  77   ParRootScanWithBarrierTwoGensClosure _older_gen_closure;
+  78   // This closure will always be bound to the old gen; it will be used
+  79   // in evacuate_followers.
+  80   ParRootScanWithBarrierTwoGensClosure _old_gen_root_closure; // scan_old_root_with_gc_barrier
+  81   ParEvacuateFollowersClosure          _evacuate_followers;
+  82   DefNewGeneration::IsAliveClosure     _is_alive_closure;
+  83   ParScanWeakRefClosure                _scan_weak_ref_closure;
+  84   ParKeepAliveClosure                  _keep_alive_closure;
+  85 
+  86   Space* _to_space;
+  87   Space* to_space() { return _to_space; }
+  88 
+  89   ParNewGeneration* _young_gen;
+  90   ParNewGeneration* young_gen() const { return _young_gen; }
+  91 
+  92   Generation* _old_gen;
+  93   Generation* old_gen() { return _old_gen; }
+  94 
+  95   HeapWord *_young_old_boundary;
+  96 
+  97   int _hash_seed;
+  98   int _thread_num;
+  99   AgeTable _ageTable;
+ 100 
+ 101   bool _to_space_full;
+ 102 
+ 103 #if TASKQUEUE_STATS
+ 104   size_t _term_attempts;
+ 105   size_t _overflow_refills;
+ 106   size_t _overflow_refill_objs;
+ 107 #endif // TASKQUEUE_STATS
+ 108 
+ 109   // Stats for promotion failure
+ 110   PromotionFailedInfo _promotion_failed_info;
+ 111 
+ 112   // Timing numbers.
+ 113   double _start;
+ 114   double _start_strong_roots;
+ 115   double _strong_roots_time;
+ 116   double _start_term;
+ 117   double _term_time;
+ 118 
+ 119   // Helper for trim_queues. Scans subset of an array and makes
+ 120   // remainder available for work stealing.
+ 121   void scan_partial_array_and_push_remainder(oop obj);
+ 122 
+ 123   // In support of CMS' parallel rescan of survivor space.
+ 124   ChunkArray* _survivor_chunk_array;
+ 125   ChunkArray* survivor_chunk_array() { return _survivor_chunk_array; }
+ 126 
+ 127   void record_survivor_plab(HeapWord* plab_start, size_t plab_word_size);
+ 128 
+ 129   ParScanThreadState(Space* to_space_, ParNewGeneration* gen_,
+ 130                      Generation* old_gen_, int thread_num_,
+ 131                      ObjToScanQueueSet* work_queue_set_,
+ 132                      Stack&lt;oop, mtGC&gt;* overflow_stacks_,
+ 133                      PreservedMarks* preserved_marks_,
+ 134                      size_t desired_plab_sz_,
+ 135                      ParallelTaskTerminator&amp; term_);
+ 136 
+ 137  public:
+ 138   AgeTable* age_table() {return &amp;_ageTable;}
+ 139 
+ 140   ObjToScanQueue* work_queue() { return _work_queue; }
+ 141 
+ 142   PreservedMarks* preserved_marks() const { return _preserved_marks; }
+ 143 
+ 144   PLAB* to_space_alloc_buffer() {
+ 145     return &amp;_to_space_alloc_buffer;
+ 146   }
+ 147 
+ 148   ParEvacuateFollowersClosure&amp;      evacuate_followers_closure() { return _evacuate_followers; }
+ 149   DefNewGeneration::IsAliveClosure&amp; is_alive_closure() { return _is_alive_closure; }
+ 150   ParScanWeakRefClosure&amp;            scan_weak_ref_closure() { return _scan_weak_ref_closure; }
+ 151   ParKeepAliveClosure&amp;              keep_alive_closure() { return _keep_alive_closure; }
+ 152   ParScanClosure&amp;                   older_gen_closure() { return _older_gen_closure; }
+ 153   ParRootScanWithoutBarrierClosure&amp; to_space_root_closure() { return _to_space_root_closure; };
+ 154 
+ 155   // Decrease queue size below "max_size".
+ 156   void trim_queues(int max_size);
+ 157 
+ 158   // Private overflow stack usage
+ 159   Stack&lt;oop, mtGC&gt;* overflow_stack() { return _overflow_stack; }
+ 160   bool take_from_overflow_stack();
+ 161   void push_on_overflow_stack(oop p);
+ 162 
+ 163   // Is new_obj a candidate for scan_partial_array_and_push_remainder method.
+ 164   inline bool should_be_partially_scanned(oop new_obj, oop old_obj) const;
+ 165 
+ 166   int* hash_seed()  { return &amp;_hash_seed; }
+ 167   int  thread_num() { return _thread_num; }
+ 168 
+ 169   // Allocate a to-space block of size "sz", or else return NULL.
+ 170   HeapWord* alloc_in_to_space_slow(size_t word_sz);
+ 171 
+ 172   inline HeapWord* alloc_in_to_space(size_t word_sz);
+ 173 
+ 174   HeapWord* young_old_boundary() { return _young_old_boundary; }
+ 175 
+ 176   void set_young_old_boundary(HeapWord *boundary) {
+ 177     _young_old_boundary = boundary;
+ 178   }
+ 179 
+ 180   // Undo the most recent allocation ("obj", of "word_sz").
+ 181   void undo_alloc_in_to_space(HeapWord* obj, size_t word_sz);
+ 182 
+ 183   // Promotion failure stats
+ 184   void register_promotion_failure(size_t sz) {
+ 185     _promotion_failed_info.register_copy_failure(sz);
+ 186   }
+ 187   PromotionFailedInfo&amp; promotion_failed_info() {
+ 188     return _promotion_failed_info;
+ 189   }
+ 190   bool promotion_failed() {
+ 191     return _promotion_failed_info.has_failed();
+ 192   }
+ 193   void print_promotion_failure_size();
+ 194 
+ 195 #if TASKQUEUE_STATS
+ 196   TaskQueueStats &amp; taskqueue_stats() const { return _work_queue-&gt;stats; }
+ 197 
+ 198   size_t term_attempts() const             { return _term_attempts; }
+ 199   size_t overflow_refills() const          { return _overflow_refills; }
+ 200   size_t overflow_refill_objs() const      { return _overflow_refill_objs; }
+ 201 
+ 202   void note_term_attempt()                 { ++_term_attempts; }
+ 203   void note_overflow_refill(size_t objs)   {
+ 204     ++_overflow_refills; _overflow_refill_objs += objs;
+ 205   }
+ 206 
+ 207   void reset_stats();
+ 208 #endif // TASKQUEUE_STATS
+ 209 
+ 210   void start_strong_roots() {
+ 211     _start_strong_roots = os::elapsedTime();
+ 212   }
+ 213   void end_strong_roots() {
+ 214     _strong_roots_time += (os::elapsedTime() - _start_strong_roots);
+ 215   }
+ 216   double strong_roots_time() const { return _strong_roots_time; }
+ 217   void start_term_time() {
+ 218     TASKQUEUE_STATS_ONLY(note_term_attempt());
+ 219     _start_term = os::elapsedTime();
+ 220   }
+ 221   void end_term_time() {
+ 222     _term_time += (os::elapsedTime() - _start_term);
+ 223   }
+ 224   double term_time() const { return _term_time; }
+ 225 
+ 226   double elapsed_time() const {
+ 227     return os::elapsedTime() - _start;
+ 228   }
+ 229 };
+ 230 
+ 231 class ParNewGenTask: public AbstractGangTask {
+ 232  private:
+ 233   ParNewGeneration*            _young_gen;
+ 234   Generation*                  _old_gen;
+ 235   HeapWord*                    _young_old_boundary;
+ 236   class ParScanThreadStateSet* _state_set;
+ 237   StrongRootsScope*            _strong_roots_scope;
+ 238 
+ 239 public:
+ 240   ParNewGenTask(ParNewGeneration*      young_gen,
+ 241                 Generation*            old_gen,
+ 242                 HeapWord*              young_old_boundary,
+ 243                 ParScanThreadStateSet* state_set,
+ 244                 StrongRootsScope*      strong_roots_scope);
+ 245 
+ 246   HeapWord* young_old_boundary() { return _young_old_boundary; }
+ 247 
+ 248   void work(uint worker_id);
+ 249 };
+ 250 
+ 251 class KeepAliveClosure: public DefNewGeneration::KeepAliveClosure {
+ 252  protected:
+ 253   template &lt;class T&gt; void do_oop_work(T* p);
+ 254  public:
+ 255   KeepAliveClosure(ScanWeakRefClosure* cl);
+ 256   virtual void do_oop(oop* p);
+ 257   virtual void do_oop(narrowOop* p);
+ 258 };
+ 259 
+ 260 class EvacuateFollowersClosureGeneral: public VoidClosure {
+ 261  private:
+ 262   GenCollectedHeap* _gch;
+ 263   OopsInGenClosure* _scan_cur_or_nonheap;
+ 264   OopsInGenClosure* _scan_older;
+ 265  public:
+ 266   EvacuateFollowersClosureGeneral(GenCollectedHeap* gch,
+ 267                                   OopsInGenClosure* cur,
+ 268                                   OopsInGenClosure* older);
+ 269   virtual void do_void();
+ 270 };
+ 271 
+ 272 // Closure for scanning ParNewGeneration.
+ 273 // Same as ScanClosure, except does parallel GC barrier.
+ 274 class ScanClosureWithParBarrier: public ScanClosure {
+ 275  protected:
+ 276   template &lt;class T&gt; void do_oop_work(T* p);
+ 277  public:
+ 278   ScanClosureWithParBarrier(ParNewGeneration* g, bool gc_barrier);
+ 279   virtual void do_oop(oop* p);
+ 280   virtual void do_oop(narrowOop* p);
+ 281 };
+ 282 
+ 283 // Implements AbstractRefProcTaskExecutor for ParNew.
+ 284 class ParNewRefProcTaskExecutor: public AbstractRefProcTaskExecutor {
+ 285  private:
+ 286   ParNewGeneration&amp;      _young_gen;
+ 287   Generation&amp;            _old_gen;
+ 288   ParScanThreadStateSet&amp; _state_set;
+ 289  public:
+ 290   ParNewRefProcTaskExecutor(ParNewGeneration&amp; young_gen,
+ 291                             Generation&amp; old_gen,
+ 292                             ParScanThreadStateSet&amp; state_set)
+ 293     : _young_gen(young_gen), _old_gen(old_gen), _state_set(state_set)
+ 294   { }
+ 295 
+ 296   // Executes a task using worker threads.
+ 297   virtual void execute(ProcessTask&amp; task);
+ 298   virtual void execute(EnqueueTask&amp; task);
+ 299   // Switch to single threaded mode.
+ 300   virtual void set_single_threaded_mode();
+ 301 };
+ 302 
+ 303 
+ 304 // A Generation that does parallel young-gen collection.
+ 305 
+ 306 class ParNewGeneration: public DefNewGeneration {
+ 307   friend class ParNewGenTask;
+ 308   friend class ParNewRefProcTask;
+ 309   friend class ParNewRefProcTaskExecutor;
+ 310   friend class ParScanThreadStateSet;
+ 311   friend class ParEvacuateFollowersClosure;
+ 312 
+ 313  private:
+ 314   // The per-worker-thread work queues
+ 315   ObjToScanQueueSet* _task_queues;
+ 316 
+ 317   // Per-worker-thread local overflow stacks
+ 318   Stack&lt;oop, mtGC&gt;* _overflow_stacks;
+ 319 
+ 320   // Desired size of survivor space plab's
+ 321   PLABStats _plab_stats;
+ 322 
+ 323   // A list of from-space images of to-be-scanned objects, threaded through
+ 324   // klass-pointers (klass information already copied to the forwarded
+ 325   // image.)  Manipulated with CAS.
+<a name="2" id="anc2"></a><span class="changed"> 326   oop _overflow_list;</span>
+ 327   NOT_PRODUCT(ssize_t _num_par_pushes;)
+ 328 
+ 329   // This closure is used by the reference processor to filter out
+ 330   // references to live referent.
+ 331   DefNewGeneration::IsAliveClosure _is_alive_closure;
+ 332 
+ 333   // GC tracer that should be used during collection.
+ 334   ParNewTracer _gc_tracer;
+ 335 
+ 336   static oop real_forwardee_slow(oop obj);
+ 337   static void waste_some_time();
+ 338 
+ 339   void handle_promotion_failed(GenCollectedHeap* gch, ParScanThreadStateSet&amp; thread_state_set);
+ 340 
+ 341  protected:
+ 342 
+ 343   bool _survivor_overflow;
+ 344 
+ 345   bool survivor_overflow() { return _survivor_overflow; }
+ 346   void set_survivor_overflow(bool v) { _survivor_overflow = v; }
+ 347 
+ 348  public:
+ 349   ParNewGeneration(ReservedSpace rs, size_t initial_byte_size);
+ 350 
+ 351   ~ParNewGeneration() {
+ 352     for (uint i = 0; i &lt; ParallelGCThreads; i++)
+ 353         delete _task_queues-&gt;queue(i);
+ 354 
+ 355     delete _task_queues;
+ 356   }
+ 357 
+ 358   virtual void ref_processor_init();
+ 359   virtual Generation::Name kind()        { return Generation::ParNew; }
+ 360   virtual const char* name() const;
+ 361   virtual const char* short_name() const { return "ParNew"; }
+ 362 
+ 363   // override
+ 364   virtual bool refs_discovery_is_mt()     const {
+ 365     return ParallelGCThreads &gt; 1;
+ 366   }
+ 367 
+ 368   // Make the collection virtual.
+ 369   virtual void collect(bool   full,
+ 370                        bool   clear_all_soft_refs,
+ 371                        size_t size,
+ 372                        bool   is_tlab);
+ 373 
+ 374   // This needs to be visible to the closure function.
+ 375   // "obj" is the object to be copied, "m" is a recent value of its mark
+ 376   // that must not contain a forwarding pointer (though one might be
+ 377   // inserted in "obj"s mark word by a parallel thread).
+ 378   oop copy_to_survivor_space(ParScanThreadState* par_scan_state,
+ 379                              oop obj, size_t obj_sz, markOop m);
+ 380 
+ 381   // in support of testing overflow code
+ 382   NOT_PRODUCT(int _overflow_counter;)
+ 383   NOT_PRODUCT(bool should_simulate_overflow();)
+ 384 
+ 385   // Accessor for overflow list
+ 386   oop overflow_list() { return _overflow_list; }
+ 387 
+ 388   // Push the given (from-space) object on the global overflow list.
+ 389   void push_on_overflow_list(oop from_space_obj, ParScanThreadState* par_scan_state);
+ 390 
+ 391   // If the global overflow list is non-empty, move some tasks from it
+ 392   // onto "work_q" (which need not be empty).  No more than 1/4 of the
+ 393   // available space on "work_q" is used.
+ 394   bool take_from_overflow_list(ParScanThreadState* par_scan_state);
+ 395   bool take_from_overflow_list_work(ParScanThreadState* par_scan_state);
+ 396 
+ 397   // The task queues to be used by parallel GC threads.
+ 398   ObjToScanQueueSet* task_queues() {
+ 399     return _task_queues;
+ 400   }
+ 401 
+ 402   PLABStats* plab_stats() {
+ 403     return &amp;_plab_stats;
+ 404   }
+ 405 
+ 406   size_t desired_plab_sz();
+ 407 
+ 408   const ParNewTracer* gc_tracer() const {
+ 409     return &amp;_gc_tracer;
+ 410   }
+ 411 
+ 412   static oop real_forwardee(oop obj);
+ 413 };
+ 414 
+ 415 #endif // SHARE_VM_GC_CMS_PARNEWGENERATION_HPP
+<a name="3" id="anc3"></a><b style="font-size: large; color: red">--- EOF ---</b>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</pre><form name="eof"><input name="value" value="3" type="hidden" /></form></body></html>

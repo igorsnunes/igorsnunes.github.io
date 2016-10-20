@@ -1,0 +1,191 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>hotspot Sdiff src/cpu/ppc/vm </title>
+</head><body id="SUNWwebrev">
+<center><a href='../../../../src/cpu/ppc/vm/ppc.ad.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/cpu/ppc/vm/templateInterpreterGenerator_ppc.cpp.sdiff.html' target='_top'>next &gt</a></center>
+<h2>src/cpu/ppc/vm/sharedRuntime_ppc.cpp</h2>
+<a class="print" href="javascript:print()">Print this page</a>
+<pre></pre>
+
+<table><tr valign="top">
+<td><pre>
+
+</pre><hr></hr><pre>
+2472   // DTrace method exit
+2473 # endif
+2474 
+2475   // Clear "last Java frame" SP and PC.
+2476   // --------------------------------------------------------------------------
+2477 
+2478   __ reset_last_Java_frame();
+2479 
+2480   // Unpack oop result.
+2481   // --------------------------------------------------------------------------
+2482 
+2483   if (ret_type == T_OBJECT || ret_type == T_ARRAY) {
+2484     Label skip_unboxing;
+2485     __ cmpdi(CCR0, R3_RET, 0);
+2486     __ beq(CCR0, skip_unboxing);
+2487     __ ld(R3_RET, 0, R3_RET);
+2488     __ bind(skip_unboxing);
+2489     __ verify_oop(R3_RET);
+2490   }
+2491 
+
+
+
+
+
+2492 
+2493   // Reset handle block.
+2494   // --------------------------------------------------------------------------
+2495   if (!is_critical_native) {
+2496   __ ld(r_temp_1, thread_(active_handles));
+2497   // TODO: PPC port assert(4 == JNIHandleBlock::top_size_in_bytes(), "unexpected field size");
+2498   __ li(r_temp_2, 0);
+2499   __ stw(r_temp_2, JNIHandleBlock::top_offset_in_bytes(), r_temp_1);
+2500 
+2501 
+2502   // Check for pending exceptions.
+2503   // --------------------------------------------------------------------------
+2504   __ ld(r_temp_2, thread_(pending_exception));
+2505   __ cmpdi(CCR0, r_temp_2, 0);
+2506   __ bne(CCR0, handle_pending_exception);
+2507   }
+2508 
+2509   // Return
+2510   // --------------------------------------------------------------------------
+2511 
+
+</pre><hr></hr>
+</pre></td><td><pre>
+
+</pre><hr></hr><pre>
+2472   // DTrace method exit
+2473 # endif
+2474 
+2475   // Clear "last Java frame" SP and PC.
+2476   // --------------------------------------------------------------------------
+2477 
+2478   __ reset_last_Java_frame();
+2479 
+2480   // Unpack oop result.
+2481   // --------------------------------------------------------------------------
+2482 
+2483   if (ret_type == T_OBJECT || ret_type == T_ARRAY) {
+2484     Label skip_unboxing;
+2485     __ cmpdi(CCR0, R3_RET, 0);
+2486     __ beq(CCR0, skip_unboxing);
+2487     __ ld(R3_RET, 0, R3_RET);
+2488     __ bind(skip_unboxing);
+2489     __ verify_oop(R3_RET);
+2490   }
+2491 
+<span class="new">2492   if (CheckJNICalls) {</span>
+<span class="new">2493     // clear_pending_jni_exception_check</span>
+<span class="new">2494     __ load_const_optimized(R0, 0L);</span>
+<span class="new">2495     __ st_ptr(R0, JavaThread::pending_jni_exception_check_fn_offset(), R16_thread);</span>
+<span class="new">2496   }</span>
+2497 
+2498   // Reset handle block.
+2499   // --------------------------------------------------------------------------
+2500   if (!is_critical_native) {
+2501   __ ld(r_temp_1, thread_(active_handles));
+2502   // TODO: PPC port assert(4 == JNIHandleBlock::top_size_in_bytes(), "unexpected field size");
+2503   __ li(r_temp_2, 0);
+2504   __ stw(r_temp_2, JNIHandleBlock::top_offset_in_bytes(), r_temp_1);
+2505 
+2506 
+2507   // Check for pending exceptions.
+2508   // --------------------------------------------------------------------------
+2509   __ ld(r_temp_2, thread_(pending_exception));
+2510   __ cmpdi(CCR0, r_temp_2, 0);
+2511   __ bne(CCR0, handle_pending_exception);
+2512   }
+2513 
+2514   // Return
+2515   // --------------------------------------------------------------------------
+2516 
+
+</pre><hr></hr>
+</pre></td>
+</tr></table>
+<center><a href='../../../../src/cpu/ppc/vm/ppc.ad.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/cpu/ppc/vm/templateInterpreterGenerator_ppc.cpp.sdiff.html' target='_top'>next &gt</a></center>
+</body></html>

@@ -1,0 +1,209 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>hotspot Sdiff src/share/vm/gc/g1 </title>
+</head><body id="SUNWwebrev">
+<center><a href='../../../../../src/share/vm/gc/g1/g1IHOPControl.hpp.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../../index.html' target='_top'>index</a> <a href='../../../../../src/share/vm/gc/g1/heapRegion.cpp.sdiff.html' target='_top'>next &gt</a></center>
+<h2>src/share/vm/gc/g1/g1RemSet.cpp</h2>
+<a class="print" href="javascript:print()">Print this page</a>
+<pre></pre>
+
+<table><tr valign="top">
+<td><pre>
+
+</pre><hr></hr><pre>
+ 651   G1Mux2Closure mux(&amp;invoke_cl, &amp;update_rs_oop_cl);
+ 652 
+ 653   FilterOutOfRegionClosure filter_then_update_rs_oop_cl(r,
+ 654                         (check_for_refs_into_cset ?
+ 655                                 (OopClosure*)&amp;mux :
+ 656                                 (OopClosure*)&amp;update_rs_oop_cl));
+ 657 
+ 658   // The region for the current card may be a young region. The
+ 659   // current card may have been a card that was evicted from the
+ 660   // card cache. When the card was inserted into the cache, we had
+ 661   // determined that its region was non-young. While in the cache,
+ 662   // the region may have been freed during a cleanup pause, reallocated
+ 663   // and tagged as young.
+ 664   //
+ 665   // We wish to filter out cards for such a region but the current
+ 666   // thread, if we're running concurrently, may "see" the young type
+ 667   // change at any time (so an earlier "is_young" check may pass or
+ 668   // fail arbitrarily). We tell the iteration code to perform this
+ 669   // filtering when it has been determined that there has been an actual
+ 670   // allocation in this region and making it safe to check the young type.
+<span class="removed"> 671   bool filter_young = true;</span>
+ 672 
+<span class="changed"> 673   HeapWord* stop_point =</span>
+ 674     r-&gt;oops_on_card_seq_iterate_careful(dirtyRegion,
+ 675                                         &amp;filter_then_update_rs_oop_cl,
+<span class="removed"> 676                                         filter_young,</span>
+ 677                                         card_ptr);
+ 678 
+<span class="changed"> 679   // If stop_point is non-null, then we encountered an unallocated region</span>
+<span class="changed"> 680   // (perhaps the unfilled portion of a TLAB.)  For now, we'll dirty the</span>
+<span class="changed"> 681   // card and re-enqueue: if we put off the card until a GC pause, then the</span>
+<span class="changed"> 682   // unallocated portion will be filled in.  Alternatively, we might try</span>
+<span class="changed"> 683   // the full complexity of the technique used in "regular" precleaning.</span>
+<span class="changed"> 684   if (stop_point != NULL) {</span>
+ 685     // The card might have gotten re-dirtied and re-enqueued while we
+ 686     // worked.  (In fact, it's pretty likely.)
+ 687     if (*card_ptr != CardTableModRefBS::dirty_card_val()) {
+ 688       *card_ptr = CardTableModRefBS::dirty_card_val();
+ 689       MutexLockerEx x(Shared_DirtyCardQ_lock,
+ 690                       Mutex::_no_safepoint_check_flag);
+ 691       DirtyCardQueue* sdcq =
+ 692         JavaThread::dirty_card_queue_set().shared_dirty_card_queue();
+ 693       sdcq-&gt;enqueue(card_ptr);
+ 694     }
+ 695   } else {
+ 696     _conc_refine_cards++;
+ 697   }
+ 698 
+ 699   // This gets set to true if the card being refined has
+ 700   // references that point into the collection set.
+ 701   bool has_refs_into_cset = trigger_cl.triggered();
+ 702 
+ 703   // We should only be detecting that the card contains references
+ 704   // that point into the collection set if the current thread is
+
+</pre><hr></hr>
+</pre></td><td><pre>
+
+</pre><hr></hr><pre>
+ 651   G1Mux2Closure mux(&amp;invoke_cl, &amp;update_rs_oop_cl);
+ 652 
+ 653   FilterOutOfRegionClosure filter_then_update_rs_oop_cl(r,
+ 654                         (check_for_refs_into_cset ?
+ 655                                 (OopClosure*)&amp;mux :
+ 656                                 (OopClosure*)&amp;update_rs_oop_cl));
+ 657 
+ 658   // The region for the current card may be a young region. The
+ 659   // current card may have been a card that was evicted from the
+ 660   // card cache. When the card was inserted into the cache, we had
+ 661   // determined that its region was non-young. While in the cache,
+ 662   // the region may have been freed during a cleanup pause, reallocated
+ 663   // and tagged as young.
+ 664   //
+ 665   // We wish to filter out cards for such a region but the current
+ 666   // thread, if we're running concurrently, may "see" the young type
+ 667   // change at any time (so an earlier "is_young" check may pass or
+ 668   // fail arbitrarily). We tell the iteration code to perform this
+ 669   // filtering when it has been determined that there has been an actual
+ 670   // allocation in this region and making it safe to check the young type.
+
+ 671 
+<span class="changed"> 672   bool card_processed =</span>
+ 673     r-&gt;oops_on_card_seq_iterate_careful(dirtyRegion,
+ 674                                         &amp;filter_then_update_rs_oop_cl,
+
+ 675                                         card_ptr);
+ 676 
+<span class="changed"> 677   // If unable to process the card then we encountered an unparsable</span>
+<span class="changed"> 678   // part of the heap (e.g. a partially allocated object).  Redirty</span>
+<span class="changed"> 679   // and re-enqueue: if we put off the card until a GC pause, then the</span>
+<span class="changed"> 680   // allocation will have completed.</span>
+<span class="changed"> 681   if (!card_processed) {</span>
+<span class="changed"> 682     assert(!_g1-&gt;is_gc_active(), "Unparsable heap during GC");</span>
+ 683     // The card might have gotten re-dirtied and re-enqueued while we
+ 684     // worked.  (In fact, it's pretty likely.)
+ 685     if (*card_ptr != CardTableModRefBS::dirty_card_val()) {
+ 686       *card_ptr = CardTableModRefBS::dirty_card_val();
+ 687       MutexLockerEx x(Shared_DirtyCardQ_lock,
+ 688                       Mutex::_no_safepoint_check_flag);
+ 689       DirtyCardQueue* sdcq =
+ 690         JavaThread::dirty_card_queue_set().shared_dirty_card_queue();
+ 691       sdcq-&gt;enqueue(card_ptr);
+ 692     }
+ 693   } else {
+ 694     _conc_refine_cards++;
+ 695   }
+ 696 
+ 697   // This gets set to true if the card being refined has
+ 698   // references that point into the collection set.
+ 699   bool has_refs_into_cset = trigger_cl.triggered();
+ 700 
+ 701   // We should only be detecting that the card contains references
+ 702   // that point into the collection set if the current thread is
+
+</pre><hr></hr>
+</pre></td>
+</tr></table>
+<center><a href='../../../../../src/share/vm/gc/g1/g1IHOPControl.hpp.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../../index.html' target='_top'>index</a> <a href='../../../../../src/share/vm/gc/g1/heapRegion.cpp.sdiff.html' target='_top'>next &gt</a></center>
+</body></html>

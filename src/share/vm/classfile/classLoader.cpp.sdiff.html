@@ -1,0 +1,391 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>hotspot Sdiff src/share/vm/classfile </title>
+</head><body id="SUNWwebrev">
+<center><a href='../../../../src/os_cpu/solaris_x86/vm/os_solaris_x86.cpp.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/share/vm/gc/cms/concurrentMarkSweepGeneration.hpp.sdiff.html' target='_top'>next &gt</a></center>
+<h2>src/share/vm/classfile/classLoader.cpp</h2>
+<a class="print" href="javascript:print()">Print this page</a>
+<pre></pre>
+
+<table><tr valign="top">
+<td><pre>
+
+</pre><hr></hr><pre>
+  64 #include "runtime/os.hpp"
+  65 #include "runtime/threadCritical.hpp"
+  66 #include "runtime/timer.hpp"
+  67 #include "runtime/vm_version.hpp"
+  68 #include "services/management.hpp"
+  69 #include "services/threadService.hpp"
+  70 #include "utilities/events.hpp"
+  71 #include "utilities/hashtable.inline.hpp"
+  72 #include "utilities/macros.hpp"
+  73 #if INCLUDE_CDS
+  74 #include "classfile/sharedClassUtil.hpp"
+  75 #include "classfile/sharedPathsMiscInfo.hpp"
+  76 #endif
+  77 
+  78 // Entry points in zip.dll for loading zip/jar file entries
+  79 
+  80 typedef void * * (JNICALL *ZipOpen_t)(const char *name, char **pmsg);
+  81 typedef void (JNICALL *ZipClose_t)(jzfile *zip);
+  82 typedef jzentry* (JNICALL *FindEntry_t)(jzfile *zip, const char *name, jint *sizeP, jint *nameLen);
+  83 typedef jboolean (JNICALL *ReadEntry_t)(jzfile *zip, jzentry *entry, unsigned char *buf, char *namebuf);
+<span class="removed">  84 typedef jboolean (JNICALL *ReadMappedEntry_t)(jzfile *zip, jzentry *entry, unsigned char **buf, char *namebuf);</span>
+  85 typedef jzentry* (JNICALL *GetNextEntry_t)(jzfile *zip, jint n);
+  86 typedef jboolean (JNICALL *ZipInflateFully_t)(void *inBuf, jlong inLen, void *outBuf, jlong outLen, char **pmsg);
+  87 typedef jint     (JNICALL *Crc32_t)(jint crc, const jbyte *buf, jint len);
+  88 typedef void     (JNICALL *FreeEntry_t)(jzfile *zip, jzentry *entry);
+  89 
+  90 static ZipOpen_t         ZipOpen            = NULL;
+  91 static ZipClose_t        ZipClose           = NULL;
+  92 static FindEntry_t       FindEntry          = NULL;
+  93 static ReadEntry_t       ReadEntry          = NULL;
+<span class="removed">  94 static ReadMappedEntry_t ReadMappedEntry    = NULL;</span>
+  95 static GetNextEntry_t    GetNextEntry       = NULL;
+  96 static canonicalize_fn_t CanonicalizeEntry  = NULL;
+  97 static ZipInflateFully_t ZipInflateFully    = NULL;
+  98 static Crc32_t           Crc32              = NULL;
+  99 static FreeEntry_t       FreeEntry          = NULL;
+ 100 
+ 101 // Entry points for jimage.dll for loading jimage file entries
+ 102 
+ 103 static JImageOpen_t                    JImageOpen             = NULL;
+ 104 static JImageClose_t                   JImageClose            = NULL;
+ 105 static JImagePackageToModule_t         JImagePackageToModule  = NULL;
+ 106 static JImageFindResource_t            JImageFindResource     = NULL;
+ 107 static JImageGetResource_t             JImageGetResource      = NULL;
+ 108 static JImageResourceIterator_t        JImageResourceIterator = NULL;
+ 109 static JImage_ResourcePath_t           JImageResourcePath     = NULL;
+ 110 
+ 111 // Globals
+ 112 
+ 113 PerfCounter*    ClassLoader::_perf_accumulated_time = NULL;
+ 114 PerfCounter*    ClassLoader::_perf_classes_inited = NULL;
+
+</pre><hr></hr><pre>
+ 336   return false;
+ 337 }
+ 338 
+ 339 u1* ClassPathZipEntry::open_entry(const char* name, jint* filesize, bool nul_terminate, TRAPS) {
+ 340     // enable call to C land
+ 341   JavaThread* thread = JavaThread::current();
+ 342   ThreadToNativeFromVM ttn(thread);
+ 343   // check whether zip archive contains name
+ 344   jint name_len;
+ 345   jzentry* entry = (*FindEntry)(_zip, name, filesize, &amp;name_len);
+ 346   if (entry == NULL) return NULL;
+ 347   u1* buffer;
+ 348   char name_buf[128];
+ 349   char* filename;
+ 350   if (name_len &lt; 128) {
+ 351     filename = name_buf;
+ 352   } else {
+ 353     filename = NEW_RESOURCE_ARRAY(char, name_len + 1);
+ 354   }
+ 355 
+<span class="removed"> 356   // file found, get pointer to the entry in mmapped jar file.</span>
+<span class="removed"> 357   if (ReadMappedEntry == NULL ||</span>
+<span class="removed"> 358       !(*ReadMappedEntry)(_zip, entry, &amp;buffer, filename)) {</span>
+<span class="removed"> 359       // mmapped access not available, perhaps due to compression,</span>
+ 360       // read contents into resource array
+ 361       int size = (*filesize) + ((nul_terminate) ? 1 : 0);
+ 362       buffer = NEW_RESOURCE_ARRAY(u1, size);
+ 363       if (!(*ReadEntry)(_zip, entry, buffer, filename)) return NULL;
+<span class="removed"> 364   }</span>
+ 365 
+ 366   // return result
+ 367   if (nul_terminate) {
+ 368     buffer[*filesize] = 0;
+ 369   }
+ 370   return buffer;
+ 371 }
+ 372 
+ 373 #if INCLUDE_CDS
+ 374 u1* ClassPathZipEntry::open_versioned_entry(const char* name, jint* filesize, TRAPS) {
+ 375   u1* buffer = NULL;
+ 376   if (DumpSharedSpaces &amp;&amp; !_is_boot_append) {
+ 377     // We presume default is multi-release enabled
+ 378     const char* multi_ver = Arguments::get_property("jdk.util.jar.enableMultiRelease");
+ 379     const char* verstr = Arguments::get_property("jdk.util.jar.version");
+ 380     bool is_multi_ver = (multi_ver == NULL ||
+ 381                          strcmp(multi_ver, "true") == 0 ||
+ 382                          strcmp(multi_ver, "force")  == 0) &amp;&amp;
+ 383                          is_multiple_versioned(THREAD);
+ 384     // command line version setting
+
+</pre><hr></hr><pre>
+1062 
+1063 void ClassLoader::load_zip_library() {
+1064   assert(ZipOpen == NULL, "should not load zip library twice");
+1065   // First make sure native library is loaded
+1066   os::native_java_library();
+1067   // Load zip library
+1068   char path[JVM_MAXPATHLEN];
+1069   char ebuf[1024];
+1070   void* handle = NULL;
+1071   if (os::dll_build_name(path, sizeof(path), Arguments::get_dll_dir(), "zip")) {
+1072     handle = os::dll_load(path, ebuf, sizeof ebuf);
+1073   }
+1074   if (handle == NULL) {
+1075     vm_exit_during_initialization("Unable to load ZIP library", path);
+1076   }
+1077   // Lookup zip entry points
+1078   ZipOpen      = CAST_TO_FN_PTR(ZipOpen_t, os::dll_lookup(handle, "ZIP_Open"));
+1079   ZipClose     = CAST_TO_FN_PTR(ZipClose_t, os::dll_lookup(handle, "ZIP_Close"));
+1080   FindEntry    = CAST_TO_FN_PTR(FindEntry_t, os::dll_lookup(handle, "ZIP_FindEntry"));
+1081   ReadEntry    = CAST_TO_FN_PTR(ReadEntry_t, os::dll_lookup(handle, "ZIP_ReadEntry"));
+<span class="removed">1082   ReadMappedEntry = CAST_TO_FN_PTR(ReadMappedEntry_t, os::dll_lookup(handle, "ZIP_ReadMappedEntry"));</span>
+1083   GetNextEntry = CAST_TO_FN_PTR(GetNextEntry_t, os::dll_lookup(handle, "ZIP_GetNextEntry"));
+1084   ZipInflateFully = CAST_TO_FN_PTR(ZipInflateFully_t, os::dll_lookup(handle, "ZIP_InflateFully"));
+1085   Crc32        = CAST_TO_FN_PTR(Crc32_t, os::dll_lookup(handle, "ZIP_CRC32"));
+1086   FreeEntry    = CAST_TO_FN_PTR(FreeEntry_t, os::dll_lookup(handle, "ZIP_FreeEntry"));
+1087 
+1088   // ZIP_Close is not exported on Windows in JDK5.0 so don't abort if ZIP_Close is NULL
+1089   if (ZipOpen == NULL || FindEntry == NULL || ReadEntry == NULL ||
+1090       GetNextEntry == NULL || Crc32 == NULL) {
+1091     vm_exit_during_initialization("Corrupted ZIP library", path);
+1092   }
+1093 
+1094   if (ZipInflateFully == NULL) {
+1095     vm_exit_during_initialization("Corrupted ZIP library ZIP_InflateFully missing", path);
+1096   }
+1097 
+1098   // Lookup canonicalize entry in libjava.dll
+1099   void *javalib_handle = os::native_java_library();
+1100   CanonicalizeEntry = CAST_TO_FN_PTR(canonicalize_fn_t, os::dll_lookup(javalib_handle, "Canonicalize"));
+1101   // This lookup only works on 1.3. Do not check for non-null here
+1102 }
+
+</pre><hr></hr>
+</pre></td><td><pre>
+
+</pre><hr></hr><pre>
+  64 #include "runtime/os.hpp"
+  65 #include "runtime/threadCritical.hpp"
+  66 #include "runtime/timer.hpp"
+  67 #include "runtime/vm_version.hpp"
+  68 #include "services/management.hpp"
+  69 #include "services/threadService.hpp"
+  70 #include "utilities/events.hpp"
+  71 #include "utilities/hashtable.inline.hpp"
+  72 #include "utilities/macros.hpp"
+  73 #if INCLUDE_CDS
+  74 #include "classfile/sharedClassUtil.hpp"
+  75 #include "classfile/sharedPathsMiscInfo.hpp"
+  76 #endif
+  77 
+  78 // Entry points in zip.dll for loading zip/jar file entries
+  79 
+  80 typedef void * * (JNICALL *ZipOpen_t)(const char *name, char **pmsg);
+  81 typedef void (JNICALL *ZipClose_t)(jzfile *zip);
+  82 typedef jzentry* (JNICALL *FindEntry_t)(jzfile *zip, const char *name, jint *sizeP, jint *nameLen);
+  83 typedef jboolean (JNICALL *ReadEntry_t)(jzfile *zip, jzentry *entry, unsigned char *buf, char *namebuf);
+
+  84 typedef jzentry* (JNICALL *GetNextEntry_t)(jzfile *zip, jint n);
+  85 typedef jboolean (JNICALL *ZipInflateFully_t)(void *inBuf, jlong inLen, void *outBuf, jlong outLen, char **pmsg);
+  86 typedef jint     (JNICALL *Crc32_t)(jint crc, const jbyte *buf, jint len);
+  87 typedef void     (JNICALL *FreeEntry_t)(jzfile *zip, jzentry *entry);
+  88 
+  89 static ZipOpen_t         ZipOpen            = NULL;
+  90 static ZipClose_t        ZipClose           = NULL;
+  91 static FindEntry_t       FindEntry          = NULL;
+  92 static ReadEntry_t       ReadEntry          = NULL;
+
+  93 static GetNextEntry_t    GetNextEntry       = NULL;
+  94 static canonicalize_fn_t CanonicalizeEntry  = NULL;
+  95 static ZipInflateFully_t ZipInflateFully    = NULL;
+  96 static Crc32_t           Crc32              = NULL;
+  97 static FreeEntry_t       FreeEntry          = NULL;
+  98 
+  99 // Entry points for jimage.dll for loading jimage file entries
+ 100 
+ 101 static JImageOpen_t                    JImageOpen             = NULL;
+ 102 static JImageClose_t                   JImageClose            = NULL;
+ 103 static JImagePackageToModule_t         JImagePackageToModule  = NULL;
+ 104 static JImageFindResource_t            JImageFindResource     = NULL;
+ 105 static JImageGetResource_t             JImageGetResource      = NULL;
+ 106 static JImageResourceIterator_t        JImageResourceIterator = NULL;
+ 107 static JImage_ResourcePath_t           JImageResourcePath     = NULL;
+ 108 
+ 109 // Globals
+ 110 
+ 111 PerfCounter*    ClassLoader::_perf_accumulated_time = NULL;
+ 112 PerfCounter*    ClassLoader::_perf_classes_inited = NULL;
+
+</pre><hr></hr><pre>
+ 334   return false;
+ 335 }
+ 336 
+ 337 u1* ClassPathZipEntry::open_entry(const char* name, jint* filesize, bool nul_terminate, TRAPS) {
+ 338     // enable call to C land
+ 339   JavaThread* thread = JavaThread::current();
+ 340   ThreadToNativeFromVM ttn(thread);
+ 341   // check whether zip archive contains name
+ 342   jint name_len;
+ 343   jzentry* entry = (*FindEntry)(_zip, name, filesize, &amp;name_len);
+ 344   if (entry == NULL) return NULL;
+ 345   u1* buffer;
+ 346   char name_buf[128];
+ 347   char* filename;
+ 348   if (name_len &lt; 128) {
+ 349     filename = name_buf;
+ 350   } else {
+ 351     filename = NEW_RESOURCE_ARRAY(char, name_len + 1);
+ 352   }
+ 353 
+
+
+
+
+ 354   // read contents into resource array
+ 355   int size = (*filesize) + ((nul_terminate) ? 1 : 0);
+ 356   buffer = NEW_RESOURCE_ARRAY(u1, size);
+ 357   if (!(*ReadEntry)(_zip, entry, buffer, filename)) return NULL;
+
+ 358 
+ 359   // return result
+ 360   if (nul_terminate) {
+ 361     buffer[*filesize] = 0;
+ 362   }
+ 363   return buffer;
+ 364 }
+ 365 
+ 366 #if INCLUDE_CDS
+ 367 u1* ClassPathZipEntry::open_versioned_entry(const char* name, jint* filesize, TRAPS) {
+ 368   u1* buffer = NULL;
+ 369   if (DumpSharedSpaces &amp;&amp; !_is_boot_append) {
+ 370     // We presume default is multi-release enabled
+ 371     const char* multi_ver = Arguments::get_property("jdk.util.jar.enableMultiRelease");
+ 372     const char* verstr = Arguments::get_property("jdk.util.jar.version");
+ 373     bool is_multi_ver = (multi_ver == NULL ||
+ 374                          strcmp(multi_ver, "true") == 0 ||
+ 375                          strcmp(multi_ver, "force")  == 0) &amp;&amp;
+ 376                          is_multiple_versioned(THREAD);
+ 377     // command line version setting
+
+</pre><hr></hr><pre>
+1055 
+1056 void ClassLoader::load_zip_library() {
+1057   assert(ZipOpen == NULL, "should not load zip library twice");
+1058   // First make sure native library is loaded
+1059   os::native_java_library();
+1060   // Load zip library
+1061   char path[JVM_MAXPATHLEN];
+1062   char ebuf[1024];
+1063   void* handle = NULL;
+1064   if (os::dll_build_name(path, sizeof(path), Arguments::get_dll_dir(), "zip")) {
+1065     handle = os::dll_load(path, ebuf, sizeof ebuf);
+1066   }
+1067   if (handle == NULL) {
+1068     vm_exit_during_initialization("Unable to load ZIP library", path);
+1069   }
+1070   // Lookup zip entry points
+1071   ZipOpen      = CAST_TO_FN_PTR(ZipOpen_t, os::dll_lookup(handle, "ZIP_Open"));
+1072   ZipClose     = CAST_TO_FN_PTR(ZipClose_t, os::dll_lookup(handle, "ZIP_Close"));
+1073   FindEntry    = CAST_TO_FN_PTR(FindEntry_t, os::dll_lookup(handle, "ZIP_FindEntry"));
+1074   ReadEntry    = CAST_TO_FN_PTR(ReadEntry_t, os::dll_lookup(handle, "ZIP_ReadEntry"));
+
+1075   GetNextEntry = CAST_TO_FN_PTR(GetNextEntry_t, os::dll_lookup(handle, "ZIP_GetNextEntry"));
+1076   ZipInflateFully = CAST_TO_FN_PTR(ZipInflateFully_t, os::dll_lookup(handle, "ZIP_InflateFully"));
+1077   Crc32        = CAST_TO_FN_PTR(Crc32_t, os::dll_lookup(handle, "ZIP_CRC32"));
+1078   FreeEntry    = CAST_TO_FN_PTR(FreeEntry_t, os::dll_lookup(handle, "ZIP_FreeEntry"));
+1079 
+1080   // ZIP_Close is not exported on Windows in JDK5.0 so don't abort if ZIP_Close is NULL
+1081   if (ZipOpen == NULL || FindEntry == NULL || ReadEntry == NULL ||
+1082       GetNextEntry == NULL || Crc32 == NULL) {
+1083     vm_exit_during_initialization("Corrupted ZIP library", path);
+1084   }
+1085 
+1086   if (ZipInflateFully == NULL) {
+1087     vm_exit_during_initialization("Corrupted ZIP library ZIP_InflateFully missing", path);
+1088   }
+1089 
+1090   // Lookup canonicalize entry in libjava.dll
+1091   void *javalib_handle = os::native_java_library();
+1092   CanonicalizeEntry = CAST_TO_FN_PTR(canonicalize_fn_t, os::dll_lookup(javalib_handle, "Canonicalize"));
+1093   // This lookup only works on 1.3. Do not check for non-null here
+1094 }
+
+</pre><hr></hr>
+</pre></td>
+</tr></table>
+<center><a href='../../../../src/os_cpu/solaris_x86/vm/os_solaris_x86.cpp.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/share/vm/gc/cms/concurrentMarkSweepGeneration.hpp.sdiff.html' target='_top'>next &gt</a></center>
+</body></html>

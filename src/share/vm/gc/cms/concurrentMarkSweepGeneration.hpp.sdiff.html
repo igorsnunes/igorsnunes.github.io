@@ -1,0 +1,183 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>hotspot Sdiff src/share/vm/gc/cms </title>
+</head><body id="SUNWwebrev">
+<center><a href='../../../../../src/share/vm/classfile/classLoader.cpp.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../../index.html' target='_top'>index</a> <a href='../../../../../src/share/vm/gc/cms/parNewGeneration.hpp.sdiff.html' target='_top'>next &gt</a></center>
+<h2>src/share/vm/gc/cms/concurrentMarkSweepGeneration.hpp</h2>
+<a class="print" href="javascript:print()">Print this page</a>
+<pre></pre>
+
+<table><tr valign="top">
+<td><pre>
+
+</pre><hr></hr><pre>
+ 523   friend class CMSKeepAliveClosure;           //  -- ditto --
+ 524   friend class CMSDrainMarkingStackClosure;   //  -- ditto --
+ 525   friend class CMSInnerParMarkAndPushClosure; //  -- ditto --
+ 526   NOT_PRODUCT(friend class ScanMarkedObjectsAgainClosure;) //  assertion on _overflow_list
+ 527   friend class ReleaseForegroundGC;  // to access _foregroundGCShouldWait
+ 528   friend class VM_CMS_Operation;
+ 529   friend class VM_CMS_Initial_Mark;
+ 530   friend class VM_CMS_Final_Remark;
+ 531   friend class TraceCMSMemoryManagerStats;
+ 532 
+ 533  private:
+ 534   jlong _time_of_last_gc;
+ 535   void update_time_of_last_gc(jlong now) {
+ 536     _time_of_last_gc = now;
+ 537   }
+ 538 
+ 539   OopTaskQueueSet* _task_queues;
+ 540 
+ 541   // Overflow list of grey objects, threaded through mark-word
+ 542   // Manipulated with CAS in the parallel/multi-threaded case.
+<span class="changed"> 543   oop _overflow_list;</span>
+ 544   // The following array-pair keeps track of mark words
+ 545   // displaced for accommodating overflow list above.
+ 546   // This code will likely be revisited under RFE#4922830.
+ 547   Stack&lt;oop, mtGC&gt;     _preserved_oop_stack;
+ 548   Stack&lt;markOop, mtGC&gt; _preserved_mark_stack;
+ 549 
+ 550   int*             _hash_seed;
+ 551 
+ 552   // In support of multi-threaded concurrent phases
+ 553   YieldingFlexibleWorkGang* _conc_workers;
+ 554 
+ 555   // Performance Counters
+ 556   CollectorCounters* _gc_counters;
+ 557 
+ 558   // Initialization Errors
+ 559   bool _completed_initialization;
+ 560 
+ 561   // In support of ExplicitGCInvokesConcurrent
+ 562   static bool _full_gc_requested;
+ 563   static GCCause::Cause _full_gc_cause;
+
+</pre><hr></hr>
+</pre></td><td><pre>
+
+</pre><hr></hr><pre>
+ 523   friend class CMSKeepAliveClosure;           //  -- ditto --
+ 524   friend class CMSDrainMarkingStackClosure;   //  -- ditto --
+ 525   friend class CMSInnerParMarkAndPushClosure; //  -- ditto --
+ 526   NOT_PRODUCT(friend class ScanMarkedObjectsAgainClosure;) //  assertion on _overflow_list
+ 527   friend class ReleaseForegroundGC;  // to access _foregroundGCShouldWait
+ 528   friend class VM_CMS_Operation;
+ 529   friend class VM_CMS_Initial_Mark;
+ 530   friend class VM_CMS_Final_Remark;
+ 531   friend class TraceCMSMemoryManagerStats;
+ 532 
+ 533  private:
+ 534   jlong _time_of_last_gc;
+ 535   void update_time_of_last_gc(jlong now) {
+ 536     _time_of_last_gc = now;
+ 537   }
+ 538 
+ 539   OopTaskQueueSet* _task_queues;
+ 540 
+ 541   // Overflow list of grey objects, threaded through mark-word
+ 542   // Manipulated with CAS in the parallel/multi-threaded case.
+<span class="changed"> 543   oopDesc* volatile _overflow_list;</span>
+ 544   // The following array-pair keeps track of mark words
+ 545   // displaced for accommodating overflow list above.
+ 546   // This code will likely be revisited under RFE#4922830.
+ 547   Stack&lt;oop, mtGC&gt;     _preserved_oop_stack;
+ 548   Stack&lt;markOop, mtGC&gt; _preserved_mark_stack;
+ 549 
+ 550   int*             _hash_seed;
+ 551 
+ 552   // In support of multi-threaded concurrent phases
+ 553   YieldingFlexibleWorkGang* _conc_workers;
+ 554 
+ 555   // Performance Counters
+ 556   CollectorCounters* _gc_counters;
+ 557 
+ 558   // Initialization Errors
+ 559   bool _completed_initialization;
+ 560 
+ 561   // In support of ExplicitGCInvokesConcurrent
+ 562   static bool _full_gc_requested;
+ 563   static GCCause::Cause _full_gc_cause;
+
+</pre><hr></hr>
+</pre></td>
+</tr></table>
+<center><a href='../../../../../src/share/vm/classfile/classLoader.cpp.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../../index.html' target='_top'>index</a> <a href='../../../../../src/share/vm/gc/cms/parNewGeneration.hpp.sdiff.html' target='_top'>next &gt</a></center>
+</body></html>

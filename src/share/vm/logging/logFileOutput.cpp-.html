@@ -1,0 +1,525 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>Old src/share/vm/logging/logFileOutput.cpp</title>
+<body id="SUNWwebrev">
+<pre>
+   1 /*
+   2  * Copyright (c) 2015, 2016, Oracle and/or its affiliates. All rights reserved.
+   3  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+   4  *
+   5  * This code is free software; you can redistribute it and/or modify it
+   6  * under the terms of the GNU General Public License version 2 only, as
+   7  * published by the Free Software Foundation.
+   8  *
+   9  * This code is distributed in the hope that it will be useful, but WITHOUT
+  10  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+  11  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+  12  * version 2 for more details (a copy is included in the LICENSE file that
+  13  * accompanied this code).
+  14  *
+  15  * You should have received a copy of the GNU General Public License version
+  16  * 2 along with this work; if not, write to the Free Software Foundation,
+  17  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+  18  *
+  19  * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+  20  * or visit www.oracle.com if you need additional information or have any
+  21  * questions.
+  22  *
+  23  */
+  24 #include "precompiled.hpp"
+  25 #include "logging/log.hpp"
+  26 #include "logging/logConfiguration.hpp"
+  27 #include "logging/logFileOutput.hpp"
+  28 #include "memory/allocation.inline.hpp"
+  29 #include "runtime/arguments.hpp"
+  30 #include "runtime/os.inline.hpp"
+  31 #include "utilities/globalDefinitions.hpp"
+  32 #include "utilities/defaultStream.hpp"
+  33 
+  34 const char* LogFileOutput::Prefix = "file=";
+  35 const char* LogFileOutput::FileOpenMode = "a";
+  36 const char* LogFileOutput::PidFilenamePlaceholder = "%p";
+  37 const char* LogFileOutput::TimestampFilenamePlaceholder = "%t";
+  38 const char* LogFileOutput::TimestampFormat = "%Y-%m-%d_%H-%M-%S";
+  39 const char* LogFileOutput::FileSizeOptionKey = "filesize";
+  40 const char* LogFileOutput::FileCountOptionKey = "filecount";
+  41 char        LogFileOutput::_pid_str[PidBufferSize];
+  42 char        LogFileOutput::_vm_start_time_str[StartTimeBufferSize];
+  43 
+  44 LogFileOutput::LogFileOutput(const char* name)
+  45     : LogFileStreamOutput(NULL), _name(os::strdup_check_oom(name, mtLogging)),
+  46       _file_name(NULL), _archive_name(NULL), _archive_name_len(0),
+  47       _rotate_size(DefaultFileSize), _file_count(DefaultFileCount),
+  48       _current_size(0), _current_file(0), _rotation_semaphore(1) {
+  49   assert(strstr(name, Prefix) == name, "invalid output name '%s': missing prefix: %s", name, Prefix);
+  50   _file_name = make_file_name(name + strlen(Prefix), _pid_str, _vm_start_time_str);
+  51 }
+  52 
+  53 void LogFileOutput::set_file_name_parameters(jlong vm_start_time) {
+  54   int res = jio_snprintf(_pid_str, sizeof(_pid_str), "%d", os::current_process_id());
+  55   assert(res &gt; 0, "PID buffer too small");
+  56 
+  57   struct tm local_time;
+  58   time_t utc_time = vm_start_time / 1000;
+  59   os::localtime_pd(&amp;utc_time, &amp;local_time);
+  60   res = (int)strftime(_vm_start_time_str, sizeof(_vm_start_time_str), TimestampFormat, &amp;local_time);
+  61   assert(res &gt; 0, "VM start time buffer too small.");
+  62 }
+  63 
+  64 LogFileOutput::~LogFileOutput() {
+  65   if (_stream != NULL) {
+  66     if (fclose(_stream) != 0) {
+  67       jio_fprintf(defaultStream::error_stream(), "Could not close log file '%s' (%s).\n",
+  68                   _file_name, os::strerror(errno));
+  69     }
+  70   }
+  71   os::free(_archive_name);
+  72   os::free(_file_name);
+  73   os::free(const_cast&lt;char*&gt;(_name));
+  74 }
+  75 
+  76 static size_t parse_value(const char* value_str) {
+  77   char* end;
+  78   unsigned long long value = strtoull(value_str, &amp;end, 10);
+  79   if (!isdigit(*value_str) || end != value_str + strlen(value_str) || value &gt;= SIZE_MAX) {
+  80     return SIZE_MAX;
+  81   }
+  82   return value;
+  83 }
+  84 
+  85 static bool file_exists(const char* filename) {
+  86   struct stat dummy_stat;
+  87   return os::stat(filename, &amp;dummy_stat) == 0;
+  88 }
+  89 
+  90 static uint number_of_digits(uint number) {
+  91   return number &lt; 10 ? 1 : (number &lt; 100 ? 2 : 3);
+  92 }
+  93 
+  94 static bool is_regular_file(const char* filename) {
+  95   struct stat st;
+  96   int ret = os::stat(filename, &amp;st);
+  97   if (ret != 0) {
+  98     return false;
+  99   }
+ 100 #ifdef _WINDOWS
+ 101   return (st.st_mode &amp; S_IFMT) == _S_IFREG;
+ 102 #else
+ 103   return S_ISREG(st.st_mode);
+ 104 #endif
+ 105 }
+ 106 
+ 107 // Try to find the next number that should be used for file rotation.
+ 108 // Return UINT_MAX on error.
+ 109 static uint next_file_number(const char* filename,
+ 110                              uint number_of_digits,
+ 111                              uint filecount,
+ 112                              outputStream* errstream) {
+ 113   bool found = false;
+ 114   uint next_num = 0;
+ 115 
+ 116   // len is filename + dot + digits + null char
+ 117   size_t len = strlen(filename) + number_of_digits + 2;
+ 118   char* archive_name = NEW_C_HEAP_ARRAY(char, len, mtLogging);
+ 119   char* oldest_name = NEW_C_HEAP_ARRAY(char, len, mtLogging);
+ 120 
+ 121   for (uint i = 0; i &lt; filecount; i++) {
+ 122     int ret = jio_snprintf(archive_name, len, "%s.%0*u",
+ 123                            filename, number_of_digits, i);
+ 124     assert(ret &gt; 0 &amp;&amp; static_cast&lt;size_t&gt;(ret) == len - 1,
+ 125            "incorrect buffer length calculation");
+ 126 
+ 127     if (file_exists(archive_name) &amp;&amp; !is_regular_file(archive_name)) {
+ 128       // We've encountered something that's not a regular file among the
+ 129       // possible file rotation targets. Fail immediately to prevent
+ 130       // problems later.
+ 131       errstream-&gt;print_cr("Possible rotation target file '%s' already exists "
+ 132                           "but is not a regular file.", archive_name);
+ 133       next_num = UINT_MAX;
+ 134       break;
+ 135     }
+ 136 
+ 137     // Stop looking if we find an unused file name
+ 138     if (!file_exists(archive_name)) {
+ 139       next_num = i;
+ 140       found = true;
+ 141       break;
+ 142     }
+ 143 
+ 144     // Keep track of oldest existing log file
+ 145     if (!found
+ 146         || os::compare_file_modified_times(oldest_name, archive_name) &gt; 0) {
+ 147       strcpy(oldest_name, archive_name);
+ 148       next_num = i;
+ 149       found = true;
+ 150     }
+ 151   }
+ 152 
+ 153   FREE_C_HEAP_ARRAY(char, oldest_name);
+ 154   FREE_C_HEAP_ARRAY(char, archive_name);
+ 155   return next_num;
+ 156 }
+ 157 
+ 158 bool LogFileOutput::parse_options(const char* options, outputStream* errstream) {
+ 159   if (options == NULL || strlen(options) == 0) {
+ 160     return true;
+ 161   }
+ 162   bool success = true;
+ 163   char* opts = os::strdup_check_oom(options, mtLogging);
+ 164 
+ 165   char* comma_pos;
+ 166   char* pos = opts;
+ 167   do {
+ 168     comma_pos = strchr(pos, ',');
+ 169     if (comma_pos != NULL) {
+ 170       *comma_pos = '\0';
+ 171     }
+ 172 
+ 173     char* equals_pos = strchr(pos, '=');
+ 174     if (equals_pos == NULL) {
+ 175       success = false;
+ 176       break;
+ 177     }
+ 178     char* key = pos;
+ 179     char* value_str = equals_pos + 1;
+ 180     *equals_pos = '\0';
+ 181 
+ 182     if (strcmp(FileCountOptionKey, key) == 0) {
+ 183       size_t value = parse_value(value_str);
+ 184       if (value &gt; MaxRotationFileCount) {
+ 185         errstream-&gt;print_cr("Invalid option: %s must be in range [0, %u]",
+ 186                             FileCountOptionKey,
+ 187                             MaxRotationFileCount);
+ 188         success = false;
+ 189         break;
+ 190       }
+ 191       _file_count = static_cast&lt;uint&gt;(value);
+ 192     } else if (strcmp(FileSizeOptionKey, key) == 0) {
+ 193       julong value;
+ 194       success = Arguments::atojulong(value_str, &amp;value);
+ 195       if (!success || (value &gt; SIZE_MAX)) {
+ 196         errstream-&gt;print_cr("Invalid option: %s must be in range [0, "
+ 197                             SIZE_FORMAT "]", FileSizeOptionKey, SIZE_MAX);
+ 198         success = false;
+ 199         break;
+ 200       }
+ 201       _rotate_size = static_cast&lt;size_t&gt;(value);
+ 202     } else {
+ 203       errstream-&gt;print_cr("Invalid option '%s' for log file output.", key);
+ 204       success = false;
+ 205       break;
+ 206     }
+ 207     pos = comma_pos + 1;
+ 208   } while (comma_pos != NULL);
+ 209 
+ 210   os::free(opts);
+ 211   return success;
+ 212 }
+ 213 
+ 214 bool LogFileOutput::initialize(const char* options, outputStream* errstream) {
+ 215   if (!parse_options(options, errstream)) {
+ 216     return false;
+ 217   }
+ 218 
+ 219   if (_file_count &gt; 0) {
+ 220     // compute digits with filecount - 1 since numbers will start from 0
+ 221     _file_count_max_digits = number_of_digits(_file_count - 1);
+ 222     _archive_name_len = 2 + strlen(_file_name) + _file_count_max_digits;
+ 223     _archive_name = NEW_C_HEAP_ARRAY(char, _archive_name_len, mtLogging);
+ 224   }
+ 225 
+ 226   log_trace(logging)("Initializing logging to file '%s' (filecount: %u"
+ 227                      ", filesize: " SIZE_FORMAT " KiB).",
+ 228                      _file_name, _file_count, _rotate_size / K);
+ 229 
+ 230   if (_file_count &gt; 0 &amp;&amp; file_exists(_file_name)) {
+ 231     if (!is_regular_file(_file_name)) {
+ 232       errstream-&gt;print_cr("Unable to log to file %s with log file rotation: "
+ 233                           "%s is not a regular file",
+ 234                           _file_name, _file_name);
+ 235       return false;
+ 236     }
+ 237     _current_file = next_file_number(_file_name,
+ 238                                      _file_count_max_digits,
+ 239                                      _file_count,
+ 240                                      errstream);
+ 241     if (_current_file == UINT_MAX) {
+ 242       return false;
+ 243     }
+ 244     log_trace(logging)("Existing log file found, saving it as '%s.%0*u'",
+ 245                        _file_name, _file_count_max_digits, _current_file);
+ 246     archive();
+ 247     increment_file_count();
+ 248   }
+ 249 
+ 250   _stream = fopen(_file_name, FileOpenMode);
+ 251   if (_stream == NULL) {
+ 252     errstream-&gt;print_cr("Error opening log file '%s': %s",
+ 253                         _file_name, strerror(errno));
+ 254     return false;
+ 255   }
+ 256 
+ 257   if (_file_count == 0 &amp;&amp; is_regular_file(_file_name)) {
+ 258     log_trace(logging)("Truncating log file");
+ 259     os::ftruncate(os::get_fileno(_stream), 0);
+ 260   }
+ 261 
+ 262   return true;
+ 263 }
+ 264 
+ 265 int LogFileOutput::write(const LogDecorations&amp; decorations, const char* msg) {
+ 266   if (_stream == NULL) {
+ 267     // An error has occurred with this output, avoid writing to it.
+ 268     return 0;
+ 269   }
+ 270 
+ 271   _rotation_semaphore.wait();
+ 272   int written = LogFileStreamOutput::write(decorations, msg);
+ 273   _current_size += written;
+ 274 
+ 275   if (should_rotate()) {
+ 276     rotate();
+ 277   }
+ 278   _rotation_semaphore.signal();
+ 279 
+ 280   return written;
+ 281 }
+ 282 
+ 283 int LogFileOutput::write(LogMessageBuffer::Iterator msg_iterator) {
+ 284   if (_stream == NULL) {
+ 285     // An error has occurred with this output, avoid writing to it.
+ 286     return 0;
+ 287   }
+ 288 
+ 289   _rotation_semaphore.wait();
+ 290   int written = LogFileStreamOutput::write(msg_iterator);
+ 291   _current_size += written;
+ 292 
+ 293   if (should_rotate()) {
+ 294     rotate();
+ 295   }
+ 296   _rotation_semaphore.signal();
+ 297 
+ 298   return written;
+ 299 }
+ 300 
+ 301 void LogFileOutput::archive() {
+ 302   assert(_archive_name != NULL &amp;&amp; _archive_name_len &gt; 0, "Rotation must be configured before using this function.");
+ 303   int ret = jio_snprintf(_archive_name, _archive_name_len, "%s.%0*u",
+ 304                          _file_name, _file_count_max_digits, _current_file);
+ 305   assert(ret &gt;= 0, "Buffer should always be large enough");
+ 306 
+ 307   // Attempt to remove possibly existing archived log file before we rename.
+ 308   // Don't care if it fails, we really only care about the rename that follows.
+ 309   remove(_archive_name);
+ 310 
+ 311   // Rename the file from ex hotspot.log to hotspot.log.2
+ 312   if (rename(_file_name, _archive_name) == -1) {
+ 313     jio_fprintf(defaultStream::error_stream(), "Could not rename log file '%s' to '%s' (%s).\n",
+ 314                 _file_name, _archive_name, os::strerror(errno));
+ 315   }
+ 316 }
+ 317 
+ 318 void LogFileOutput::force_rotate() {
+ 319   if (_file_count == 0) {
+ 320     // Rotation not possible
+ 321     return;
+ 322   }
+ 323   _rotation_semaphore.wait();
+ 324   rotate();
+ 325   _rotation_semaphore.signal();
+ 326 }
+ 327 
+ 328 void LogFileOutput::rotate() {
+ 329 
+ 330   if (fclose(_stream)) {
+ 331     jio_fprintf(defaultStream::error_stream(), "Error closing file '%s' during log rotation (%s).\n",
+ 332                 _file_name, os::strerror(errno));
+ 333   }
+ 334 
+ 335   // Archive the current log file
+ 336   archive();
+ 337 
+ 338   // Open the active log file using the same stream as before
+ 339   _stream = fopen(_file_name, FileOpenMode);
+ 340   if (_stream == NULL) {
+ 341     jio_fprintf(defaultStream::error_stream(), "Could not reopen file '%s' during log rotation (%s).\n",
+ 342                 _file_name, os::strerror(errno));
+ 343     return;
+ 344   }
+ 345 
+ 346   // Reset accumulated size, increase current file counter, and check for file count wrap-around.
+ 347   _current_size = 0;
+ 348   increment_file_count();
+ 349 }
+ 350 
+ 351 char* LogFileOutput::make_file_name(const char* file_name,
+ 352                                     const char* pid_string,
+ 353                                     const char* timestamp_string) {
+ 354   char* result = NULL;
+ 355 
+ 356   // Lets start finding out if we have any %d and/or %t in the name.
+ 357   // We will only replace the first occurrence of any placeholder
+ 358   const char* pid = strstr(file_name, PidFilenamePlaceholder);
+ 359   const char* timestamp = strstr(file_name, TimestampFilenamePlaceholder);
+ 360 
+ 361   if (pid == NULL &amp;&amp; timestamp == NULL) {
+ 362     // We found no place-holders, return the simple filename
+ 363     return os::strdup_check_oom(file_name, mtLogging);
+ 364   }
+ 365 
+ 366   // At least one of the place-holders were found in the file_name
+ 367   const char* first = "";
+ 368   size_t first_pos = SIZE_MAX;
+ 369   size_t first_replace_len = 0;
+ 370 
+ 371   const char* second = "";
+ 372   size_t second_pos = SIZE_MAX;
+ 373   size_t second_replace_len = 0;
+ 374 
+ 375   // If we found a %p, then setup our variables accordingly
+ 376   if (pid != NULL) {
+ 377     if (timestamp == NULL || pid &lt; timestamp) {
+ 378       first = pid_string;
+ 379       first_pos = pid - file_name;
+ 380       first_replace_len = strlen(PidFilenamePlaceholder);
+ 381     } else {
+ 382       second = pid_string;
+ 383       second_pos = pid - file_name;
+ 384       second_replace_len = strlen(PidFilenamePlaceholder);
+ 385     }
+ 386   }
+ 387 
+ 388   if (timestamp != NULL) {
+ 389     if (pid == NULL || timestamp &lt; pid) {
+ 390       first = timestamp_string;
+ 391       first_pos = timestamp - file_name;
+ 392       first_replace_len = strlen(TimestampFilenamePlaceholder);
+ 393     } else {
+ 394       second = timestamp_string;
+ 395       second_pos = timestamp - file_name;
+ 396       second_replace_len = strlen(TimestampFilenamePlaceholder);
+ 397     }
+ 398   }
+ 399 
+ 400   size_t first_len = strlen(first);
+ 401   size_t second_len = strlen(second);
+ 402 
+ 403   // Allocate the new buffer, size it to hold all we want to put in there +1.
+ 404   size_t result_len =  strlen(file_name) + first_len - first_replace_len + second_len - second_replace_len;
+ 405   result = NEW_C_HEAP_ARRAY(char, result_len + 1, mtLogging);
+ 406 
+ 407   // Assemble the strings
+ 408   size_t file_name_pos = 0;
+ 409   size_t i = 0;
+ 410   while (i &lt; result_len) {
+ 411     if (file_name_pos == first_pos) {
+ 412       // We are in the range of the first placeholder
+ 413       strcpy(result + i, first);
+ 414       // Bump output buffer position with length of replacing string
+ 415       i += first_len;
+ 416       // Bump source buffer position to skip placeholder
+ 417       file_name_pos += first_replace_len;
+ 418     } else if (file_name_pos == second_pos) {
+ 419       // We are in the range of the second placeholder
+ 420       strcpy(result + i, second);
+ 421       i += second_len;
+ 422       file_name_pos += second_replace_len;
+ 423     } else {
+ 424       // Else, copy char by char of the original file
+ 425       result[i] = file_name[file_name_pos++];
+ 426       i++;
+ 427     }
+ 428   }
+ 429   // Add terminating char
+ 430   result[result_len] = '\0';
+ 431   return result;
+ 432 }
+ 433 
+ 434 void LogFileOutput::describe(outputStream *out) {
+ 435   LogOutput::describe(out);
+ 436   out-&gt;print(" ");
+ 437 
+ 438   out-&gt;print("filecount=%u,filesize=" SIZE_FORMAT "%s", _file_count,
+ 439              byte_size_in_proper_unit(_rotate_size),
+ 440              proper_unit_for_byte_size(_rotate_size));
+ 441 }
+ 442 
+</pre></body></html>

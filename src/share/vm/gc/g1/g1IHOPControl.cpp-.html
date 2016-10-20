@@ -1,0 +1,385 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>Old src/share/vm/gc/g1/g1IHOPControl.cpp</title>
+<body id="SUNWwebrev">
+<pre>
+   1 /*
+   2  * Copyright (c) 2015, 2016, Oracle and/or its affiliates. All rights reserved.
+   3  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+   4  *
+   5  * This code is free software; you can redistribute it and/or modify it
+   6  * under the terms of the GNU General Public License version 2 only, as
+   7  * published by the Free Software Foundation.
+   8  *
+   9  * This code is distributed in the hope that it will be useful, but WITHOUT
+  10  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+  11  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+  12  * version 2 for more details (a copy is included in the LICENSE file that
+  13  * accompanied this code).
+  14  *
+  15  * You should have received a copy of the GNU General Public License version
+  16  * 2 along with this work; if not, write to the Free Software Foundation,
+  17  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+  18  *
+  19  * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+  20  * or visit www.oracle.com if you need additional information or have any
+  21  * questions.
+  22  *
+  23  */
+  24 
+  25 #include "precompiled.hpp"
+  26 #include "gc/g1/g1CollectedHeap.inline.hpp"
+  27 #include "gc/g1/g1IHOPControl.hpp"
+  28 #include "gc/g1/g1Predictions.hpp"
+  29 #include "gc/shared/gcTrace.hpp"
+  30 #include "logging/log.hpp"
+  31 
+  32 G1IHOPControl::G1IHOPControl(double initial_ihop_percent) :
+  33   _initial_ihop_percent(initial_ihop_percent),
+  34   _target_occupancy(0),
+  35   _last_allocated_bytes(0),
+  36   _last_allocation_time_s(0.0)
+  37 {
+  38   assert(_initial_ihop_percent &gt;= 0.0 &amp;&amp; _initial_ihop_percent &lt;= 100.0, "Initial IHOP value must be between 0 and 100 but is %.3f", initial_ihop_percent);
+  39 }
+  40 
+  41 void G1IHOPControl::update_target_occupancy(size_t new_target_occupancy) {
+  42   log_debug(gc, ihop)("Target occupancy update: old: " SIZE_FORMAT "B, new: " SIZE_FORMAT "B",
+  43                       _target_occupancy, new_target_occupancy);
+  44   _target_occupancy = new_target_occupancy;
+  45 }
+  46 
+  47 void G1IHOPControl::update_allocation_info(double allocation_time_s, size_t allocated_bytes, size_t additional_buffer_size) {
+  48   assert(allocation_time_s &gt;= 0.0, "Allocation time must be positive but is %.3f", allocation_time_s);
+  49 
+  50   _last_allocation_time_s = allocation_time_s;
+  51   _last_allocated_bytes = allocated_bytes;
+  52 }
+  53 
+  54 void G1IHOPControl::print() {
+  55   assert(_target_occupancy &gt; 0, "Target occupancy still not updated yet.");
+  56   size_t cur_conc_mark_start_threshold = get_conc_mark_start_threshold();
+  57   log_debug(gc, ihop)("Basic information (value update), threshold: " SIZE_FORMAT "B (%1.2f), target occupancy: " SIZE_FORMAT "B, current occupancy: " SIZE_FORMAT "B, "
+  58                       "recent allocation size: " SIZE_FORMAT "B, recent allocation duration: %1.2fms, recent old gen allocation rate: %1.2fB/s, recent marking phase length: %1.2fms",
+  59                       cur_conc_mark_start_threshold,
+  60                       cur_conc_mark_start_threshold * 100.0 / _target_occupancy,
+  61                       _target_occupancy,
+  62                       G1CollectedHeap::heap()-&gt;used(),
+  63                       _last_allocated_bytes,
+  64                       _last_allocation_time_s * 1000.0,
+  65                       _last_allocation_time_s &gt; 0.0 ? _last_allocated_bytes / _last_allocation_time_s : 0.0,
+  66                       last_marking_length_s() * 1000.0);
+  67 }
+  68 
+  69 void G1IHOPControl::send_trace_event(G1NewTracer* tracer) {
+  70   assert(_target_occupancy &gt; 0, "Target occupancy still not updated yet.");
+  71   tracer-&gt;report_basic_ihop_statistics(get_conc_mark_start_threshold(),
+  72                                        _target_occupancy,
+  73                                        G1CollectedHeap::heap()-&gt;used(),
+  74                                        _last_allocated_bytes,
+  75                                        _last_allocation_time_s,
+  76                                        last_marking_length_s());
+  77 }
+  78 
+  79 G1StaticIHOPControl::G1StaticIHOPControl(double ihop_percent) :
+  80   G1IHOPControl(ihop_percent),
+  81   _last_marking_length_s(0.0) {
+  82 }
+  83 
+  84 #ifndef PRODUCT
+  85 static void test_update(G1IHOPControl* ctrl, double alloc_time, size_t alloc_amount, size_t young_size, double mark_time) {
+  86   for (int i = 0; i &lt; 100; i++) {
+  87     ctrl-&gt;update_allocation_info(alloc_time, alloc_amount, young_size);
+  88     ctrl-&gt;update_marking_length(mark_time);
+  89   }
+  90 }
+  91 
+  92 void G1StaticIHOPControl::test() {
+  93   size_t const initial_ihop = 45;
+  94 
+  95   G1StaticIHOPControl ctrl(initial_ihop);
+  96   ctrl.update_target_occupancy(100);
+  97 
+  98   size_t threshold = ctrl.get_conc_mark_start_threshold();
+  99   assert(threshold == initial_ihop,
+ 100          "Expected IHOP threshold of " SIZE_FORMAT " but is " SIZE_FORMAT, initial_ihop, threshold);
+ 101 
+ 102   ctrl.update_allocation_info(100.0, 100, 100);
+ 103   threshold = ctrl.get_conc_mark_start_threshold();
+ 104   assert(threshold == initial_ihop,
+ 105          "Expected IHOP threshold of " SIZE_FORMAT " but is " SIZE_FORMAT, initial_ihop, threshold);
+ 106 
+ 107   ctrl.update_marking_length(1000.0);
+ 108   threshold = ctrl.get_conc_mark_start_threshold();
+ 109   assert(threshold == initial_ihop,
+ 110          "Expected IHOP threshold of " SIZE_FORMAT " but is " SIZE_FORMAT, initial_ihop, threshold);
+ 111 
+ 112   // Whatever we pass, the IHOP value must stay the same.
+ 113   test_update(&amp;ctrl, 2, 10, 10, 3);
+ 114   threshold = ctrl.get_conc_mark_start_threshold();
+ 115   assert(threshold == initial_ihop,
+ 116          "Expected IHOP threshold of " SIZE_FORMAT " but is " SIZE_FORMAT, initial_ihop, threshold);
+ 117 
+ 118   test_update(&amp;ctrl, 12, 10, 10, 3);
+ 119   threshold = ctrl.get_conc_mark_start_threshold();
+ 120   assert(threshold == initial_ihop,
+ 121          "Expected IHOP threshold of " SIZE_FORMAT " but is " SIZE_FORMAT, initial_ihop, threshold);
+ 122 }
+ 123 #endif
+ 124 
+ 125 G1AdaptiveIHOPControl::G1AdaptiveIHOPControl(double ihop_percent,
+ 126                                              G1Predictions const* predictor,
+ 127                                              size_t heap_reserve_percent,
+ 128                                              size_t heap_waste_percent) :
+ 129   G1IHOPControl(ihop_percent),
+ 130   _predictor(predictor),
+ 131   _marking_times_s(10, 0.95),
+ 132   _allocation_rate_s(10, 0.95),
+ 133   _last_unrestrained_young_size(0),
+ 134   _heap_reserve_percent(heap_reserve_percent),
+ 135   _heap_waste_percent(heap_waste_percent)
+ 136 {
+ 137 }
+ 138 
+ 139 size_t G1AdaptiveIHOPControl::actual_target_threshold() const {
+ 140   guarantee(_target_occupancy &gt; 0, "Target occupancy still not updated yet.");
+ 141   // The actual target threshold takes the heap reserve and the expected waste in
+ 142   // free space  into account.
+ 143   // _heap_reserve is that part of the total heap capacity that is reserved for
+ 144   // eventual promotion failure.
+ 145   // _heap_waste is the amount of space will never be reclaimed in any
+ 146   // heap, so can not be used for allocation during marking and must always be
+ 147   // considered.
+ 148 
+ 149   double safe_total_heap_percentage = MIN2((double)(_heap_reserve_percent + _heap_waste_percent), 100.0);
+ 150 
+ 151   return (size_t)MIN2(
+ 152     G1CollectedHeap::heap()-&gt;max_capacity() * (100.0 - safe_total_heap_percentage) / 100.0,
+ 153     _target_occupancy * (100.0 - _heap_waste_percent) / 100.0
+ 154     );
+ 155 }
+ 156 
+ 157 bool G1AdaptiveIHOPControl::have_enough_data_for_prediction() const {
+ 158   return ((size_t)_marking_times_s.num() &gt;= G1AdaptiveIHOPNumInitialSamples) &amp;&amp;
+ 159          ((size_t)_allocation_rate_s.num() &gt;= G1AdaptiveIHOPNumInitialSamples);
+ 160 }
+ 161 
+ 162 size_t G1AdaptiveIHOPControl::get_conc_mark_start_threshold() {
+ 163   if (have_enough_data_for_prediction()) {
+ 164     double pred_marking_time = _predictor-&gt;get_new_prediction(&amp;_marking_times_s);
+ 165     double pred_promotion_rate = _predictor-&gt;get_new_prediction(&amp;_allocation_rate_s);
+ 166     size_t pred_promotion_size = (size_t)(pred_marking_time * pred_promotion_rate);
+ 167 
+ 168     size_t predicted_needed_bytes_during_marking =
+ 169       pred_promotion_size +
+ 170       // In reality we would need the maximum size of the young gen during
+ 171       // marking. This is a conservative estimate.
+ 172       _last_unrestrained_young_size;
+ 173 
+ 174     size_t internal_threshold = actual_target_threshold();
+ 175     size_t predicted_initiating_threshold = predicted_needed_bytes_during_marking &lt; internal_threshold ?
+ 176                                             internal_threshold - predicted_needed_bytes_during_marking :
+ 177                                             0;
+ 178     return predicted_initiating_threshold;
+ 179   } else {
+ 180     // Use the initial value.
+ 181     return (size_t)(_initial_ihop_percent * _target_occupancy / 100.0);
+ 182   }
+ 183 }
+ 184 
+ 185 void G1AdaptiveIHOPControl::update_allocation_info(double allocation_time_s,
+ 186                                                    size_t allocated_bytes,
+ 187                                                    size_t additional_buffer_size) {
+ 188   G1IHOPControl::update_allocation_info(allocation_time_s, allocated_bytes, additional_buffer_size);
+ 189 
+ 190   double allocation_rate = (double) allocated_bytes / allocation_time_s;
+ 191   _allocation_rate_s.add(allocation_rate);
+ 192 
+ 193   _last_unrestrained_young_size = additional_buffer_size;
+ 194 }
+ 195 
+ 196 void G1AdaptiveIHOPControl::update_marking_length(double marking_length_s) {
+ 197    assert(marking_length_s &gt;= 0.0, "Marking length must be larger than zero but is %.3f", marking_length_s);
+ 198   _marking_times_s.add(marking_length_s);
+ 199 }
+ 200 
+ 201 void G1AdaptiveIHOPControl::print() {
+ 202   G1IHOPControl::print();
+ 203   size_t actual_target = actual_target_threshold();
+ 204   log_debug(gc, ihop)("Adaptive IHOP information (value update), threshold: " SIZE_FORMAT "B (%1.2f), internal target occupancy: " SIZE_FORMAT "B, "
+ 205                       "occupancy: " SIZE_FORMAT "B, additional buffer size: " SIZE_FORMAT "B, predicted old gen allocation rate: %1.2fB/s, "
+ 206                       "predicted marking phase length: %1.2fms, prediction active: %s",
+ 207                       get_conc_mark_start_threshold(),
+ 208                       percent_of(get_conc_mark_start_threshold(), actual_target),
+ 209                       actual_target,
+ 210                       G1CollectedHeap::heap()-&gt;used(),
+ 211                       _last_unrestrained_young_size,
+ 212                       _predictor-&gt;get_new_prediction(&amp;_allocation_rate_s),
+ 213                       _predictor-&gt;get_new_prediction(&amp;_marking_times_s) * 1000.0,
+ 214                       have_enough_data_for_prediction() ? "true" : "false");
+ 215 }
+ 216 
+ 217 void G1AdaptiveIHOPControl::send_trace_event(G1NewTracer* tracer) {
+ 218   G1IHOPControl::send_trace_event(tracer);
+ 219   tracer-&gt;report_adaptive_ihop_statistics(get_conc_mark_start_threshold(),
+ 220                                           actual_target_threshold(),
+ 221                                           G1CollectedHeap::heap()-&gt;used(),
+ 222                                           _last_unrestrained_young_size,
+ 223                                           _predictor-&gt;get_new_prediction(&amp;_allocation_rate_s),
+ 224                                           _predictor-&gt;get_new_prediction(&amp;_marking_times_s),
+ 225                                           have_enough_data_for_prediction());
+ 226 }
+ 227 
+ 228 #ifndef PRODUCT
+ 229 void G1AdaptiveIHOPControl::test() {
+ 230   size_t const initial_threshold = 45;
+ 231   size_t const young_size = 10;
+ 232   size_t const target_size = 100;
+ 233 
+ 234   // The final IHOP value is always
+ 235   // target_size - (young_size + alloc_amount/alloc_time * marking_time)
+ 236 
+ 237   G1Predictions pred(0.95);
+ 238   G1AdaptiveIHOPControl ctrl(initial_threshold, &amp;pred, 0, 0);
+ 239   ctrl.update_target_occupancy(target_size);
+ 240 
+ 241   // First "load".
+ 242   size_t const alloc_time1 = 2;
+ 243   size_t const alloc_amount1 = 10;
+ 244   size_t const marking_time1 = 2;
+ 245   size_t const settled_ihop1 = target_size - (young_size + alloc_amount1/alloc_time1 * marking_time1);
+ 246 
+ 247   size_t threshold;
+ 248   threshold = ctrl.get_conc_mark_start_threshold();
+ 249   assert(threshold == initial_threshold,
+ 250          "Expected IHOP threshold of " SIZE_FORMAT " but is " SIZE_FORMAT, initial_threshold, threshold);
+ 251   for (size_t i = 0; i &lt; G1AdaptiveIHOPNumInitialSamples - 1; i++) {
+ 252     ctrl.update_allocation_info(alloc_time1, alloc_amount1, young_size);
+ 253     ctrl.update_marking_length(marking_time1);
+ 254     // Not enough data yet.
+ 255     threshold = ctrl.get_conc_mark_start_threshold();
+ 256     assert(threshold == initial_threshold,
+ 257            "Expected IHOP threshold of " SIZE_FORMAT " but is " SIZE_FORMAT, initial_threshold, threshold);
+ 258   }
+ 259 
+ 260   test_update(&amp;ctrl, alloc_time1, alloc_amount1, young_size, marking_time1);
+ 261 
+ 262   threshold = ctrl.get_conc_mark_start_threshold();
+ 263   assert(threshold == settled_ihop1,
+ 264          "Expected IHOP threshold to settle at " SIZE_FORMAT " but is " SIZE_FORMAT, settled_ihop1, threshold);
+ 265 
+ 266   // Second "load". A bit higher allocation rate.
+ 267   size_t const alloc_time2 = 2;
+ 268   size_t const alloc_amount2 = 30;
+ 269   size_t const marking_time2 = 2;
+ 270   size_t const settled_ihop2 = target_size - (young_size + alloc_amount2/alloc_time2 * marking_time2);
+ 271 
+ 272   test_update(&amp;ctrl, alloc_time2, alloc_amount2, young_size, marking_time2);
+ 273 
+ 274   threshold = ctrl.get_conc_mark_start_threshold();
+ 275   assert(threshold &lt; settled_ihop1,
+ 276          "Expected IHOP threshold to settle at a value lower than " SIZE_FORMAT " but is " SIZE_FORMAT, settled_ihop1, threshold);
+ 277 
+ 278   // Third "load". Very high (impossible) allocation rate.
+ 279   size_t const alloc_time3 = 1;
+ 280   size_t const alloc_amount3 = 50;
+ 281   size_t const marking_time3 = 2;
+ 282   size_t const settled_ihop3 = 0;
+ 283 
+ 284   test_update(&amp;ctrl, alloc_time3, alloc_amount3, young_size, marking_time3);
+ 285   threshold = ctrl.get_conc_mark_start_threshold();
+ 286 
+ 287   assert(threshold == settled_ihop3,
+ 288          "Expected IHOP threshold to settle at " SIZE_FORMAT " but is " SIZE_FORMAT, settled_ihop3, threshold);
+ 289 
+ 290   // And back to some arbitrary value.
+ 291   test_update(&amp;ctrl, alloc_time2, alloc_amount2, young_size, marking_time2);
+ 292 
+ 293   threshold = ctrl.get_conc_mark_start_threshold();
+ 294   assert(threshold &gt; settled_ihop3,
+ 295          "Expected IHOP threshold to settle at value larger than " SIZE_FORMAT " but is " SIZE_FORMAT, settled_ihop3, threshold);
+ 296 }
+ 297 
+ 298 void IHOP_test() {
+ 299   G1StaticIHOPControl::test();
+ 300   G1AdaptiveIHOPControl::test();
+ 301 }
+ 302 #endif
+</pre></body></html>

@@ -1,0 +1,245 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>hotspot Cdiff test/runtime/SharedArchiveFile/SASymbolTableTest.java</title>
+</head>
+<body id="SUNWwebrev">
+<center><a href='../../../test/jprt.config.cdiff.html' target='_top'>&lt prev</a> <a href='../../../index.html' target='_top'>index</a> <a href='../../../test/runtime/SharedArchiveFile/SASymbolTableTestAgent.java.cdiff.html' target='_top'>next &gt</a></center>
+<h2>test/runtime/SharedArchiveFile/SASymbolTableTest.java</h2>
+        <a class="print" href="javascript:print()">Print this page</a>
+<pre></pre>
+        <pre>
+<hr /><span class="oldmarker">*** 32,49 ****</span>
+   *          jdk.hotspot.agent/sun.jvm.hotspot.oops
+   *          jdk.hotspot.agent/sun.jvm.hotspot.memory
+   *          jdk.hotspot.agent/sun.jvm.hotspot.runtime
+   *          jdk.hotspot.agent/sun.jvm.hotspot.tools
+   *          java.management
+<span class="changed">!  * @build SASymbolTableTestAgent SASymbolTableTestAttachee</span>
+   * @run main SASymbolTableTest
+   */
+  
+  import jdk.test.lib.process.ProcessTools;
+  import jdk.test.lib.process.OutputAnalyzer;
+  import jdk.test.lib.JDKToolFinder;
+  import jdk.test.lib.Platform;
+  
+  /*
+   * The purpose of this test is to validate that we can use SA to
+   * attach a process and walk its SymbolTable, regardless whether
+   * the attachee process runs in CDS mode or not.
+<span class="newmarker">--- 32,52 ----</span>
+   *          jdk.hotspot.agent/sun.jvm.hotspot.oops
+   *          jdk.hotspot.agent/sun.jvm.hotspot.memory
+   *          jdk.hotspot.agent/sun.jvm.hotspot.runtime
+   *          jdk.hotspot.agent/sun.jvm.hotspot.tools
+   *          java.management
+<span class="changed">!  * @build SASymbolTableTestAgent</span>
+   * @run main SASymbolTableTest
+   */
+  
+<span class="new">+ import java.util.Arrays;</span>
+<span class="new">+ import java.util.List;</span>
+  import jdk.test.lib.process.ProcessTools;
+  import jdk.test.lib.process.OutputAnalyzer;
+  import jdk.test.lib.JDKToolFinder;
+  import jdk.test.lib.Platform;
+<span class="new">+ import jdk.test.lib.apps.LingeredApp;</span>
+  
+  /*
+   * The purpose of this test is to validate that we can use SA to
+   * attach a process and walk its SymbolTable, regardless whether
+   * the attachee process runs in CDS mode or not.
+<hr /><span class="oldmarker">*** 51,60 ****</span>
+<span class="newmarker">--- 54,64 ----</span>
+   * SASymbolTableTest Just sets up the agent and attachee processes.
+   * The SymbolTable walking is done in the SASymbolTableTestAgent class.
+   */
+  public class SASymbolTableTest {
+      static String jsaName = "./SASymbolTableTest.jsa";
+<span class="new">+     private static LingeredApp theApp = null;</span>
+  
+      public static void main(String[] args) throws Exception {
+          if (!Platform.shouldSAAttach()) {
+              System.out.println("SA attach not expected to work - test skipped.");
+              return;
+<hr /><span class="oldmarker">*** 76,127 ****</span>
+      }
+  
+      private static void run(boolean useArchive) throws Exception {
+          String flag = useArchive ? "auto" : "off";
+  
+          // (1) Launch the attachee process
+<span class="changed">!         ProcessBuilder attachee = ProcessTools.createJavaProcessBuilder(</span>
+              "-XX:+UnlockDiagnosticVMOptions",
+              "-XX:SharedArchiveFile=" + jsaName,
+              "-Xshare:" + flag,
+<span class="changed">!             "-showversion",                // so we can see "sharing" in the output</span>
+<span class="changed">!             "SASymbolTableTestAttachee");</span>
+  
+<span class="changed">!         final Process p = attachee.start();</span>
+  
+          // (2) Launch the agent process
+<span class="changed">!         long pid = p.getPid();</span>
+<span class="changed">!         System.out.println("Attaching agent " + pid);</span>
+          ProcessBuilder tool = ProcessTools.createJavaProcessBuilder(
+              "--add-modules=jdk.hotspot.agent",
+              "--add-exports=jdk.hotspot.agent/sun.jvm.hotspot.oops=ALL-UNNAMED",
+              "--add-exports=jdk.hotspot.agent/sun.jvm.hotspot.memory=ALL-UNNAMED",
+              "--add-exports=jdk.hotspot.agent/sun.jvm.hotspot.runtime=ALL-UNNAMED",
+              "--add-exports=jdk.hotspot.agent/sun.jvm.hotspot.tools=ALL-UNNAMED",
+              "SASymbolTableTestAgent",
+              Long.toString(pid));
+          OutputAnalyzer output = ProcessTools.executeProcess(tool);
+<span class="removed">-         System.out.println(output.getOutput());</span>
+<span class="removed">-         output.shouldHaveExitValue(0);</span>
+<span class="removed">- </span>
+<span class="removed">-         Thread t = new Thread() {</span>
+<span class="removed">-                 public void run() {</span>
+<span class="removed">-                     try {</span>
+<span class="removed">-                         OutputAnalyzer output = new OutputAnalyzer(p);</span>
+                          System.out.println("STDOUT[");
+<span class="changed">!                         System.out.print(output.getStdout());</span>
+                          System.out.println("]");
+                          System.out.println("STDERR[");
+                          System.out.print(output.getStderr());
+                          System.out.println("]");
+<span class="changed">!                     } catch (Throwable t) {</span>
+<span class="changed">!                         t.printStackTrace();</span>
+<span class="changed">!                     }</span>
+                  }
+<span class="removed">-             };</span>
+<span class="removed">-         t.start();</span>
+<span class="removed">- </span>
+<span class="removed">-         Thread.sleep(2 * 1000);</span>
+<span class="removed">-         p.destroy();</span>
+<span class="removed">-         t.join();</span>
+      }
+  }
+<span class="newmarker">--- 80,125 ----</span>
+      }
+  
+      private static void run(boolean useArchive) throws Exception {
+          String flag = useArchive ? "auto" : "off";
+  
+<span class="new">+         try {</span>
+              // (1) Launch the attachee process
+<span class="changed">!             System.out.println("Starting LingeredApp");</span>
+<span class="changed">!             List&lt;String&gt; vmOpts = Arrays.asList(</span>
+                      "-XX:+UnlockDiagnosticVMOptions",
+                      "-XX:SharedArchiveFile=" + jsaName,
+                      "-Xshare:" + flag,
+<span class="changed">!                     "-showversion");                // so we can see "sharing" in the output</span>
+  
+<span class="changed">!             theApp = LingeredApp.startApp(vmOpts);</span>
+  
+              // (2) Launch the agent process
+<span class="changed">!             long pid = theApp.getPid();</span>
+<span class="changed">!             System.out.println("Attaching agent to " + pid );</span>
+              ProcessBuilder tool = ProcessTools.createJavaProcessBuilder(
+                      "--add-modules=jdk.hotspot.agent",
+                      "--add-exports=jdk.hotspot.agent/sun.jvm.hotspot.oops=ALL-UNNAMED",
+                      "--add-exports=jdk.hotspot.agent/sun.jvm.hotspot.memory=ALL-UNNAMED",
+                      "--add-exports=jdk.hotspot.agent/sun.jvm.hotspot.runtime=ALL-UNNAMED",
+                      "--add-exports=jdk.hotspot.agent/sun.jvm.hotspot.tools=ALL-UNNAMED",
+                      "SASymbolTableTestAgent",
+                      Long.toString(pid));
+              OutputAnalyzer output = ProcessTools.executeProcess(tool);
+              System.out.println("STDOUT[");
+<span class="changed">!             System.out.println(output.getOutput());</span>
+<span class="changed">!             if (output.getStdout().contains("connected too early")) {</span>
+<span class="changed">!                 System.out.println("SymbolTable not created by VM - test skipped");</span>
+<span class="changed">!                 return;</span>
+<span class="changed">!             }</span>
+              System.out.println("]");
+              System.out.println("STDERR[");
+              System.out.print(output.getStderr());
+              System.out.println("]");
+<span class="changed">!             output.shouldHaveExitValue(0);</span>
+<span class="changed">!         } catch (Exception ex) {</span>
+<span class="changed">!             throw new RuntimeException("Test ERROR " + ex, ex);</span>
+<span class="changed">!         } finally {</span>
+<span class="changed">!             LingeredApp.stopApp(theApp);</span>
+          }
+      }
+  }
+</pre>
+<center><a href='../../../test/jprt.config.cdiff.html' target='_top'>&lt prev</a> <a href='../../../index.html' target='_top'>index</a> <a href='../../../test/runtime/SharedArchiveFile/SASymbolTableTestAgent.java.cdiff.html' target='_top'>next &gt</a></center>
+</body></html>
+

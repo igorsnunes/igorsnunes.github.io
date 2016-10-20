@@ -1,0 +1,263 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+    <script type="text/javascript" src="../../../../ancnav.js"></script>
+    </head>
+    <body id="SUNWwebrev" onkeypress="keypress(event);">
+    <a name="0"></a>
+    <pre></pre><hr></hr>
+<pre>
+   1 /*
+   2  * Copyright (c) 2016, Oracle and/or its affiliates. All rights reserved.
+   3  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+   4  *
+   5  * This code is free software; you can redistribute it and/or modify it
+   6  * under the terms of the GNU General Public License version 2 only, as
+   7  * published by the Free Software Foundation.
+   8  *
+   9  * This code is distributed in the hope that it will be useful, but WITHOUT
+  10  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+  11  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+  12  * version 2 for more details (a copy is included in the LICENSE file that
+  13  * accompanied this code).
+  14  *
+  15  * You should have received a copy of the GNU General Public License version
+  16  * 2 along with this work; if not, write to the Free Software Foundation,
+  17  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+  18  *
+  19  * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+  20  * or visit www.oracle.com if you need additional information or have any
+  21  * questions.
+  22  *
+  23  */
+  24 
+  25 #include "precompiled.hpp"
+  26 
+  27 #ifndef PRODUCT
+  28 
+  29 #include "utilities/internalVMTests.hpp"
+  30 #include "utilities/macros.hpp"
+  31 #include "utilities/ostream.hpp"
+  32 
+  33 #define run_unit_test(unit_test_function_call)                \
+  34   void unit_test_function_call();                             \
+  35   run_test(#unit_test_function_call, unit_test_function_call);
+  36 
+  37 void InternalVMTests::run_test(const char* name, void (*test)()) {
+  38   tty-&gt;print_cr("Running test: %s", name);
+  39   test();
+  40 }
+  41 
+  42 void InternalVMTests::run() {
+  43   tty-&gt;print_cr("Running internal VM tests");
+  44   run_unit_test(TestDependencyContext_test);
+  45   run_unit_test(test_semaphore);
+  46   run_unit_test(TestOS_test);
+  47   run_unit_test(TestReservedSpace_test);
+  48   run_unit_test(TestReserveMemorySpecial_test);
+  49   run_unit_test(TestVirtualSpace_test);
+  50   run_unit_test(TestMetaspaceAux_test);
+  51   run_unit_test(TestMetachunk_test);
+  52   run_unit_test(TestVirtualSpaceNode_test);
+  53   run_unit_test(TestGlobalDefinitions_test);
+  54   run_unit_test(GCTimer_test);
+  55   run_unit_test(CollectedHeap_test);
+  56   run_unit_test(QuickSort_test);
+  57   run_unit_test(GuardedMemory_test);
+  58   run_unit_test(TestNewSize_test);
+  59   run_unit_test(TestOldSize_test);
+  60   run_unit_test(TestBitMap_test);
+  61   run_unit_test(TestResourcehash_test);
+  62   run_unit_test(ObjectMonitor_test);
+<a name="1" id="anc1"></a>
+  63   run_unit_test(Test_log_tag_combinations_limit);
+  64   run_unit_test(Test_logtarget);
+  65   run_unit_test(Test_logstream);
+  66   run_unit_test(Test_loghandle);
+  67   run_unit_test(Test_logtargethandle);
+  68   run_unit_test(Test_log_gctracetime);
+  69   run_unit_test(Test_configure_stdout);
+  70   run_unit_test(Test_logconfiguration_subscribe);
+  71   run_unit_test(Test_log_prefix);
+  72   run_unit_test(Test_log_big);
+  73   run_unit_test(Test_logtagset_duplicates);
+  74   run_unit_test(Test_logtagset_descriptions);
+  75   run_unit_test(Test_log_file_startup_rotation);
+  76   run_unit_test(Test_log_file_startup_truncation);
+  77   run_unit_test(Test_invalid_log_file);
+  78   run_unit_test(Test_multiline_logging);
+  79   run_unit_test(DirectivesParser_test);
+  80 #if INCLUDE_VM_STRUCTS
+  81   run_unit_test(VMStructs_test);
+  82 #endif
+  83 #if INCLUDE_ALL_GCS
+  84   run_unit_test(TestG1BiasedArray_test);
+  85   run_unit_test(TestBufferingOopClosure_test);
+  86   if (UseG1GC) {
+  87     run_unit_test(FreeRegionList_test);
+<a name="2" id="anc2"></a>
+  88   }
+  89   run_unit_test(WorkerDataArray_test);
+  90   run_unit_test(ParallelCompact_test);
+  91 #endif
+  92   tty-&gt;print_cr("All internal VM tests passed");
+  93 }
+  94 
+  95 #endif
+<a name="3" id="anc3"></a><b style="font-size: large; color: red">--- EOF ---</b>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</pre><form name="eof"><input name="value" value="3" type="hidden" /></form></body></html>

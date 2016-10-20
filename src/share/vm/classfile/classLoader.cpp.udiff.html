@@ -1,0 +1,156 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>hotspot Udiff src/share/vm/classfile/classLoader.cpp</title>
+
+<style type="text/css" media="screen">
+span.new {
+    color: blue;
+    font-weight: normal;
+}
+</style>
+
+</head>
+<body id="SUNWwebrev">
+<center><a href='../../../../src/os_cpu/solaris_x86/vm/os_solaris_x86.cpp.udiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/share/vm/gc/cms/concurrentMarkSweepGeneration.hpp.udiff.html' target='_top'>next &gt</a></center>
+<h2>src/share/vm/classfile/classLoader.cpp</h2>
+        <a class="print" href="javascript:print()">Print this page</a>
+<pre></pre>
+        <pre>
+</pre><hr /><pre>
+<span class="newmarker">@@ -79,21 +79,19 @@</span>
+ 
+ typedef void * * (JNICALL *ZipOpen_t)(const char *name, char **pmsg);
+ typedef void (JNICALL *ZipClose_t)(jzfile *zip);
+ typedef jzentry* (JNICALL *FindEntry_t)(jzfile *zip, const char *name, jint *sizeP, jint *nameLen);
+ typedef jboolean (JNICALL *ReadEntry_t)(jzfile *zip, jzentry *entry, unsigned char *buf, char *namebuf);
+<span class="removed">-typedef jboolean (JNICALL *ReadMappedEntry_t)(jzfile *zip, jzentry *entry, unsigned char **buf, char *namebuf);</span>
+ typedef jzentry* (JNICALL *GetNextEntry_t)(jzfile *zip, jint n);
+ typedef jboolean (JNICALL *ZipInflateFully_t)(void *inBuf, jlong inLen, void *outBuf, jlong outLen, char **pmsg);
+ typedef jint     (JNICALL *Crc32_t)(jint crc, const jbyte *buf, jint len);
+ typedef void     (JNICALL *FreeEntry_t)(jzfile *zip, jzentry *entry);
+ 
+ static ZipOpen_t         ZipOpen            = NULL;
+ static ZipClose_t        ZipClose           = NULL;
+ static FindEntry_t       FindEntry          = NULL;
+ static ReadEntry_t       ReadEntry          = NULL;
+<span class="removed">-static ReadMappedEntry_t ReadMappedEntry    = NULL;</span>
+ static GetNextEntry_t    GetNextEntry       = NULL;
+ static canonicalize_fn_t CanonicalizeEntry  = NULL;
+ static ZipInflateFully_t ZipInflateFully    = NULL;
+ static Crc32_t           Crc32              = NULL;
+ static FreeEntry_t       FreeEntry          = NULL;
+</pre><hr /><pre>
+<span class="newmarker">@@ -351,19 +349,14 @@</span>
+     filename = name_buf;
+   } else {
+     filename = NEW_RESOURCE_ARRAY(char, name_len + 1);
+   }
+ 
+<span class="removed">-  // file found, get pointer to the entry in mmapped jar file.</span>
+<span class="removed">-  if (ReadMappedEntry == NULL ||</span>
+<span class="removed">-      !(*ReadMappedEntry)(_zip, entry, &amp;buffer, filename)) {</span>
+<span class="removed">-      // mmapped access not available, perhaps due to compression,</span>
+       // read contents into resource array
+       int size = (*filesize) + ((nul_terminate) ? 1 : 0);
+       buffer = NEW_RESOURCE_ARRAY(u1, size);
+       if (!(*ReadEntry)(_zip, entry, buffer, filename)) return NULL;
+<span class="removed">-  }</span>
+ 
+   // return result
+   if (nul_terminate) {
+     buffer[*filesize] = 0;
+   }
+</pre><hr /><pre>
+<span class="newmarker">@@ -1077,11 +1070,10 @@</span>
+   // Lookup zip entry points
+   ZipOpen      = CAST_TO_FN_PTR(ZipOpen_t, os::dll_lookup(handle, "ZIP_Open"));
+   ZipClose     = CAST_TO_FN_PTR(ZipClose_t, os::dll_lookup(handle, "ZIP_Close"));
+   FindEntry    = CAST_TO_FN_PTR(FindEntry_t, os::dll_lookup(handle, "ZIP_FindEntry"));
+   ReadEntry    = CAST_TO_FN_PTR(ReadEntry_t, os::dll_lookup(handle, "ZIP_ReadEntry"));
+<span class="removed">-  ReadMappedEntry = CAST_TO_FN_PTR(ReadMappedEntry_t, os::dll_lookup(handle, "ZIP_ReadMappedEntry"));</span>
+   GetNextEntry = CAST_TO_FN_PTR(GetNextEntry_t, os::dll_lookup(handle, "ZIP_GetNextEntry"));
+   ZipInflateFully = CAST_TO_FN_PTR(ZipInflateFully_t, os::dll_lookup(handle, "ZIP_InflateFully"));
+   Crc32        = CAST_TO_FN_PTR(Crc32_t, os::dll_lookup(handle, "ZIP_CRC32"));
+   FreeEntry    = CAST_TO_FN_PTR(FreeEntry_t, os::dll_lookup(handle, "ZIP_FreeEntry"));
+ 
+</pre>
+<center><a href='../../../../src/os_cpu/solaris_x86/vm/os_solaris_x86.cpp.udiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/share/vm/gc/cms/concurrentMarkSweepGeneration.hpp.udiff.html' target='_top'>next &gt</a></center>
+</body></html>
+

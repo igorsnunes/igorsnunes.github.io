@@ -1,0 +1,15 @@
+--- old/src/share/vm/logging/logFileOutput.cpp	2016-10-20 11:02:27.144093218 -0200
++++ new/src/share/vm/logging/logFileOutput.cpp	2016-10-20 11:02:27.080093282 -0200
+@@ -97,11 +97,7 @@
+   if (ret != 0) {
+     return false;
+   }
+-#ifdef _WINDOWS
+-  return (st.st_mode & S_IFMT) == _S_IFREG;
+-#else
+-  return S_ISREG(st.st_mode);
+-#endif
++  return (st.st_mode & S_IFMT) == S_IFREG;
+ }
+ 
+ // Try to find the next number that should be used for file rotation.

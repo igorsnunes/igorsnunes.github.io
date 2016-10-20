@@ -1,0 +1,221 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>hotspot Sdiff src/os/windows/vm </title>
+</head><body id="SUNWwebrev">
+<center><a href='../../../../src/cpu/ppc/vm/templateInterpreterGenerator_ppc.cpp.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/os_cpu/bsd_x86/vm/os_bsd_x86.cpp.sdiff.html' target='_top'>next &gt</a></center>
+<h2>src/os/windows/vm/os_windows.cpp</h2>
+<a class="print" href="javascript:print()">Print this page</a>
+<pre></pre>
+
+<table><tr valign="top">
+<td><pre>
+
+</pre><hr></hr><pre>
+2349 #endif // !_WIN64
+2350 
+2351   return EXCEPTION_CONTINUE_SEARCH;
+2352 }
+2353 
+2354 static inline void report_error(Thread* t, DWORD exception_code,
+2355                                 address addr, void* siginfo, void* context) {
+2356   VMError::report_and_die(t, exception_code, addr, siginfo, context);
+2357 
+2358   // If UseOsErrorReporting, this will return here and save the error file
+2359   // somewhere where we can find it in the minidump.
+2360 }
+2361 
+2362 bool os::win32::get_frame_at_stack_banging_point(JavaThread* thread,
+2363         struct _EXCEPTION_POINTERS* exceptionInfo, address pc, frame* fr) {
+2364   PEXCEPTION_RECORD exceptionRecord = exceptionInfo-&gt;ExceptionRecord;
+2365   address addr = (address) exceptionRecord-&gt;ExceptionInformation[1];
+2366   if (Interpreter::contains(pc)) {
+2367     *fr = os::fetch_frame_from_context((void*)exceptionInfo-&gt;ContextRecord);
+2368     if (!fr-&gt;is_first_java_frame()) {
+<span class="changed">2369       assert(fr-&gt;safe_for_sender(thread), "Safety check");</span>
+
+
+2370       *fr = fr-&gt;java_sender();
+2371     }
+2372   } else {
+2373     // more complex code with compiled code
+2374     assert(!Interpreter::contains(pc), "Interpreted methods should have been handled above");
+2375     CodeBlob* cb = CodeCache::find_blob(pc);
+2376     if (cb == NULL || !cb-&gt;is_nmethod() || cb-&gt;is_frame_complete_at(pc)) {
+2377       // Not sure where the pc points to, fallback to default
+2378       // stack overflow handling
+2379       return false;
+2380     } else {
+2381       *fr = os::fetch_frame_from_context((void*)exceptionInfo-&gt;ContextRecord);
+2382       // in compiled code, the stack banging is performed just after the return pc
+2383       // has been pushed on the stack
+2384       *fr = frame(fr-&gt;sp() + 1, fr-&gt;fp(), (address)*(fr-&gt;sp()));
+2385       if (!fr-&gt;is_java_frame()) {
+<span class="changed">2386         assert(fr-&gt;safe_for_sender(thread), "Safety check");</span>
+2387         *fr = fr-&gt;java_sender();
+2388       }
+2389     }
+2390   }
+2391   assert(fr-&gt;is_java_frame(), "Safety check");
+2392   return true;
+2393 }
+2394 
+2395 //-----------------------------------------------------------------------------
+2396 LONG WINAPI topLevelExceptionFilter(struct _EXCEPTION_POINTERS* exceptionInfo) {
+2397   if (InterceptOSException) return EXCEPTION_CONTINUE_SEARCH;
+2398   DWORD exception_code = exceptionInfo-&gt;ExceptionRecord-&gt;ExceptionCode;
+2399 #ifdef _M_IA64
+2400   // On Itanium, we need the "precise pc", which has the slot number coded
+2401   // into the least 4 bits: 0000=slot0, 0100=slot1, 1000=slot2 (Windows format).
+2402   address pc = (address) exceptionInfo-&gt;ExceptionRecord-&gt;ExceptionAddress;
+2403   // Convert the pc to "Unix format", which has the slot number coded
+2404   // into the least 2 bits: 0000=slot0, 0001=slot1, 0010=slot2
+2405   // This is needed for IA64 because "relocation" / "implicit null check" / "poll instruction"
+2406   // information is saved in the Unix format.
+
+</pre><hr></hr>
+</pre></td><td><pre>
+
+</pre><hr></hr><pre>
+2349 #endif // !_WIN64
+2350 
+2351   return EXCEPTION_CONTINUE_SEARCH;
+2352 }
+2353 
+2354 static inline void report_error(Thread* t, DWORD exception_code,
+2355                                 address addr, void* siginfo, void* context) {
+2356   VMError::report_and_die(t, exception_code, addr, siginfo, context);
+2357 
+2358   // If UseOsErrorReporting, this will return here and save the error file
+2359   // somewhere where we can find it in the minidump.
+2360 }
+2361 
+2362 bool os::win32::get_frame_at_stack_banging_point(JavaThread* thread,
+2363         struct _EXCEPTION_POINTERS* exceptionInfo, address pc, frame* fr) {
+2364   PEXCEPTION_RECORD exceptionRecord = exceptionInfo-&gt;ExceptionRecord;
+2365   address addr = (address) exceptionRecord-&gt;ExceptionInformation[1];
+2366   if (Interpreter::contains(pc)) {
+2367     *fr = os::fetch_frame_from_context((void*)exceptionInfo-&gt;ContextRecord);
+2368     if (!fr-&gt;is_first_java_frame()) {
+<span class="changed">2369       // get_frame_at_stack_banging_point() is only called when we</span>
+<span class="changed">2370       // have well defined stacks so java_sender() calls do not need</span>
+<span class="changed">2371       // to assert safe_for_sender() first.</span>
+2372       *fr = fr-&gt;java_sender();
+2373     }
+2374   } else {
+2375     // more complex code with compiled code
+2376     assert(!Interpreter::contains(pc), "Interpreted methods should have been handled above");
+2377     CodeBlob* cb = CodeCache::find_blob(pc);
+2378     if (cb == NULL || !cb-&gt;is_nmethod() || cb-&gt;is_frame_complete_at(pc)) {
+2379       // Not sure where the pc points to, fallback to default
+2380       // stack overflow handling
+2381       return false;
+2382     } else {
+2383       *fr = os::fetch_frame_from_context((void*)exceptionInfo-&gt;ContextRecord);
+2384       // in compiled code, the stack banging is performed just after the return pc
+2385       // has been pushed on the stack
+2386       *fr = frame(fr-&gt;sp() + 1, fr-&gt;fp(), (address)*(fr-&gt;sp()));
+2387       if (!fr-&gt;is_java_frame()) {
+<span class="changed">2388         // See java_sender() comment above.</span>
+2389         *fr = fr-&gt;java_sender();
+2390       }
+2391     }
+2392   }
+2393   assert(fr-&gt;is_java_frame(), "Safety check");
+2394   return true;
+2395 }
+2396 
+2397 //-----------------------------------------------------------------------------
+2398 LONG WINAPI topLevelExceptionFilter(struct _EXCEPTION_POINTERS* exceptionInfo) {
+2399   if (InterceptOSException) return EXCEPTION_CONTINUE_SEARCH;
+2400   DWORD exception_code = exceptionInfo-&gt;ExceptionRecord-&gt;ExceptionCode;
+2401 #ifdef _M_IA64
+2402   // On Itanium, we need the "precise pc", which has the slot number coded
+2403   // into the least 4 bits: 0000=slot0, 0100=slot1, 1000=slot2 (Windows format).
+2404   address pc = (address) exceptionInfo-&gt;ExceptionRecord-&gt;ExceptionAddress;
+2405   // Convert the pc to "Unix format", which has the slot number coded
+2406   // into the least 2 bits: 0000=slot0, 0001=slot1, 0010=slot2
+2407   // This is needed for IA64 because "relocation" / "implicit null check" / "poll instruction"
+2408   // information is saved in the Unix format.
+
+</pre><hr></hr>
+</pre></td>
+</tr></table>
+<center><a href='../../../../src/cpu/ppc/vm/templateInterpreterGenerator_ppc.cpp.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/os_cpu/bsd_x86/vm/os_bsd_x86.cpp.sdiff.html' target='_top'>next &gt</a></center>
+</body></html>

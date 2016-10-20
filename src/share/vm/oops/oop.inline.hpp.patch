@@ -1,0 +1,28 @@
+--- old/src/share/vm/oops/oop.inline.hpp	2016-10-20 11:02:28.640091722 -0200
++++ new/src/share/vm/oops/oop.inline.hpp	2016-10-20 11:02:28.576091786 -0200
+@@ -109,7 +109,6 @@
+ }
+ 
+ Klass* oopDesc::klass_or_null() const volatile {
+-  // can be NULL in CMS
+   if (UseCompressedClassPointers) {
+     return Klass::decode_klass(_metadata._compressed_klass);
+   } else {
+@@ -117,6 +116,17 @@
+   }
+ }
+ 
++Klass* oopDesc::klass_or_null_acquire() const volatile {
++  if (UseCompressedClassPointers) {
++    // Workaround for non-const load_acquire parameter.
++    const volatile narrowKlass* addr = &_metadata._compressed_klass;
++    volatile narrowKlass* xaddr = const_cast<volatile narrowKlass*>(addr);
++    return Klass::decode_klass(OrderAccess::load_acquire(xaddr));
++  } else {
++    return (Klass*)OrderAccess::load_ptr_acquire(&_metadata._klass);
++  }
++}
++
+ Klass** oopDesc::klass_addr() {
+   // Only used internally and with CMS and will not work with
+   // UseCompressedOops

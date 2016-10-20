@@ -1,0 +1,187 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>hotspot Sdiff src/cpu/ppc/vm </title>
+</head><body id="SUNWwebrev">
+<center><a href='../../../../.hgtags.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/cpu/ppc/vm/assembler_ppc.inline.hpp.sdiff.html' target='_top'>next &gt</a></center>
+<h2>src/cpu/ppc/vm/assembler_ppc.hpp</h2>
+<a class="print" href="javascript:print()">Print this page</a>
+<pre></pre>
+
+<table><tr valign="top">
+<td><pre>
+
+</pre><hr></hr><pre>
+1558   DEBUG_ONLY(inline void ld_ptr(Register d, ByteSize b, Register s1);)
+1559 
+1560   //  PPC 1, section 3.3.3 Fixed-Point Store Instructions
+1561   inline void stwx( Register d, Register s1, Register s2);
+1562   inline void stw(  Register d, int si16,    Register s1);
+1563   inline void stwu( Register d, int si16,    Register s1);
+1564 
+1565   inline void sthx( Register d, Register s1, Register s2);
+1566   inline void sth(  Register d, int si16,    Register s1);
+1567   inline void sthu( Register d, int si16,    Register s1);
+1568 
+1569   inline void stbx( Register d, Register s1, Register s2);
+1570   inline void stb(  Register d, int si16,    Register s1);
+1571   inline void stbu( Register d, int si16,    Register s1);
+1572 
+1573   inline void stdx( Register d, Register s1, Register s2);
+1574   inline void std(  Register d, int si16,    Register s1);
+1575   inline void stdu( Register d, int si16,    Register s1);
+1576   inline void stdux(Register s, Register a,  Register b);
+1577 
+
+
+
+1578   // PPC 1, section 3.3.13 Move To/From System Register Instructions
+1579   inline void mtlr( Register s1);
+1580   inline void mflr( Register d);
+1581   inline void mtctr(Register s1);
+1582   inline void mfctr(Register d);
+1583   inline void mtcrf(int fxm, Register s);
+1584   inline void mfcr( Register d);
+1585   inline void mcrf( ConditionRegister crd, ConditionRegister cra);
+1586   inline void mtcr( Register s);
+1587 
+1588   // Special purpose registers
+1589   // Exception Register
+1590   inline void mtxer(Register s1);
+1591   inline void mfxer(Register d);
+1592   // Vector Register Save Register
+1593   inline void mtvrsave(Register s1);
+1594   inline void mfvrsave(Register d);
+1595   // Timebase
+1596   inline void mftb(Register d);
+1597   // Introduced with Power 8:
+
+</pre><hr></hr>
+</pre></td><td><pre>
+
+</pre><hr></hr><pre>
+1558   DEBUG_ONLY(inline void ld_ptr(Register d, ByteSize b, Register s1);)
+1559 
+1560   //  PPC 1, section 3.3.3 Fixed-Point Store Instructions
+1561   inline void stwx( Register d, Register s1, Register s2);
+1562   inline void stw(  Register d, int si16,    Register s1);
+1563   inline void stwu( Register d, int si16,    Register s1);
+1564 
+1565   inline void sthx( Register d, Register s1, Register s2);
+1566   inline void sth(  Register d, int si16,    Register s1);
+1567   inline void sthu( Register d, int si16,    Register s1);
+1568 
+1569   inline void stbx( Register d, Register s1, Register s2);
+1570   inline void stb(  Register d, int si16,    Register s1);
+1571   inline void stbu( Register d, int si16,    Register s1);
+1572 
+1573   inline void stdx( Register d, Register s1, Register s2);
+1574   inline void std(  Register d, int si16,    Register s1);
+1575   inline void stdu( Register d, int si16,    Register s1);
+1576   inline void stdux(Register s, Register a,  Register b);
+1577 
+<span class="new">1578   inline void st_ptr(Register d, int si16,    Register s1);</span>
+<span class="new">1579   DEBUG_ONLY(inline void st_ptr(Register d, ByteSize b, Register s1);)</span>
+<span class="new">1580 </span>
+1581   // PPC 1, section 3.3.13 Move To/From System Register Instructions
+1582   inline void mtlr( Register s1);
+1583   inline void mflr( Register d);
+1584   inline void mtctr(Register s1);
+1585   inline void mfctr(Register d);
+1586   inline void mtcrf(int fxm, Register s);
+1587   inline void mfcr( Register d);
+1588   inline void mcrf( ConditionRegister crd, ConditionRegister cra);
+1589   inline void mtcr( Register s);
+1590 
+1591   // Special purpose registers
+1592   // Exception Register
+1593   inline void mtxer(Register s1);
+1594   inline void mfxer(Register d);
+1595   // Vector Register Save Register
+1596   inline void mtvrsave(Register s1);
+1597   inline void mfvrsave(Register d);
+1598   // Timebase
+1599   inline void mftb(Register d);
+1600   // Introduced with Power 8:
+
+</pre><hr></hr>
+</pre></td>
+</tr></table>
+<center><a href='../../../../.hgtags.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/cpu/ppc/vm/assembler_ppc.inline.hpp.sdiff.html' target='_top'>next &gt</a></center>
+</body></html>

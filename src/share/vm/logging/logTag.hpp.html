@@ -1,0 +1,260 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>New src/share/vm/logging/logTag.hpp</title>
+<body id="SUNWwebrev">
+<pre>
+   1 /*
+   2  * Copyright (c) 2015, 2016, Oracle and/or its affiliates. All rights reserved.
+   3  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+   4  *
+   5  * This code is free software; you can redistribute it and/or modify it
+   6  * under the terms of the GNU General Public License version 2 only, as
+   7  * published by the Free Software Foundation.
+   8  *
+   9  * This code is distributed in the hope that it will be useful, but WITHOUT
+  10  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+  11  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+  12  * version 2 for more details (a copy is included in the LICENSE file that
+  13  * accompanied this code).
+  14  *
+  15  * You should have received a copy of the GNU General Public License version
+  16  * 2 along with this work; if not, write to the Free Software Foundation,
+  17  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+  18  *
+  19  * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+  20  * or visit www.oracle.com if you need additional information or have any
+  21  * questions.
+  22  *
+  23  */
+  24 #ifndef SHARE_VM_LOGGING_LOGTAG_HPP
+  25 #define SHARE_VM_LOGGING_LOGTAG_HPP
+  26 
+  27 #include "logging/logTag_ext.hpp"
+  28 #include "memory/allocation.hpp"
+  29 #include "utilities/globalDefinitions.hpp"
+  30 
+  31 // List of available logging tags. New tags should be added here.
+  32 // (The tags 'all', 'disable' and 'help' are special tags that can
+  33 // not be used in log calls, and should not be listed below.)
+  34 #define LOG_TAG_LIST \
+  35   LOG_TAG(add) \
+  36   LOG_TAG(age) \
+  37   LOG_TAG(alloc) \
+  38   LOG_TAG(annotation) \
+  39   LOG_TAG(arguments) \
+  40   LOG_TAG(attach) \
+  41   LOG_TAG(barrier) \
+  42   LOG_TAG(biasedlocking) \
+  43   LOG_TAG(bot) \
+  44   LOG_TAG(breakpoint) \
+  45   LOG_TAG(census) \
+  46   LOG_TAG(class) \
+  47   LOG_TAG(classhisto) \
+  48   LOG_TAG(cleanup) \
+  49   LOG_TAG(compaction) \
+  50   LOG_TAG(constraints) \
+  51   LOG_TAG(constantpool) \
+  52   LOG_TAG(coops) \
+  53   LOG_TAG(cpu) \
+  54   LOG_TAG(cset) \
+  55   LOG_TAG(data) \
+  56   LOG_TAG(defaultmethods) \
+  57   LOG_TAG(dump) \
+  58   LOG_TAG(ergo) \
+  59   LOG_TAG(exceptions) \
+  60   LOG_TAG(exit) \
+  61   LOG_TAG(freelist) \
+  62   LOG_TAG(gc) \
+  63   LOG_TAG(heap) \
+  64   LOG_TAG(humongous) \
+  65   LOG_TAG(ihop) \
+  66   LOG_TAG(iklass) \
+  67   LOG_TAG(init) \
+  68   LOG_TAG(itables) \
+  69   LOG_TAG(jni) \
+  70   LOG_TAG(jvmti) \
+  71   LOG_TAG(liveness) \
+  72   LOG_TAG(load) /* Trace all classes loaded */ \
+  73   LOG_TAG(loader) \
+  74   LOG_TAG(logging) \
+  75   LOG_TAG(mark) \
+  76   LOG_TAG(marking) \
+  77   LOG_TAG(methodcomparator) \
+  78   LOG_TAG(metadata) \
+  79   LOG_TAG(metaspace) \
+  80   LOG_TAG(mmu) \
+  81   LOG_TAG(modules) \
+  82   LOG_TAG(monitorinflation) \
+  83   LOG_TAG(monitormismatch) \
+  84   LOG_TAG(nmethod) \
+  85   LOG_TAG(normalize) \
+  86   LOG_TAG(objecttagging) \
+  87   LOG_TAG(obsolete) \
+  88   LOG_TAG(oopmap) \
+  89   LOG_TAG(os) \
+  90   LOG_TAG(pagesize) \
+  91   LOG_TAG(path) \
+  92   LOG_TAG(phases) \
+  93   LOG_TAG(plab) \
+  94   LOG_TAG(promotion) \
+  95   LOG_TAG(preorder) /* Trace all classes loaded in order referenced (not loaded) */ \
+  96   LOG_TAG(protectiondomain) /* "Trace protection domain verification" */ \
+  97   LOG_TAG(ref) \
+  98   LOG_TAG(redefine) \
+  99   LOG_TAG(refine) \
+ 100   LOG_TAG(region) \
+ 101   LOG_TAG(remset) \
+ 102   LOG_TAG(purge) \
+ 103   LOG_TAG(resolve) \
+ 104   LOG_TAG(safepoint) \
+ 105   LOG_TAG(scavenge) \
+ 106   LOG_TAG(scrub) \
+ 107   LOG_TAG(stacktrace) \
+ 108   LOG_TAG(stackwalk) \
+ 109   LOG_TAG(start) \
+ 110   LOG_TAG(startuptime) \
+ 111   LOG_TAG(state) \
+ 112   LOG_TAG(stats) \
+ 113   LOG_TAG(stringdedup) \
+ 114   LOG_TAG(stringtable) \
+ 115   LOG_TAG(stackmap) \
+ 116   LOG_TAG(subclass) \
+ 117   LOG_TAG(survivor) \
+ 118   LOG_TAG(sweep) \
+ 119   LOG_TAG(task) \
+ 120   DEBUG_ONLY(LOG_TAG(test)) \
+ 121   LOG_TAG(thread) \
+ 122   LOG_TAG(tlab) \
+ 123   LOG_TAG(time) \
+ 124   LOG_TAG(timer) \
+ 125   LOG_TAG(update) \
+ 126   LOG_TAG(unload) /* Trace unloading of classes */ \
+ 127   LOG_TAG(verification) \
+ 128   LOG_TAG(verify) \
+ 129   LOG_TAG(vmoperation) \
+ 130   LOG_TAG(vtables) \
+ 131   LOG_TAG(workgang) \
+ 132   LOG_TAG_LIST_EXT
+ 133 
+ 134 #define PREFIX_LOG_TAG(T) (LogTag::_##T)
+ 135 
+ 136 // Expand a set of log tags to their prefixed names.
+ 137 // For error detection purposes, the macro passes one more tag than what is supported.
+ 138 // If too many tags are given, a static assert in the log class will fail.
+ 139 #define LOG_TAGS_EXPANDED(T0, T1, T2, T3, T4, T5, ...)  PREFIX_LOG_TAG(T0), PREFIX_LOG_TAG(T1), PREFIX_LOG_TAG(T2), \
+ 140                                                         PREFIX_LOG_TAG(T3), PREFIX_LOG_TAG(T4), PREFIX_LOG_TAG(T5)
+ 141 // The EXPAND_VARARGS macro is required for MSVC, or it will resolve the LOG_TAGS_EXPANDED macro incorrectly.
+ 142 #define EXPAND_VARARGS(x) x
+ 143 #define LOG_TAGS(...) EXPAND_VARARGS(LOG_TAGS_EXPANDED(__VA_ARGS__, _NO_TAG, _NO_TAG, _NO_TAG, _NO_TAG, _NO_TAG, _NO_TAG))
+ 144 
+ 145 // Log tags are used to classify log messages.
+ 146 // Each log message can be assigned between 1 to LogTag::MaxTags number of tags.
+ 147 // Specifying multiple tags for a log message means that only outputs configured
+ 148 // for those exact tags, or a subset of the tags with a wildcard, will see the logging.
+ 149 // Multiple tags should be comma separated, e.g. log_error(tag1, tag2)("msg").
+ 150 class LogTag : public AllStatic {
+ 151  public:
+ 152   // The maximum number of tags that a single log message can have.
+ 153   // E.g. there might be hundreds of different tags available,
+ 154   // but a specific log message can only be tagged with up to MaxTags of those.
+ 155   static const size_t MaxTags = 5;
+ 156 
+ 157   enum type {
+ 158     __NO_TAG,
+ 159 #define LOG_TAG(name) _##name,
+ 160     LOG_TAG_LIST
+ 161 #undef LOG_TAG
+ 162     Count
+ 163   };
+ 164 
+ 165   static const char* name(LogTag::type tag) {
+ 166     return _name[tag];
+ 167   }
+ 168 
+ 169   static LogTag::type from_string(const char *str);
+ 170 
+ 171  private:
+ 172   static const char* _name[];
+ 173 };
+ 174 
+ 175 typedef LogTag::type LogTagType;
+ 176 
+ 177 #endif // SHARE_VM_LOGGING_LOGTAG_HPP
+</pre></body></html>

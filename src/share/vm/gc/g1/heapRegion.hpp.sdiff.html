@@ -1,0 +1,203 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>hotspot Sdiff src/share/vm/gc/g1 </title>
+</head><body id="SUNWwebrev">
+<center><a href='../../../../../src/share/vm/gc/g1/heapRegion.cpp.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../../index.html' target='_top'>index</a> <a href='../../../../../src/share/vm/gc/g1/heapRegionManager.cpp.sdiff.html' target='_top'>next &gt</a></center>
+<h2>src/share/vm/gc/g1/heapRegion.hpp</h2>
+<a class="print" href="javascript:print()">Print this page</a>
+<pre></pre>
+
+<table><tr valign="top">
+<td><pre>
+
+</pre><hr></hr><pre>
+ 636   // is within the unmarked area of the region.
+ 637   bool obj_allocated_since_prev_marking(oop obj) const {
+ 638     return (HeapWord *) obj &gt;= prev_top_at_mark_start();
+ 639   }
+ 640   bool obj_allocated_since_next_marking(oop obj) const {
+ 641     return (HeapWord *) obj &gt;= next_top_at_mark_start();
+ 642   }
+ 643 
+ 644   // Returns the "evacuation_failed" property of the region.
+ 645   bool evacuation_failed() { return _evacuation_failed; }
+ 646 
+ 647   // Sets the "evacuation_failed" property of the region.
+ 648   void set_evacuation_failed(bool b) {
+ 649     _evacuation_failed = b;
+ 650 
+ 651     if (b) {
+ 652       _next_marked_bytes = 0;
+ 653     }
+ 654   }
+ 655 
+<span class="changed"> 656   // filter_young: if true and the region is a young region then we</span>
+<span class="changed"> 657   // skip the iteration.</span>
+<span class="changed"> 658   // card_ptr: if not NULL, and we decide that the card is not young</span>
+<span class="changed"> 659   // and we iterate over it, we'll clean the card before we start the</span>
+<span class="changed"> 660   // iteration.</span>
+<span class="changed"> 661   HeapWord*</span>
+<span class="changed"> 662   oops_on_card_seq_iterate_careful(MemRegion mr,</span>
+
+
+ 663                                    FilterOutOfRegionClosure* cl,
+<span class="removed"> 664                                    bool filter_young,</span>
+ 665                                    jbyte* card_ptr);
+ 666 
+ 667   size_t recorded_rs_length() const        { return _recorded_rs_length; }
+ 668   double predicted_elapsed_time_ms() const { return _predicted_elapsed_time_ms; }
+ 669   size_t predicted_bytes_to_copy() const   { return _predicted_bytes_to_copy; }
+ 670 
+ 671   void set_recorded_rs_length(size_t rs_length) {
+ 672     _recorded_rs_length = rs_length;
+ 673   }
+ 674 
+ 675   void set_predicted_elapsed_time_ms(double ms) {
+ 676     _predicted_elapsed_time_ms = ms;
+ 677   }
+ 678 
+ 679   void set_predicted_bytes_to_copy(size_t bytes) {
+ 680     _predicted_bytes_to_copy = bytes;
+ 681   }
+ 682 
+ 683   virtual CompactibleSpace* next_compaction_space() const;
+ 684 
+
+</pre><hr></hr>
+</pre></td><td><pre>
+
+</pre><hr></hr><pre>
+ 636   // is within the unmarked area of the region.
+ 637   bool obj_allocated_since_prev_marking(oop obj) const {
+ 638     return (HeapWord *) obj &gt;= prev_top_at_mark_start();
+ 639   }
+ 640   bool obj_allocated_since_next_marking(oop obj) const {
+ 641     return (HeapWord *) obj &gt;= next_top_at_mark_start();
+ 642   }
+ 643 
+ 644   // Returns the "evacuation_failed" property of the region.
+ 645   bool evacuation_failed() { return _evacuation_failed; }
+ 646 
+ 647   // Sets the "evacuation_failed" property of the region.
+ 648   void set_evacuation_failed(bool b) {
+ 649     _evacuation_failed = b;
+ 650 
+ 651     if (b) {
+ 652       _next_marked_bytes = 0;
+ 653     }
+ 654   }
+ 655 
+<span class="changed"> 656   // Iterate over the card in the card designated by card_ptr,</span>
+<span class="changed"> 657   // applying cl to all references in the region.</span>
+<span class="changed"> 658   // mr: the memory region covered by the card.</span>
+<span class="changed"> 659   // card_ptr: if we decide that the card is not young and we iterate</span>
+<span class="changed"> 660   // over it, we'll clean the card before we start the iteration.</span>
+<span class="changed"> 661   // Returns true if card was successfully processed, false if an</span>
+<span class="changed"> 662   // unparsable part of the heap was encountered, which should only</span>
+<span class="changed"> 663   // happen when invoked concurrently with the mutator.</span>
+<span class="changed"> 664   bool oops_on_card_seq_iterate_careful(MemRegion mr,</span>
+ 665                                         FilterOutOfRegionClosure* cl,
+
+ 666                                         jbyte* card_ptr);
+ 667 
+ 668   size_t recorded_rs_length() const        { return _recorded_rs_length; }
+ 669   double predicted_elapsed_time_ms() const { return _predicted_elapsed_time_ms; }
+ 670   size_t predicted_bytes_to_copy() const   { return _predicted_bytes_to_copy; }
+ 671 
+ 672   void set_recorded_rs_length(size_t rs_length) {
+ 673     _recorded_rs_length = rs_length;
+ 674   }
+ 675 
+ 676   void set_predicted_elapsed_time_ms(double ms) {
+ 677     _predicted_elapsed_time_ms = ms;
+ 678   }
+ 679 
+ 680   void set_predicted_bytes_to_copy(size_t bytes) {
+ 681     _predicted_bytes_to_copy = bytes;
+ 682   }
+ 683 
+ 684   virtual CompactibleSpace* next_compaction_space() const;
+ 685 
+
+</pre><hr></hr>
+</pre></td>
+</tr></table>
+<center><a href='../../../../../src/share/vm/gc/g1/heapRegion.cpp.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../../index.html' target='_top'>index</a> <a href='../../../../../src/share/vm/gc/g1/heapRegionManager.cpp.sdiff.html' target='_top'>next &gt</a></center>
+</body></html>

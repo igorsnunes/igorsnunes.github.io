@@ -1,0 +1,227 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>hotspot Cdiff src/share/vm/gc/g1/g1IHOPControl.cpp</title>
+</head>
+<body id="SUNWwebrev">
+<center><a href='../../../../../src/share/vm/gc/cms/parNewGeneration.hpp.cdiff.html' target='_top'>&lt prev</a> <a href='../../../../../index.html' target='_top'>index</a> <a href='../../../../../src/share/vm/gc/g1/g1IHOPControl.hpp.cdiff.html' target='_top'>next &gt</a></center>
+<h2>src/share/vm/gc/g1/g1IHOPControl.cpp</h2>
+        <a class="print" href="javascript:print()">Print this page</a>
+<pre></pre>
+        <pre>
+<hr /><span class="oldmarker">*** 79,129 ****</span>
+  G1StaticIHOPControl::G1StaticIHOPControl(double ihop_percent) :
+    G1IHOPControl(ihop_percent),
+    _last_marking_length_s(0.0) {
+  }
+  
+<span class="removed">- #ifndef PRODUCT</span>
+<span class="removed">- static void test_update(G1IHOPControl* ctrl, double alloc_time, size_t alloc_amount, size_t young_size, double mark_time) {</span>
+<span class="removed">-   for (int i = 0; i &lt; 100; i++) {</span>
+<span class="removed">-     ctrl-&gt;update_allocation_info(alloc_time, alloc_amount, young_size);</span>
+<span class="removed">-     ctrl-&gt;update_marking_length(mark_time);</span>
+<span class="removed">-   }</span>
+<span class="removed">- }</span>
+<span class="removed">- </span>
+<span class="removed">- void G1StaticIHOPControl::test() {</span>
+<span class="removed">-   size_t const initial_ihop = 45;</span>
+<span class="removed">- </span>
+<span class="removed">-   G1StaticIHOPControl ctrl(initial_ihop);</span>
+<span class="removed">-   ctrl.update_target_occupancy(100);</span>
+<span class="removed">- </span>
+<span class="removed">-   size_t threshold = ctrl.get_conc_mark_start_threshold();</span>
+<span class="removed">-   assert(threshold == initial_ihop,</span>
+<span class="removed">-          "Expected IHOP threshold of " SIZE_FORMAT " but is " SIZE_FORMAT, initial_ihop, threshold);</span>
+<span class="removed">- </span>
+<span class="removed">-   ctrl.update_allocation_info(100.0, 100, 100);</span>
+<span class="removed">-   threshold = ctrl.get_conc_mark_start_threshold();</span>
+<span class="removed">-   assert(threshold == initial_ihop,</span>
+<span class="removed">-          "Expected IHOP threshold of " SIZE_FORMAT " but is " SIZE_FORMAT, initial_ihop, threshold);</span>
+<span class="removed">- </span>
+<span class="removed">-   ctrl.update_marking_length(1000.0);</span>
+<span class="removed">-   threshold = ctrl.get_conc_mark_start_threshold();</span>
+<span class="removed">-   assert(threshold == initial_ihop,</span>
+<span class="removed">-          "Expected IHOP threshold of " SIZE_FORMAT " but is " SIZE_FORMAT, initial_ihop, threshold);</span>
+<span class="removed">- </span>
+<span class="removed">-   // Whatever we pass, the IHOP value must stay the same.</span>
+<span class="removed">-   test_update(&amp;ctrl, 2, 10, 10, 3);</span>
+<span class="removed">-   threshold = ctrl.get_conc_mark_start_threshold();</span>
+<span class="removed">-   assert(threshold == initial_ihop,</span>
+<span class="removed">-          "Expected IHOP threshold of " SIZE_FORMAT " but is " SIZE_FORMAT, initial_ihop, threshold);</span>
+<span class="removed">- </span>
+<span class="removed">-   test_update(&amp;ctrl, 12, 10, 10, 3);</span>
+<span class="removed">-   threshold = ctrl.get_conc_mark_start_threshold();</span>
+<span class="removed">-   assert(threshold == initial_ihop,</span>
+<span class="removed">-          "Expected IHOP threshold of " SIZE_FORMAT " but is " SIZE_FORMAT, initial_ihop, threshold);</span>
+<span class="removed">- }</span>
+<span class="removed">- #endif</span>
+<span class="removed">- </span>
+  G1AdaptiveIHOPControl::G1AdaptiveIHOPControl(double ihop_percent,
+                                               G1Predictions const* predictor,
+                                               size_t heap_reserve_percent,
+                                               size_t heap_waste_percent) :
+    G1IHOPControl(ihop_percent),
+<span class="newmarker">--- 79,88 ----</span>
+<hr /><span class="oldmarker">*** 222,302 ****</span>
+                                            _last_unrestrained_young_size,
+                                            _predictor-&gt;get_new_prediction(&amp;_allocation_rate_s),
+                                            _predictor-&gt;get_new_prediction(&amp;_marking_times_s),
+                                            have_enough_data_for_prediction());
+  }
+<span class="removed">- </span>
+<span class="removed">- #ifndef PRODUCT</span>
+<span class="removed">- void G1AdaptiveIHOPControl::test() {</span>
+<span class="removed">-   size_t const initial_threshold = 45;</span>
+<span class="removed">-   size_t const young_size = 10;</span>
+<span class="removed">-   size_t const target_size = 100;</span>
+<span class="removed">- </span>
+<span class="removed">-   // The final IHOP value is always</span>
+<span class="removed">-   // target_size - (young_size + alloc_amount/alloc_time * marking_time)</span>
+<span class="removed">- </span>
+<span class="removed">-   G1Predictions pred(0.95);</span>
+<span class="removed">-   G1AdaptiveIHOPControl ctrl(initial_threshold, &amp;pred, 0, 0);</span>
+<span class="removed">-   ctrl.update_target_occupancy(target_size);</span>
+<span class="removed">- </span>
+<span class="removed">-   // First "load".</span>
+<span class="removed">-   size_t const alloc_time1 = 2;</span>
+<span class="removed">-   size_t const alloc_amount1 = 10;</span>
+<span class="removed">-   size_t const marking_time1 = 2;</span>
+<span class="removed">-   size_t const settled_ihop1 = target_size - (young_size + alloc_amount1/alloc_time1 * marking_time1);</span>
+<span class="removed">- </span>
+<span class="removed">-   size_t threshold;</span>
+<span class="removed">-   threshold = ctrl.get_conc_mark_start_threshold();</span>
+<span class="removed">-   assert(threshold == initial_threshold,</span>
+<span class="removed">-          "Expected IHOP threshold of " SIZE_FORMAT " but is " SIZE_FORMAT, initial_threshold, threshold);</span>
+<span class="removed">-   for (size_t i = 0; i &lt; G1AdaptiveIHOPNumInitialSamples - 1; i++) {</span>
+<span class="removed">-     ctrl.update_allocation_info(alloc_time1, alloc_amount1, young_size);</span>
+<span class="removed">-     ctrl.update_marking_length(marking_time1);</span>
+<span class="removed">-     // Not enough data yet.</span>
+<span class="removed">-     threshold = ctrl.get_conc_mark_start_threshold();</span>
+<span class="removed">-     assert(threshold == initial_threshold,</span>
+<span class="removed">-            "Expected IHOP threshold of " SIZE_FORMAT " but is " SIZE_FORMAT, initial_threshold, threshold);</span>
+<span class="removed">-   }</span>
+<span class="removed">- </span>
+<span class="removed">-   test_update(&amp;ctrl, alloc_time1, alloc_amount1, young_size, marking_time1);</span>
+<span class="removed">- </span>
+<span class="removed">-   threshold = ctrl.get_conc_mark_start_threshold();</span>
+<span class="removed">-   assert(threshold == settled_ihop1,</span>
+<span class="removed">-          "Expected IHOP threshold to settle at " SIZE_FORMAT " but is " SIZE_FORMAT, settled_ihop1, threshold);</span>
+<span class="removed">- </span>
+<span class="removed">-   // Second "load". A bit higher allocation rate.</span>
+<span class="removed">-   size_t const alloc_time2 = 2;</span>
+<span class="removed">-   size_t const alloc_amount2 = 30;</span>
+<span class="removed">-   size_t const marking_time2 = 2;</span>
+<span class="removed">-   size_t const settled_ihop2 = target_size - (young_size + alloc_amount2/alloc_time2 * marking_time2);</span>
+<span class="removed">- </span>
+<span class="removed">-   test_update(&amp;ctrl, alloc_time2, alloc_amount2, young_size, marking_time2);</span>
+<span class="removed">- </span>
+<span class="removed">-   threshold = ctrl.get_conc_mark_start_threshold();</span>
+<span class="removed">-   assert(threshold &lt; settled_ihop1,</span>
+<span class="removed">-          "Expected IHOP threshold to settle at a value lower than " SIZE_FORMAT " but is " SIZE_FORMAT, settled_ihop1, threshold);</span>
+<span class="removed">- </span>
+<span class="removed">-   // Third "load". Very high (impossible) allocation rate.</span>
+<span class="removed">-   size_t const alloc_time3 = 1;</span>
+<span class="removed">-   size_t const alloc_amount3 = 50;</span>
+<span class="removed">-   size_t const marking_time3 = 2;</span>
+<span class="removed">-   size_t const settled_ihop3 = 0;</span>
+<span class="removed">- </span>
+<span class="removed">-   test_update(&amp;ctrl, alloc_time3, alloc_amount3, young_size, marking_time3);</span>
+<span class="removed">-   threshold = ctrl.get_conc_mark_start_threshold();</span>
+<span class="removed">- </span>
+<span class="removed">-   assert(threshold == settled_ihop3,</span>
+<span class="removed">-          "Expected IHOP threshold to settle at " SIZE_FORMAT " but is " SIZE_FORMAT, settled_ihop3, threshold);</span>
+<span class="removed">- </span>
+<span class="removed">-   // And back to some arbitrary value.</span>
+<span class="removed">-   test_update(&amp;ctrl, alloc_time2, alloc_amount2, young_size, marking_time2);</span>
+<span class="removed">- </span>
+<span class="removed">-   threshold = ctrl.get_conc_mark_start_threshold();</span>
+<span class="removed">-   assert(threshold &gt; settled_ihop3,</span>
+<span class="removed">-          "Expected IHOP threshold to settle at value larger than " SIZE_FORMAT " but is " SIZE_FORMAT, settled_ihop3, threshold);</span>
+<span class="removed">- }</span>
+<span class="removed">- </span>
+<span class="removed">- void IHOP_test() {</span>
+<span class="removed">-   G1StaticIHOPControl::test();</span>
+<span class="removed">-   G1AdaptiveIHOPControl::test();</span>
+<span class="removed">- }</span>
+<span class="removed">- #endif</span>
+<span class="newmarker">--- 181,185 ----</span>
+</pre>
+<center><a href='../../../../../src/share/vm/gc/cms/parNewGeneration.hpp.cdiff.html' target='_top'>&lt prev</a> <a href='../../../../../index.html' target='_top'>index</a> <a href='../../../../../src/share/vm/gc/g1/g1IHOPControl.hpp.cdiff.html' target='_top'>next &gt</a></center>
+</body></html>
+

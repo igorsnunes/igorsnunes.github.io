@@ -1,0 +1,139 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>hotspot Cdiff src/share/vm/gc/g1/g1RemSet.cpp</title>
+</head>
+<body id="SUNWwebrev">
+<center><a href='../../../../../src/share/vm/gc/g1/g1IHOPControl.hpp.cdiff.html' target='_top'>&lt prev</a> <a href='../../../../../index.html' target='_top'>index</a> <a href='../../../../../src/share/vm/gc/g1/heapRegion.cpp.cdiff.html' target='_top'>next &gt</a></center>
+<h2>src/share/vm/gc/g1/g1RemSet.cpp</h2>
+        <a class="print" href="javascript:print()">Print this page</a>
+<pre></pre>
+        <pre>
+<hr /><span class="oldmarker">*** 666,689 ****</span>
+    // thread, if we're running concurrently, may "see" the young type
+    // change at any time (so an earlier "is_young" check may pass or
+    // fail arbitrarily). We tell the iteration code to perform this
+    // filtering when it has been determined that there has been an actual
+    // allocation in this region and making it safe to check the young type.
+<span class="removed">-   bool filter_young = true;</span>
+  
+<span class="changed">!   HeapWord* stop_point =</span>
+      r-&gt;oops_on_card_seq_iterate_careful(dirtyRegion,
+                                          &amp;filter_then_update_rs_oop_cl,
+<span class="removed">-                                         filter_young,</span>
+                                          card_ptr);
+  
+<span class="changed">!   // If stop_point is non-null, then we encountered an unallocated region</span>
+<span class="changed">!   // (perhaps the unfilled portion of a TLAB.)  For now, we'll dirty the</span>
+<span class="changed">!   // card and re-enqueue: if we put off the card until a GC pause, then the</span>
+<span class="changed">!   // unallocated portion will be filled in.  Alternatively, we might try</span>
+<span class="changed">!   // the full complexity of the technique used in "regular" precleaning.</span>
+<span class="changed">!   if (stop_point != NULL) {</span>
+      // The card might have gotten re-dirtied and re-enqueued while we
+      // worked.  (In fact, it's pretty likely.)
+      if (*card_ptr != CardTableModRefBS::dirty_card_val()) {
+        *card_ptr = CardTableModRefBS::dirty_card_val();
+        MutexLockerEx x(Shared_DirtyCardQ_lock,
+<span class="newmarker">--- 666,687 ----</span>
+    // thread, if we're running concurrently, may "see" the young type
+    // change at any time (so an earlier "is_young" check may pass or
+    // fail arbitrarily). We tell the iteration code to perform this
+    // filtering when it has been determined that there has been an actual
+    // allocation in this region and making it safe to check the young type.
+  
+<span class="changed">!   bool card_processed =</span>
+      r-&gt;oops_on_card_seq_iterate_careful(dirtyRegion,
+                                          &amp;filter_then_update_rs_oop_cl,
+                                          card_ptr);
+  
+<span class="changed">!   // If unable to process the card then we encountered an unparsable</span>
+<span class="changed">!   // part of the heap (e.g. a partially allocated object).  Redirty</span>
+<span class="changed">!   // and re-enqueue: if we put off the card until a GC pause, then the</span>
+<span class="changed">!   // allocation will have completed.</span>
+<span class="changed">!   if (!card_processed) {</span>
+<span class="changed">!     assert(!_g1-&gt;is_gc_active(), "Unparsable heap during GC");</span>
+      // The card might have gotten re-dirtied and re-enqueued while we
+      // worked.  (In fact, it's pretty likely.)
+      if (*card_ptr != CardTableModRefBS::dirty_card_val()) {
+        *card_ptr = CardTableModRefBS::dirty_card_val();
+        MutexLockerEx x(Shared_DirtyCardQ_lock,
+</pre>
+<center><a href='../../../../../src/share/vm/gc/g1/g1IHOPControl.hpp.cdiff.html' target='_top'>&lt prev</a> <a href='../../../../../index.html' target='_top'>index</a> <a href='../../../../../src/share/vm/gc/g1/heapRegion.cpp.cdiff.html' target='_top'>next &gt</a></center>
+</body></html>
+

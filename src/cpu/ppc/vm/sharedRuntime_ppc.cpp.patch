@@ -1,0 +1,14 @@
+--- old/src/cpu/ppc/vm/sharedRuntime_ppc.cpp	2016-10-20 11:02:20.232100130 -0200
++++ new/src/cpu/ppc/vm/sharedRuntime_ppc.cpp	2016-10-20 11:02:20.164100198 -0200
+@@ -2489,6 +2489,11 @@
+     __ verify_oop(R3_RET);
+   }
+ 
++  if (CheckJNICalls) {
++    // clear_pending_jni_exception_check
++    __ load_const_optimized(R0, 0L);
++    __ st_ptr(R0, JavaThread::pending_jni_exception_check_fn_offset(), R16_thread);
++  }
+ 
+   // Reset handle block.
+   // --------------------------------------------------------------------------

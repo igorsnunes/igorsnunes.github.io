@@ -1,0 +1,227 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>hotspot Sdiff src/os_cpu/linux_x86/vm </title>
+</head><body id="SUNWwebrev">
+<center><a href='../../../../src/os_cpu/bsd_x86/vm/os_bsd_x86.cpp.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/os_cpu/solaris_x86/vm/os_solaris_x86.cpp.sdiff.html' target='_top'>next &gt</a></center>
+<h2>src/os_cpu/linux_x86/vm/os_linux_x86.cpp</h2>
+<a class="print" href="javascript:print()">Print this page</a>
+<pre></pre>
+
+<table><tr valign="top">
+<td><pre>
+
+</pre><hr></hr><pre>
+ 174   ExtendedPC epc = fetch_frame_from_context(ucVoid, &amp;sp, &amp;fp);
+ 175   return frame(sp, fp, epc.pc());
+ 176 }
+ 177 
+ 178 frame os::fetch_frame_from_ucontext(Thread* thread, void* ucVoid) {
+ 179   intptr_t* sp;
+ 180   intptr_t* fp;
+ 181   ExtendedPC epc = os::Linux::fetch_frame_from_ucontext(thread, (ucontext_t*)ucVoid, &amp;sp, &amp;fp);
+ 182   return frame(sp, fp, epc.pc());
+ 183 }
+ 184 
+ 185 bool os::Linux::get_frame_at_stack_banging_point(JavaThread* thread, ucontext_t* uc, frame* fr) {
+ 186   address pc = (address) os::Linux::ucontext_get_pc(uc);
+ 187   if (Interpreter::contains(pc)) {
+ 188     // interpreter performs stack banging after the fixed frame header has
+ 189     // been generated while the compilers perform it before. To maintain
+ 190     // semantic consistency between interpreted and compiled frames, the
+ 191     // method returns the Java sender of the current frame.
+ 192     *fr = os::fetch_frame_from_ucontext(thread, uc);
+ 193     if (!fr-&gt;is_first_java_frame()) {
+<span class="changed"> 194       assert(fr-&gt;safe_for_sender(thread), "Safety check");</span>
+
+
+ 195       *fr = fr-&gt;java_sender();
+ 196     }
+ 197   } else {
+ 198     // more complex code with compiled code
+ 199     assert(!Interpreter::contains(pc), "Interpreted methods should have been handled above");
+ 200     CodeBlob* cb = CodeCache::find_blob(pc);
+ 201     if (cb == NULL || !cb-&gt;is_nmethod() || cb-&gt;is_frame_complete_at(pc)) {
+ 202       // Not sure where the pc points to, fallback to default
+ 203       // stack overflow handling
+ 204       return false;
+ 205     } else {
+ 206       // in compiled code, the stack banging is performed just after the return pc
+ 207       // has been pushed on the stack
+ 208       intptr_t* fp = os::Linux::ucontext_get_fp(uc);
+ 209       intptr_t* sp = os::Linux::ucontext_get_sp(uc);
+ 210       *fr = frame(sp + 1, fp, (address)*sp);
+ 211       if (!fr-&gt;is_java_frame()) {
+<span class="removed"> 212         assert(fr-&gt;safe_for_sender(thread), "Safety check");</span>
+ 213         assert(!fr-&gt;is_first_frame(), "Safety check");
+
+ 214         *fr = fr-&gt;java_sender();
+ 215       }
+ 216     }
+ 217   }
+ 218   assert(fr-&gt;is_java_frame(), "Safety check");
+ 219   return true;
+ 220 }
+ 221 
+ 222 // By default, gcc always save frame pointer (%ebp/%rbp) on stack. It may get
+ 223 // turned off by -fomit-frame-pointer,
+ 224 frame os::get_sender_for_C_frame(frame* fr) {
+ 225   return frame(fr-&gt;sender_sp(), fr-&gt;link(), fr-&gt;sender_pc());
+ 226 }
+ 227 
+ 228 intptr_t* _get_previous_fp() {
+ 229 #ifdef SPARC_WORKS
+ 230   register intptr_t **ebp;
+ 231   __asm__("mov %%"SPELL_REG_FP", %0":"=r"(ebp));
+ 232 #elif defined(__clang__)
+ 233   intptr_t **ebp;
+
+</pre><hr></hr>
+</pre></td><td><pre>
+
+</pre><hr></hr><pre>
+ 174   ExtendedPC epc = fetch_frame_from_context(ucVoid, &amp;sp, &amp;fp);
+ 175   return frame(sp, fp, epc.pc());
+ 176 }
+ 177 
+ 178 frame os::fetch_frame_from_ucontext(Thread* thread, void* ucVoid) {
+ 179   intptr_t* sp;
+ 180   intptr_t* fp;
+ 181   ExtendedPC epc = os::Linux::fetch_frame_from_ucontext(thread, (ucontext_t*)ucVoid, &amp;sp, &amp;fp);
+ 182   return frame(sp, fp, epc.pc());
+ 183 }
+ 184 
+ 185 bool os::Linux::get_frame_at_stack_banging_point(JavaThread* thread, ucontext_t* uc, frame* fr) {
+ 186   address pc = (address) os::Linux::ucontext_get_pc(uc);
+ 187   if (Interpreter::contains(pc)) {
+ 188     // interpreter performs stack banging after the fixed frame header has
+ 189     // been generated while the compilers perform it before. To maintain
+ 190     // semantic consistency between interpreted and compiled frames, the
+ 191     // method returns the Java sender of the current frame.
+ 192     *fr = os::fetch_frame_from_ucontext(thread, uc);
+ 193     if (!fr-&gt;is_first_java_frame()) {
+<span class="changed"> 194       // get_frame_at_stack_banging_point() is only called when we</span>
+<span class="changed"> 195       // have well defined stacks so java_sender() calls do not need</span>
+<span class="changed"> 196       // to assert safe_for_sender() first.</span>
+ 197       *fr = fr-&gt;java_sender();
+ 198     }
+ 199   } else {
+ 200     // more complex code with compiled code
+ 201     assert(!Interpreter::contains(pc), "Interpreted methods should have been handled above");
+ 202     CodeBlob* cb = CodeCache::find_blob(pc);
+ 203     if (cb == NULL || !cb-&gt;is_nmethod() || cb-&gt;is_frame_complete_at(pc)) {
+ 204       // Not sure where the pc points to, fallback to default
+ 205       // stack overflow handling
+ 206       return false;
+ 207     } else {
+ 208       // in compiled code, the stack banging is performed just after the return pc
+ 209       // has been pushed on the stack
+ 210       intptr_t* fp = os::Linux::ucontext_get_fp(uc);
+ 211       intptr_t* sp = os::Linux::ucontext_get_sp(uc);
+ 212       *fr = frame(sp + 1, fp, (address)*sp);
+ 213       if (!fr-&gt;is_java_frame()) {
+
+ 214         assert(!fr-&gt;is_first_frame(), "Safety check");
+<span class="new"> 215         // See java_sender() comment above.</span>
+ 216         *fr = fr-&gt;java_sender();
+ 217       }
+ 218     }
+ 219   }
+ 220   assert(fr-&gt;is_java_frame(), "Safety check");
+ 221   return true;
+ 222 }
+ 223 
+ 224 // By default, gcc always save frame pointer (%ebp/%rbp) on stack. It may get
+ 225 // turned off by -fomit-frame-pointer,
+ 226 frame os::get_sender_for_C_frame(frame* fr) {
+ 227   return frame(fr-&gt;sender_sp(), fr-&gt;link(), fr-&gt;sender_pc());
+ 228 }
+ 229 
+ 230 intptr_t* _get_previous_fp() {
+ 231 #ifdef SPARC_WORKS
+ 232   register intptr_t **ebp;
+ 233   __asm__("mov %%"SPELL_REG_FP", %0":"=r"(ebp));
+ 234 #elif defined(__clang__)
+ 235   intptr_t **ebp;
+
+</pre><hr></hr>
+</pre></td>
+</tr></table>
+<center><a href='../../../../src/os_cpu/bsd_x86/vm/os_bsd_x86.cpp.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/os_cpu/solaris_x86/vm/os_solaris_x86.cpp.sdiff.html' target='_top'>next &gt</a></center>
+</body></html>

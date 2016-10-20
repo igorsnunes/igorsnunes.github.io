@@ -1,0 +1,647 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+    <script type="text/javascript" src="../../../../ancnav.js"></script>
+    </head>
+    <body id="SUNWwebrev" onkeypress="keypress(event);">
+    <a name="0"></a>
+    <pre></pre><hr></hr>
+<pre>
+   1 /*
+   2  * Copyright (c) 2015, 2016, Oracle and/or its affiliates. All rights reserved.
+   3  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+   4  *
+   5  * This code is free software; you can redistribute it and/or modify it
+   6  * under the terms of the GNU General Public License version 2 only, as
+   7  * published by the Free Software Foundation.
+   8  *
+   9  * This code is distributed in the hope that it will be useful, but WITHOUT
+  10  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+  11  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+  12  * version 2 for more details (a copy is included in the LICENSE file that
+  13  * accompanied this code).
+  14  *
+  15  * You should have received a copy of the GNU General Public License version
+  16  * 2 along with this work; if not, write to the Free Software Foundation,
+  17  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+  18  *
+  19  * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+  20  * or visit www.oracle.com if you need additional information or have any
+  21  * questions.
+  22  *
+  23  */
+  24 
+  25 #include "precompiled.hpp"
+  26 #include "classfile/javaClasses.hpp"
+  27 #include "classfile/javaClasses.inline.hpp"
+  28 #include "classfile/vmSymbols.hpp"
+<a name="1" id="anc1"></a><span class="new">  29 #include "logging/log.hpp"</span>
+  30 #include "memory/oopFactory.hpp"
+  31 #include "oops/oop.inline.hpp"
+  32 #include "oops/objArrayOop.inline.hpp"
+  33 #include "prims/stackwalk.hpp"
+  34 #include "runtime/globals.hpp"
+  35 #include "runtime/handles.inline.hpp"
+  36 #include "runtime/javaCalls.hpp"
+  37 #include "runtime/vframe.hpp"
+  38 #include "utilities/globalDefinitions.hpp"
+  39 
+  40 // setup and cleanup actions
+  41 void BaseFrameStream::setup_magic_on_entry(objArrayHandle frames_array) {
+  42   frames_array-&gt;obj_at_put(magic_pos, _thread-&gt;threadObj());
+  43   _anchor = address_value();
+  44   assert(check_magic(frames_array), "invalid magic");
+  45 }
+  46 
+  47 bool BaseFrameStream::check_magic(objArrayHandle frames_array) {
+  48   oop   m1 = frames_array-&gt;obj_at(magic_pos);
+  49   jlong m2 = _anchor;
+  50   if (m1 == _thread-&gt;threadObj() &amp;&amp; m2 == address_value())  return true;
+  51   return false;
+  52 }
+  53 
+  54 bool BaseFrameStream::cleanup_magic_on_exit(objArrayHandle frames_array) {
+  55   bool ok = check_magic(frames_array);
+  56   frames_array-&gt;obj_at_put(magic_pos, NULL);
+  57   _anchor = 0L;
+  58   return ok;
+  59 }
+  60 
+  61 JavaFrameStream::JavaFrameStream(JavaThread* thread, int mode)
+  62   : BaseFrameStream(thread), _vfst(thread) {
+  63   _need_method_info = StackWalk::need_method_info(mode);
+  64 }
+  65 
+  66 // Returns the BaseFrameStream for the current stack being traversed.
+  67 //
+  68 // Parameters:
+  69 //  thread         Current Java thread.
+  70 //  magic          Magic value used for each stack walking
+  71 //  frames_array   User-supplied buffers.  The 0th element is reserved
+  72 //                 for this BaseFrameStream to use
+  73 //
+  74 BaseFrameStream* BaseFrameStream::from_current(JavaThread* thread, jlong magic,
+  75                                                objArrayHandle frames_array)
+  76 {
+  77   assert(thread != NULL &amp;&amp; thread-&gt;is_Java_thread(), "");
+  78   oop m1 = frames_array-&gt;obj_at(magic_pos);
+  79   if (m1 != thread-&gt;threadObj())      return NULL;
+  80   if (magic == 0L)                    return NULL;
+  81   BaseFrameStream* stream = (BaseFrameStream*) (intptr_t) magic;
+  82   if (!stream-&gt;is_valid_in(thread, frames_array))   return NULL;
+  83   return stream;
+  84 }
+  85 
+  86 // Unpacks one or more frames into user-supplied buffers.
+  87 // Updates the end index, and returns the number of unpacked frames.
+  88 // Always start with the existing vfst.method and bci.
+  89 // Do not call vfst.next to advance over the last returned value.
+  90 // In other words, do not leave any stale data in the vfst.
+  91 //
+  92 // Parameters:
+  93 //   mode             Restrict which frames to be decoded.
+  94 //   BaseFrameStream  stream of frames
+  95 //   max_nframes      Maximum number of frames to be filled.
+  96 //   start_index      Start index to the user-supplied buffers.
+  97 //   frames_array     Buffer to store Class or StackFrame in, starting at start_index.
+  98 //                    frames array is a Class&lt;?&gt;[] array when only getting caller
+  99 //                    reference, and a StackFrameInfo[] array (or derivative)
+ 100 //                    otherwise. It should never be null.
+ 101 //   end_index        End index to the user-supplied buffers with unpacked frames.
+ 102 //
+ 103 // Returns the number of frames whose information was transferred into the buffers.
+ 104 //
+ 105 int StackWalk::fill_in_frames(jlong mode, BaseFrameStream&amp; stream,
+ 106                               int max_nframes, int start_index,
+ 107                               objArrayHandle  frames_array,
+ 108                               int&amp; end_index, TRAPS) {
+<a name="2" id="anc2"></a><span class="changed"> 109   log_debug(stackwalk)("fill_in_frames limit=%d start=%d frames length=%d",</span>
+
+ 110                        max_nframes, start_index, frames_array-&gt;length());
+<a name="3" id="anc3"></a>
+ 111   assert(max_nframes &gt; 0, "invalid max_nframes");
+ 112   assert(start_index + max_nframes &lt;= frames_array-&gt;length(), "oob");
+ 113 
+ 114   int frames_decoded = 0;
+ 115   for (; !stream.at_end(); stream.next()) {
+ 116     Method* method = stream.method();
+ 117 
+ 118     if (method == NULL) continue;
+ 119 
+ 120     // skip hidden frames for default StackWalker option (i.e. SHOW_HIDDEN_FRAMES
+ 121     // not set) and when StackWalker::getCallerClass is called
+ 122     if (!ShowHiddenFrames &amp;&amp; (skip_hidden_frames(mode) || get_caller_class(mode))) {
+ 123       if (method-&gt;is_hidden()) {
+<a name="4" id="anc4"></a><span class="changed"> 124         if (log_is_enabled(Debug, stackwalk)) {</span>
+<span class="changed"> 125           ResourceMark rm(THREAD);</span>
+<span class="changed"> 126           outputStream* st = Log(stackwalk)::debug_stream();</span>
+<span class="changed"> 127           st-&gt;print("  hidden method: ");</span>
+<span class="changed"> 128           method-&gt;print_short_name(st);</span>
+<span class="changed"> 129           st-&gt;cr();</span>
+ 130         }
+ 131         continue;
+ 132       }
+ 133     }
+ 134 
+ 135     int index = end_index++;
+<a name="5" id="anc5"></a><span class="changed"> 136     if (log_is_enabled(Debug, stackwalk)) {</span>
+<span class="changed"> 137       ResourceMark rm(THREAD);</span>
+<span class="changed"> 138       outputStream* st = Log(stackwalk)::debug_stream();</span>
+<span class="changed"> 139       st-&gt;print("  %d: frame method: ", index);</span>
+<span class="changed"> 140       method-&gt;print_short_name(st);</span>
+<span class="changed"> 141       st-&gt;print_cr(" bci=%d", stream.bci());</span>
+ 142     }
+ 143 
+ 144     if (!need_method_info(mode) &amp;&amp; get_caller_class(mode) &amp;&amp;
+ 145           index == start_index &amp;&amp; method-&gt;caller_sensitive()) {
+ 146       ResourceMark rm(THREAD);
+ 147       THROW_MSG_0(vmSymbols::java_lang_UnsupportedOperationException(),
+ 148         err_msg("StackWalker::getCallerClass called from @CallerSensitive %s method",
+ 149                 method-&gt;name_and_sig_as_C_string()));
+ 150     }
+ 151     // fill in StackFrameInfo and initialize MemberName
+ 152     stream.fill_frame(index, frames_array, method, CHECK_0);
+ 153     if (++frames_decoded &gt;= max_nframes)  break;
+ 154   }
+ 155   return frames_decoded;
+ 156 }
+ 157 
+ 158 // Fill in the LiveStackFrameInfo at the given index in frames_array
+ 159 void LiveFrameStream::fill_frame(int index, objArrayHandle  frames_array,
+ 160                                  const methodHandle&amp; method, TRAPS) {
+ 161   Handle stackFrame(THREAD, frames_array-&gt;obj_at(index));
+ 162   fill_live_stackframe(stackFrame, method, CHECK);
+ 163 }
+ 164 
+ 165 // Fill in the StackFrameInfo at the given index in frames_array
+ 166 void JavaFrameStream::fill_frame(int index, objArrayHandle  frames_array,
+ 167                                  const methodHandle&amp; method, TRAPS) {
+ 168   if (_need_method_info) {
+ 169     Handle stackFrame(THREAD, frames_array-&gt;obj_at(index));
+ 170     fill_stackframe(stackFrame, method);
+ 171   } else {
+ 172     frames_array-&gt;obj_at_put(index, method-&gt;method_holder()-&gt;java_mirror());
+ 173   }
+ 174 }
+ 175 
+ 176 oop LiveFrameStream::create_primitive_value_instance(StackValueCollection* values, int i, TRAPS) {
+ 177   Klass* k = SystemDictionary::resolve_or_null(vmSymbols::java_lang_LiveStackFrameInfo(), CHECK_NULL);
+ 178   instanceKlassHandle ik (THREAD, k);
+ 179 
+ 180   JavaValue result(T_OBJECT);
+ 181   JavaCallArguments args;
+ 182   Symbol* signature = NULL;
+ 183 
+ 184   // ## TODO: type is only available in LocalVariable table, if present.
+ 185   // ## StackValue type is T_INT or T_OBJECT.
+ 186   switch (values-&gt;at(i)-&gt;type()) {
+ 187     case T_INT:
+ 188       args.push_int(values-&gt;int_at(i));
+ 189       signature = vmSymbols::asPrimitive_int_signature();
+ 190       break;
+ 191 
+ 192     case T_LONG:
+ 193       args.push_long(values-&gt;long_at(i));
+ 194       signature = vmSymbols::asPrimitive_long_signature();
+ 195       break;
+ 196 
+ 197     case T_FLOAT:
+ 198       args.push_float(values-&gt;float_at(i));
+ 199       signature = vmSymbols::asPrimitive_float_signature();
+ 200       break;
+ 201 
+ 202     case T_DOUBLE:
+ 203       args.push_double(values-&gt;double_at(i));
+ 204       signature = vmSymbols::asPrimitive_double_signature();
+ 205       break;
+ 206 
+ 207     case T_BYTE:
+ 208       args.push_int(values-&gt;int_at(i));
+ 209       signature = vmSymbols::asPrimitive_byte_signature();
+ 210       break;
+ 211 
+ 212     case T_SHORT:
+ 213       args.push_int(values-&gt;int_at(i));
+ 214       signature = vmSymbols::asPrimitive_short_signature();
+ 215       break;
+ 216 
+ 217     case T_CHAR:
+ 218       args.push_int(values-&gt;int_at(i));
+ 219       signature = vmSymbols::asPrimitive_char_signature();
+ 220       break;
+ 221 
+ 222     case T_BOOLEAN:
+ 223       args.push_int(values-&gt;int_at(i));
+ 224       signature = vmSymbols::asPrimitive_boolean_signature();
+ 225       break;
+ 226 
+ 227     case T_OBJECT:
+ 228       return values-&gt;obj_at(i)();
+ 229 
+ 230     case T_CONFLICT:
+ 231       // put a non-null slot
+ 232       args.push_int(0);
+ 233       signature = vmSymbols::asPrimitive_int_signature();
+ 234       break;
+ 235 
+ 236     default: ShouldNotReachHere();
+ 237   }
+ 238   JavaCalls::call_static(&amp;result,
+ 239                          ik,
+ 240                          vmSymbols::asPrimitive_name(),
+ 241                          signature,
+ 242                          &amp;args,
+ 243                          CHECK_NULL);
+ 244   return (instanceOop) result.get_jobject();
+ 245 }
+ 246 
+ 247 objArrayHandle LiveFrameStream::values_to_object_array(StackValueCollection* values, TRAPS) {
+ 248   objArrayHandle empty;
+ 249   int length = values-&gt;size();
+ 250   objArrayOop array_oop = oopFactory::new_objArray(SystemDictionary::Object_klass(),
+ 251                                                    length, CHECK_(empty));
+ 252   objArrayHandle array_h(THREAD, array_oop);
+ 253   for (int i = 0; i &lt; values-&gt;size(); i++) {
+ 254     StackValue* st = values-&gt;at(i);
+ 255     oop obj = create_primitive_value_instance(values, i, CHECK_(empty));
+ 256     if (obj != NULL)
+ 257       array_h-&gt;obj_at_put(i, obj);
+ 258   }
+ 259   return array_h;
+ 260 }
+ 261 
+ 262 objArrayHandle LiveFrameStream::monitors_to_object_array(GrowableArray&lt;MonitorInfo*&gt;* monitors, TRAPS) {
+ 263   int length = monitors-&gt;length();
+ 264   objArrayOop array_oop = oopFactory::new_objArray(SystemDictionary::Object_klass(),
+ 265                                                    length, CHECK_(objArrayHandle()));
+ 266   objArrayHandle array_h(THREAD, array_oop);
+ 267   for (int i = 0; i &lt; length; i++) {
+ 268     MonitorInfo* monitor = monitors-&gt;at(i);
+ 269     array_h-&gt;obj_at_put(i, monitor-&gt;owner());
+ 270   }
+ 271   return array_h;
+ 272 }
+ 273 
+ 274 // Fill StackFrameInfo with declaringClass and bci and initialize memberName
+ 275 void BaseFrameStream::fill_stackframe(Handle stackFrame, const methodHandle&amp; method) {
+ 276   java_lang_StackFrameInfo::set_declaringClass(stackFrame(), method-&gt;method_holder()-&gt;java_mirror());
+ 277   java_lang_StackFrameInfo::set_method_and_bci(stackFrame(), method, bci());
+ 278 }
+ 279 
+ 280 // Fill LiveStackFrameInfo with locals, monitors, and expressions
+ 281 void LiveFrameStream::fill_live_stackframe(Handle stackFrame,
+ 282                                            const methodHandle&amp; method, TRAPS) {
+ 283   fill_stackframe(stackFrame, method);
+ 284   if (_jvf != NULL) {
+ 285     StackValueCollection* locals = _jvf-&gt;locals();
+ 286     StackValueCollection* expressions = _jvf-&gt;expressions();
+ 287     GrowableArray&lt;MonitorInfo*&gt;* monitors = _jvf-&gt;monitors();
+ 288 
+ 289     if (!locals-&gt;is_empty()) {
+ 290       objArrayHandle locals_h = values_to_object_array(locals, CHECK);
+ 291       java_lang_LiveStackFrameInfo::set_locals(stackFrame(), locals_h());
+ 292     }
+ 293     if (!expressions-&gt;is_empty()) {
+ 294       objArrayHandle expressions_h = values_to_object_array(expressions, CHECK);
+ 295       java_lang_LiveStackFrameInfo::set_operands(stackFrame(), expressions_h());
+ 296     }
+ 297     if (monitors-&gt;length() &gt; 0) {
+ 298       objArrayHandle monitors_h = monitors_to_object_array(monitors, CHECK);
+ 299       java_lang_LiveStackFrameInfo::set_monitors(stackFrame(), monitors_h());
+ 300     }
+ 301   }
+ 302 }
+ 303 
+ 304 // Begins stack walking.
+ 305 //
+ 306 // Parameters:
+ 307 //   stackStream    StackStream object
+ 308 //   mode           Stack walking mode.
+ 309 //   skip_frames    Number of frames to be skipped.
+ 310 //   frame_count    Number of frames to be traversed.
+ 311 //   start_index    Start index to the user-supplied buffers.
+ 312 //   frames_array   Buffer to store StackFrame in, starting at start_index.
+ 313 //                  frames array is a Class&lt;?&gt;[] array when only getting caller
+ 314 //                  reference, and a StackFrameInfo[] array (or derivative)
+ 315 //                  otherwise. It should never be null.
+ 316 //
+ 317 // Returns Object returned from AbstractStackWalker::doStackWalk call.
+ 318 //
+ 319 oop StackWalk::walk(Handle stackStream, jlong mode,
+ 320                     int skip_frames, int frame_count, int start_index,
+ 321                     objArrayHandle frames_array,
+ 322                     TRAPS) {
+ 323   ResourceMark rm(THREAD);
+ 324   JavaThread* jt = (JavaThread*)THREAD;
+<a name="6" id="anc6"></a><span class="changed"> 325   log_debug(stackwalk)("Start walking: mode " JLONG_FORMAT " skip %d frames batch size %d",</span>
+
+ 326                        mode, skip_frames, frame_count);
+<a name="7" id="anc7"></a>
+ 327 
+ 328   if (frames_array.is_null()) {
+ 329     THROW_MSG_(vmSymbols::java_lang_NullPointerException(), "frames_array is NULL", NULL);
+ 330   }
+ 331 
+ 332   // Setup traversal onto my stack.
+ 333   if (live_frame_info(mode)) {
+ 334     assert (use_frames_array(mode), "Bad mode for get live frame");
+ 335     RegisterMap regMap(jt, true);
+ 336     LiveFrameStream stream(jt, &amp;regMap);
+ 337     return fetchFirstBatch(stream, stackStream, mode, skip_frames, frame_count,
+ 338                            start_index, frames_array, THREAD);
+ 339   } else {
+ 340     JavaFrameStream stream(jt, mode);
+ 341     return fetchFirstBatch(stream, stackStream, mode, skip_frames, frame_count,
+ 342                            start_index, frames_array, THREAD);
+ 343   }
+ 344 }
+ 345 
+ 346 oop StackWalk::fetchFirstBatch(BaseFrameStream&amp; stream, Handle stackStream,
+ 347                                jlong mode, int skip_frames, int frame_count,
+ 348                                int start_index, objArrayHandle frames_array, TRAPS) {
+ 349   methodHandle m_doStackWalk(THREAD, Universe::do_stack_walk_method());
+ 350 
+ 351   {
+ 352     Klass* stackWalker_klass = SystemDictionary::StackWalker_klass();
+ 353     Klass* abstractStackWalker_klass = SystemDictionary::AbstractStackWalker_klass();
+ 354     while (!stream.at_end()) {
+ 355       InstanceKlass* ik = stream.method()-&gt;method_holder();
+ 356       if (ik != stackWalker_klass &amp;&amp;
+ 357             ik != abstractStackWalker_klass &amp;&amp; ik-&gt;super() != abstractStackWalker_klass)  {
+ 358         break;
+ 359       }
+ 360 
+<a name="8" id="anc8"></a><span class="changed"> 361       if (log_is_enabled(Debug, stackwalk)) {</span>
+<span class="changed"> 362         ResourceMark rm(THREAD);</span>
+<span class="changed"> 363         outputStream* st = Log(stackwalk)::debug_stream();</span>
+<span class="changed"> 364         st-&gt;print("  skip ");</span>
+<span class="changed"> 365         stream.method()-&gt;print_short_name(st);</span>
+<span class="changed"> 366         st-&gt;cr();</span>
+ 367       }
+ 368       stream.next();
+ 369     }
+ 370 
+ 371     // stack frame has been traversed individually and resume stack walk
+ 372     // from the stack frame at depth == skip_frames.
+ 373     for (int n=0; n &lt; skip_frames &amp;&amp; !stream.at_end(); stream.next(), n++) {
+<a name="9" id="anc9"></a><span class="changed"> 374       if (log_is_enabled(Debug, stackwalk)) {</span>
+<span class="changed"> 375         ResourceMark rm(THREAD);</span>
+<span class="changed"> 376         outputStream* st = Log(stackwalk)::debug_stream();</span>
+<span class="changed"> 377         st-&gt;print("  skip ");</span>
+<span class="changed"> 378         stream.method()-&gt;print_short_name(st);</span>
+<span class="changed"> 379         st-&gt;cr();</span>
+ 380       }
+ 381     }
+ 382   }
+ 383 
+ 384   int end_index = start_index;
+ 385   int numFrames = 0;
+ 386   if (!stream.at_end()) {
+ 387     numFrames = fill_in_frames(mode, stream, frame_count, start_index,
+ 388                                frames_array, end_index, CHECK_NULL);
+ 389     if (numFrames &lt; 1) {
+ 390       THROW_MSG_(vmSymbols::java_lang_InternalError(), "stack walk: decode failed", NULL);
+ 391     }
+ 392   }
+ 393 
+ 394   // JVM_CallStackWalk walks the stack and fills in stack frames, then calls to
+ 395   // Java method java.lang.StackStreamFactory.AbstractStackWalker::doStackWalk
+ 396   // which calls the implementation to consume the stack frames.
+ 397   // When JVM_CallStackWalk returns, it invalidates the stack stream.
+ 398   JavaValue result(T_OBJECT);
+ 399   JavaCallArguments args(stackStream);
+ 400   args.push_long(stream.address_value());
+ 401   args.push_int(skip_frames);
+ 402   args.push_int(frame_count);
+ 403   args.push_int(start_index);
+ 404   args.push_int(end_index);
+ 405 
+ 406   // Link the thread and vframe stream into the callee-visible object
+ 407   stream.setup_magic_on_entry(frames_array);
+ 408 
+ 409   JavaCalls::call(&amp;result, m_doStackWalk, &amp;args, THREAD);
+ 410 
+ 411   // Do this before anything else happens, to disable any lingering stream objects
+ 412   bool ok = stream.cleanup_magic_on_exit(frames_array);
+ 413 
+ 414   // Throw pending exception if we must
+ 415   (void) (CHECK_NULL);
+ 416 
+ 417   if (!ok) {
+ 418     THROW_MSG_(vmSymbols::java_lang_InternalError(), "doStackWalk: corrupted buffers on exit", NULL);
+ 419   }
+ 420 
+ 421   // Return normally
+ 422   return (oop)result.get_jobject();
+ 423 }
+ 424 
+ 425 // Walk the next batch of stack frames
+ 426 //
+ 427 // Parameters:
+ 428 //   stackStream    StackStream object
+ 429 //   mode           Stack walking mode.
+ 430 //   magic          Must be valid value to continue the stack walk
+ 431 //   frame_count    Number of frames to be decoded.
+ 432 //   start_index    Start index to the user-supplied buffers.
+ 433 //   frames_array   Buffer to store StackFrame in, starting at start_index.
+ 434 //
+ 435 // Returns the end index of frame filled in the buffer.
+ 436 //
+ 437 jint StackWalk::fetchNextBatch(Handle stackStream, jlong mode, jlong magic,
+ 438                                int frame_count, int start_index,
+ 439                                objArrayHandle frames_array,
+ 440                                TRAPS)
+ 441 {
+ 442   JavaThread* jt = (JavaThread*)THREAD;
+ 443   BaseFrameStream* existing_stream = BaseFrameStream::from_current(jt, magic, frames_array);
+ 444   if (existing_stream == NULL) {
+ 445     THROW_MSG_(vmSymbols::java_lang_InternalError(), "doStackWalk: corrupted buffers", 0L);
+ 446   }
+ 447 
+ 448   if (frames_array.is_null()) {
+ 449     THROW_MSG_(vmSymbols::java_lang_NullPointerException(), "frames_array is NULL", 0L);
+ 450   }
+ 451 
+<a name="10" id="anc10"></a><span class="changed"> 452   log_debug(stackwalk)("StackWalk::fetchNextBatch frame_count %d existing_stream "</span>
+<span class="changed"> 453                        PTR_FORMAT " start %d frames %d",</span>
+ 454                        frame_count, p2i(existing_stream), start_index, frames_array-&gt;length());
+<a name="11" id="anc11"></a>
+ 455   int end_index = start_index;
+ 456   if (frame_count &lt;= 0) {
+ 457     return end_index;        // No operation.
+ 458   }
+ 459 
+ 460   int count = frame_count + start_index;
+ 461   assert (frames_array-&gt;length() &gt;= count, "not enough space in buffers");
+ 462 
+ 463   BaseFrameStream&amp; stream = (*existing_stream);
+ 464   if (!stream.at_end()) {
+ 465     stream.next(); // advance past the last frame decoded in previous batch
+ 466     if (!stream.at_end()) {
+ 467       int n = fill_in_frames(mode, stream, frame_count, start_index,
+ 468                              frames_array, end_index, CHECK_0);
+ 469       if (n &lt; 1) {
+ 470         THROW_MSG_(vmSymbols::java_lang_InternalError(), "doStackWalk: later decode failed", 0L);
+ 471       }
+ 472       return end_index;
+ 473     }
+ 474   }
+ 475   return end_index;
+ 476 }
+<a name="12" id="anc12"></a><b style="font-size: large; color: red">--- EOF ---</b>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</pre><form name="eof"><input name="value" value="12" type="hidden" /></form></body></html>

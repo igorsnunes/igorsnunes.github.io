@@ -1,0 +1,191 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>hotspot Sdiff src/share/vm/logging </title>
+</head><body id="SUNWwebrev">
+<center><a href='../../../../src/share/vm/gc/g1/heapRegionManager.hpp.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/share/vm/logging/logTag.hpp.sdiff.html' target='_top'>next &gt</a></center>
+<h2>src/share/vm/logging/logFileOutput.cpp</h2>
+<a class="print" href="javascript:print()">Print this page</a>
+<pre></pre>
+
+<table><tr valign="top">
+<td><pre>
+
+</pre><hr></hr><pre>
+  80     return SIZE_MAX;
+  81   }
+  82   return value;
+  83 }
+  84 
+  85 static bool file_exists(const char* filename) {
+  86   struct stat dummy_stat;
+  87   return os::stat(filename, &amp;dummy_stat) == 0;
+  88 }
+  89 
+  90 static uint number_of_digits(uint number) {
+  91   return number &lt; 10 ? 1 : (number &lt; 100 ? 2 : 3);
+  92 }
+  93 
+  94 static bool is_regular_file(const char* filename) {
+  95   struct stat st;
+  96   int ret = os::stat(filename, &amp;st);
+  97   if (ret != 0) {
+  98     return false;
+  99   }
+<span class="changed"> 100 #ifdef _WINDOWS</span>
+<span class="changed"> 101   return (st.st_mode &amp; S_IFMT) == _S_IFREG;</span>
+<span class="changed"> 102 #else</span>
+<span class="changed"> 103   return S_ISREG(st.st_mode);</span>
+<span class="changed"> 104 #endif</span>
+ 105 }
+ 106 
+ 107 // Try to find the next number that should be used for file rotation.
+ 108 // Return UINT_MAX on error.
+ 109 static uint next_file_number(const char* filename,
+ 110                              uint number_of_digits,
+ 111                              uint filecount,
+ 112                              outputStream* errstream) {
+ 113   bool found = false;
+ 114   uint next_num = 0;
+ 115 
+ 116   // len is filename + dot + digits + null char
+ 117   size_t len = strlen(filename) + number_of_digits + 2;
+ 118   char* archive_name = NEW_C_HEAP_ARRAY(char, len, mtLogging);
+ 119   char* oldest_name = NEW_C_HEAP_ARRAY(char, len, mtLogging);
+ 120 
+ 121   for (uint i = 0; i &lt; filecount; i++) {
+ 122     int ret = jio_snprintf(archive_name, len, "%s.%0*u",
+ 123                            filename, number_of_digits, i);
+ 124     assert(ret &gt; 0 &amp;&amp; static_cast&lt;size_t&gt;(ret) == len - 1,
+
+</pre><hr></hr>
+</pre></td><td><pre>
+
+</pre><hr></hr><pre>
+  80     return SIZE_MAX;
+  81   }
+  82   return value;
+  83 }
+  84 
+  85 static bool file_exists(const char* filename) {
+  86   struct stat dummy_stat;
+  87   return os::stat(filename, &amp;dummy_stat) == 0;
+  88 }
+  89 
+  90 static uint number_of_digits(uint number) {
+  91   return number &lt; 10 ? 1 : (number &lt; 100 ? 2 : 3);
+  92 }
+  93 
+  94 static bool is_regular_file(const char* filename) {
+  95   struct stat st;
+  96   int ret = os::stat(filename, &amp;st);
+  97   if (ret != 0) {
+  98     return false;
+  99   }
+<span class="changed"> 100   return (st.st_mode &amp; S_IFMT) == S_IFREG;</span>
+
+
+
+
+ 101 }
+ 102 
+ 103 // Try to find the next number that should be used for file rotation.
+ 104 // Return UINT_MAX on error.
+ 105 static uint next_file_number(const char* filename,
+ 106                              uint number_of_digits,
+ 107                              uint filecount,
+ 108                              outputStream* errstream) {
+ 109   bool found = false;
+ 110   uint next_num = 0;
+ 111 
+ 112   // len is filename + dot + digits + null char
+ 113   size_t len = strlen(filename) + number_of_digits + 2;
+ 114   char* archive_name = NEW_C_HEAP_ARRAY(char, len, mtLogging);
+ 115   char* oldest_name = NEW_C_HEAP_ARRAY(char, len, mtLogging);
+ 116 
+ 117   for (uint i = 0; i &lt; filecount; i++) {
+ 118     int ret = jio_snprintf(archive_name, len, "%s.%0*u",
+ 119                            filename, number_of_digits, i);
+ 120     assert(ret &gt; 0 &amp;&amp; static_cast&lt;size_t&gt;(ret) == len - 1,
+
+</pre><hr></hr>
+</pre></td>
+</tr></table>
+<center><a href='../../../../src/share/vm/gc/g1/heapRegionManager.hpp.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/share/vm/logging/logTag.hpp.sdiff.html' target='_top'>next &gt</a></center>
+</body></html>

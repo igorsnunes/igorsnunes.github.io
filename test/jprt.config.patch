@@ -1,0 +1,18 @@
+--- old/test/jprt.config	2016-10-20 11:02:30.268090094 -0200
++++ new/test/jprt.config	2016-10-20 11:02:30.204090158 -0200
+@@ -86,12 +86,12 @@
+     fi
+ 
+     # Add basic solaris system paths
+-    path4sdk=/usr/ccs/bin:/usr/ccs/lib:/usr/bin:/bin:/usr/sfw/bin
++    path4sdk=/usr/bin
+ 
+     # Find GNU make
+-    make=/usr/sfw/bin/gmake
++    make=/usr/bin/gmake
+     if [ ! -f ${make} ] ; then
+-	make=/opt/sfw/bin/gmake
++	make=/usr/gnu/bin/make
+ 	if [ ! -f ${make} ] ; then
+ 	    make=${slashjava}/devtools/${solaris_arch}/bin/gnumake
+         fi 

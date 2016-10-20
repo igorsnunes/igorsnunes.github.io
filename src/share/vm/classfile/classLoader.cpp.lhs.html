@@ -1,0 +1,2304 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+    <script type="text/javascript" src="../../../../ancnav.js"></script>
+    </head>
+    <body id="SUNWwebrev" onkeypress="keypress(event);">
+    <a name="0"></a>
+    <pre></pre><hr></hr>
+<pre>
+   1 /*
+   2  * Copyright (c) 1997, 2016, Oracle and/or its affiliates. All rights reserved.
+   3  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+   4  *
+   5  * This code is free software; you can redistribute it and/or modify it
+   6  * under the terms of the GNU General Public License version 2 only, as
+   7  * published by the Free Software Foundation.
+   8  *
+   9  * This code is distributed in the hope that it will be useful, but WITHOUT
+  10  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+  11  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+  12  * version 2 for more details (a copy is included in the LICENSE file that
+  13  * accompanied this code).
+  14  *
+  15  * You should have received a copy of the GNU General Public License version
+  16  * 2 along with this work; if not, write to the Free Software Foundation,
+  17  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+  18  *
+  19  * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+  20  * or visit www.oracle.com if you need additional information or have any
+  21  * questions.
+  22  *
+  23  */
+  24 
+  25 #include "precompiled.hpp"
+  26 #include "classfile/classFileStream.hpp"
+  27 #include "classfile/classLoader.hpp"
+  28 #include "classfile/classLoaderData.inline.hpp"
+  29 #include "classfile/classLoaderExt.hpp"
+  30 #include "classfile/javaClasses.hpp"
+  31 #include "classfile/jimage.hpp"
+  32 #include "classfile/moduleEntry.hpp"
+  33 #include "classfile/modules.hpp"
+  34 #include "classfile/packageEntry.hpp"
+  35 #include "classfile/klassFactory.hpp"
+  36 #include "classfile/systemDictionary.hpp"
+  37 #include "classfile/vmSymbols.hpp"
+  38 #include "compiler/compileBroker.hpp"
+  39 #include "gc/shared/collectedHeap.inline.hpp"
+  40 #include "gc/shared/generation.hpp"
+  41 #include "interpreter/bytecodeStream.hpp"
+  42 #include "interpreter/oopMapCache.hpp"
+  43 #include "logging/logTag.hpp"
+  44 #include "memory/allocation.inline.hpp"
+  45 #include "memory/filemap.hpp"
+  46 #include "memory/oopFactory.hpp"
+  47 #include "memory/resourceArea.hpp"
+  48 #include "memory/universe.inline.hpp"
+  49 #include "oops/instanceKlass.hpp"
+  50 #include "oops/instanceRefKlass.hpp"
+  51 #include "oops/objArrayOop.inline.hpp"
+  52 #include "oops/oop.inline.hpp"
+  53 #include "oops/symbol.hpp"
+  54 #include "prims/jvm_misc.hpp"
+  55 #include "runtime/arguments.hpp"
+  56 #include "runtime/compilationPolicy.hpp"
+  57 #include "runtime/fprofiler.hpp"
+  58 #include "runtime/handles.hpp"
+  59 #include "runtime/handles.inline.hpp"
+  60 #include "runtime/init.hpp"
+  61 #include "runtime/interfaceSupport.hpp"
+  62 #include "runtime/java.hpp"
+  63 #include "runtime/javaCalls.hpp"
+  64 #include "runtime/os.hpp"
+  65 #include "runtime/threadCritical.hpp"
+  66 #include "runtime/timer.hpp"
+  67 #include "runtime/vm_version.hpp"
+  68 #include "services/management.hpp"
+  69 #include "services/threadService.hpp"
+  70 #include "utilities/events.hpp"
+  71 #include "utilities/hashtable.inline.hpp"
+  72 #include "utilities/macros.hpp"
+  73 #if INCLUDE_CDS
+  74 #include "classfile/sharedClassUtil.hpp"
+  75 #include "classfile/sharedPathsMiscInfo.hpp"
+  76 #endif
+  77 
+  78 // Entry points in zip.dll for loading zip/jar file entries
+  79 
+  80 typedef void * * (JNICALL *ZipOpen_t)(const char *name, char **pmsg);
+  81 typedef void (JNICALL *ZipClose_t)(jzfile *zip);
+  82 typedef jzentry* (JNICALL *FindEntry_t)(jzfile *zip, const char *name, jint *sizeP, jint *nameLen);
+  83 typedef jboolean (JNICALL *ReadEntry_t)(jzfile *zip, jzentry *entry, unsigned char *buf, char *namebuf);
+<a name="1" id="anc1"></a><span class="removed">  84 typedef jboolean (JNICALL *ReadMappedEntry_t)(jzfile *zip, jzentry *entry, unsigned char **buf, char *namebuf);</span>
+  85 typedef jzentry* (JNICALL *GetNextEntry_t)(jzfile *zip, jint n);
+  86 typedef jboolean (JNICALL *ZipInflateFully_t)(void *inBuf, jlong inLen, void *outBuf, jlong outLen, char **pmsg);
+  87 typedef jint     (JNICALL *Crc32_t)(jint crc, const jbyte *buf, jint len);
+  88 typedef void     (JNICALL *FreeEntry_t)(jzfile *zip, jzentry *entry);
+  89 
+  90 static ZipOpen_t         ZipOpen            = NULL;
+  91 static ZipClose_t        ZipClose           = NULL;
+  92 static FindEntry_t       FindEntry          = NULL;
+  93 static ReadEntry_t       ReadEntry          = NULL;
+<a name="2" id="anc2"></a><span class="removed">  94 static ReadMappedEntry_t ReadMappedEntry    = NULL;</span>
+  95 static GetNextEntry_t    GetNextEntry       = NULL;
+  96 static canonicalize_fn_t CanonicalizeEntry  = NULL;
+  97 static ZipInflateFully_t ZipInflateFully    = NULL;
+  98 static Crc32_t           Crc32              = NULL;
+  99 static FreeEntry_t       FreeEntry          = NULL;
+ 100 
+ 101 // Entry points for jimage.dll for loading jimage file entries
+ 102 
+ 103 static JImageOpen_t                    JImageOpen             = NULL;
+ 104 static JImageClose_t                   JImageClose            = NULL;
+ 105 static JImagePackageToModule_t         JImagePackageToModule  = NULL;
+ 106 static JImageFindResource_t            JImageFindResource     = NULL;
+ 107 static JImageGetResource_t             JImageGetResource      = NULL;
+ 108 static JImageResourceIterator_t        JImageResourceIterator = NULL;
+ 109 static JImage_ResourcePath_t           JImageResourcePath     = NULL;
+ 110 
+ 111 // Globals
+ 112 
+ 113 PerfCounter*    ClassLoader::_perf_accumulated_time = NULL;
+ 114 PerfCounter*    ClassLoader::_perf_classes_inited = NULL;
+ 115 PerfCounter*    ClassLoader::_perf_class_init_time = NULL;
+ 116 PerfCounter*    ClassLoader::_perf_class_init_selftime = NULL;
+ 117 PerfCounter*    ClassLoader::_perf_classes_verified = NULL;
+ 118 PerfCounter*    ClassLoader::_perf_class_verify_time = NULL;
+ 119 PerfCounter*    ClassLoader::_perf_class_verify_selftime = NULL;
+ 120 PerfCounter*    ClassLoader::_perf_classes_linked = NULL;
+ 121 PerfCounter*    ClassLoader::_perf_class_link_time = NULL;
+ 122 PerfCounter*    ClassLoader::_perf_class_link_selftime = NULL;
+ 123 PerfCounter*    ClassLoader::_perf_class_parse_time = NULL;
+ 124 PerfCounter*    ClassLoader::_perf_class_parse_selftime = NULL;
+ 125 PerfCounter*    ClassLoader::_perf_sys_class_lookup_time = NULL;
+ 126 PerfCounter*    ClassLoader::_perf_shared_classload_time = NULL;
+ 127 PerfCounter*    ClassLoader::_perf_sys_classload_time = NULL;
+ 128 PerfCounter*    ClassLoader::_perf_app_classload_time = NULL;
+ 129 PerfCounter*    ClassLoader::_perf_app_classload_selftime = NULL;
+ 130 PerfCounter*    ClassLoader::_perf_app_classload_count = NULL;
+ 131 PerfCounter*    ClassLoader::_perf_define_appclasses = NULL;
+ 132 PerfCounter*    ClassLoader::_perf_define_appclass_time = NULL;
+ 133 PerfCounter*    ClassLoader::_perf_define_appclass_selftime = NULL;
+ 134 PerfCounter*    ClassLoader::_perf_app_classfile_bytes_read = NULL;
+ 135 PerfCounter*    ClassLoader::_perf_sys_classfile_bytes_read = NULL;
+ 136 PerfCounter*    ClassLoader::_sync_systemLoaderLockContentionRate = NULL;
+ 137 PerfCounter*    ClassLoader::_sync_nonSystemLoaderLockContentionRate = NULL;
+ 138 PerfCounter*    ClassLoader::_sync_JVMFindLoadedClassLockFreeCounter = NULL;
+ 139 PerfCounter*    ClassLoader::_sync_JVMDefineClassLockFreeCounter = NULL;
+ 140 PerfCounter*    ClassLoader::_sync_JNIDefineClassLockFreeCounter = NULL;
+ 141 PerfCounter*    ClassLoader::_unsafe_defineClassCallCounter = NULL;
+ 142 PerfCounter*    ClassLoader::_isUnsyncloadClass = NULL;
+ 143 PerfCounter*    ClassLoader::_load_instance_class_failCounter = NULL;
+ 144 
+ 145 GrowableArray&lt;ModuleClassPathList*&gt;* ClassLoader::_patch_mod_entries = NULL;
+ 146 GrowableArray&lt;ModuleClassPathList*&gt;* ClassLoader::_exploded_entries = NULL;
+ 147 ClassPathEntry* ClassLoader::_jrt_entry = NULL;
+ 148 ClassPathEntry* ClassLoader::_first_append_entry = NULL;
+ 149 ClassPathEntry* ClassLoader::_last_append_entry  = NULL;
+ 150 int             ClassLoader::_num_entries        = 0;
+ 151 #if INCLUDE_CDS
+ 152 GrowableArray&lt;char*&gt;* ClassLoader::_boot_modules_array = NULL;
+ 153 GrowableArray&lt;char*&gt;* ClassLoader::_platform_modules_array = NULL;
+ 154 SharedPathsMiscInfo* ClassLoader::_shared_paths_misc_info = NULL;
+ 155 int  ClassLoader::_num_patch_mod_prefixes = 0;
+ 156 #endif
+ 157 
+ 158 // helper routines
+ 159 bool string_starts_with(const char* str, const char* str_to_find) {
+ 160   size_t str_len = strlen(str);
+ 161   size_t str_to_find_len = strlen(str_to_find);
+ 162   if (str_to_find_len &gt; str_len) {
+ 163     return false;
+ 164   }
+ 165   return (strncmp(str, str_to_find, str_to_find_len) == 0);
+ 166 }
+ 167 
+ 168 static const char* get_jimage_version_string() {
+ 169   static char version_string[10] = "";
+ 170   if (version_string[0] == '\0') {
+ 171     jio_snprintf(version_string, sizeof(version_string), "%d.%d",
+ 172                  Abstract_VM_Version::vm_major_version(), Abstract_VM_Version::vm_minor_version());
+ 173   }
+ 174   return (const char*)version_string;
+ 175 }
+ 176 
+ 177 bool ClassLoader::string_ends_with(const char* str, const char* str_to_find) {
+ 178   size_t str_len = strlen(str);
+ 179   size_t str_to_find_len = strlen(str_to_find);
+ 180   if (str_to_find_len &gt; str_len) {
+ 181     return false;
+ 182   }
+ 183   return (strncmp(str + (str_len - str_to_find_len), str_to_find, str_to_find_len) == 0);
+ 184 }
+ 185 
+ 186 // Used to obtain the package name from a fully qualified class name.
+ 187 // It is the responsibility of the caller to establish a ResourceMark.
+ 188 const char* ClassLoader::package_from_name(const char* const class_name, bool* bad_class_name) {
+ 189   if (class_name == NULL) {
+ 190     if (bad_class_name != NULL) {
+ 191       *bad_class_name = true;
+ 192     }
+ 193     return NULL;
+ 194   }
+ 195 
+ 196   if (bad_class_name != NULL) {
+ 197     *bad_class_name = false;
+ 198   }
+ 199 
+ 200   const char* const last_slash = strrchr(class_name, '/');
+ 201   if (last_slash == NULL) {
+ 202     // No package name
+ 203     return NULL;
+ 204   }
+ 205 
+ 206   char* class_name_ptr = (char*) class_name;
+ 207   // Skip over '['s
+ 208   if (*class_name_ptr == '[') {
+ 209     do {
+ 210       class_name_ptr++;
+ 211     } while (*class_name_ptr == '[');
+ 212 
+ 213     // Fully qualified class names should not contain a 'L'.
+ 214     // Set bad_class_name to true to indicate that the package name
+ 215     // could not be obtained due to an error condition.
+ 216     // In this situation, is_same_class_package returns false.
+ 217     if (*class_name_ptr == 'L') {
+ 218       if (bad_class_name != NULL) {
+ 219         *bad_class_name = true;
+ 220       }
+ 221       return NULL;
+ 222     }
+ 223   }
+ 224 
+ 225   int length = last_slash - class_name_ptr;
+ 226 
+ 227   // A class name could have just the slash character in the name.
+ 228   if (length &lt;= 0) {
+ 229     // No package name
+ 230     if (bad_class_name != NULL) {
+ 231       *bad_class_name = true;
+ 232     }
+ 233     return NULL;
+ 234   }
+ 235 
+ 236   // drop name after last slash (including slash)
+ 237   // Ex., "java/lang/String.class" =&gt; "java/lang"
+ 238   char* pkg_name = NEW_RESOURCE_ARRAY(char, length + 1);
+ 239   strncpy(pkg_name, class_name_ptr, length);
+ 240   *(pkg_name+length) = '\0';
+ 241 
+ 242   return (const char *)pkg_name;
+ 243 }
+ 244 
+ 245 // Given a fully qualified class name, find its defining package in the class loader's
+ 246 // package entry table.
+ 247 static PackageEntry* get_package_entry(const char* class_name, ClassLoaderData* loader_data, TRAPS) {
+ 248   ResourceMark rm(THREAD);
+ 249   const char *pkg_name = ClassLoader::package_from_name(class_name);
+ 250   if (pkg_name == NULL) {
+ 251     return NULL;
+ 252   }
+ 253   PackageEntryTable* pkgEntryTable = loader_data-&gt;packages();
+ 254   TempNewSymbol pkg_symbol = SymbolTable::new_symbol(pkg_name, CHECK_NULL);
+ 255   return pkgEntryTable-&gt;lookup_only(pkg_symbol);
+ 256 }
+ 257 
+ 258 ClassPathDirEntry::ClassPathDirEntry(const char* dir) : ClassPathEntry() {
+ 259   char* copy = NEW_C_HEAP_ARRAY(char, strlen(dir)+1, mtClass);
+ 260   strcpy(copy, dir);
+ 261   _dir = copy;
+ 262 }
+ 263 
+ 264 
+ 265 ClassFileStream* ClassPathDirEntry::open_stream(const char* name, TRAPS) {
+ 266   // construct full path name
+ 267   char* path = NEW_RESOURCE_ARRAY_IN_THREAD(THREAD, char, JVM_MAXPATHLEN);
+ 268   if (jio_snprintf(path, JVM_MAXPATHLEN, "%s%s%s", _dir, os::file_separator(), name) == -1) {
+ 269     FREE_RESOURCE_ARRAY(char, path, JVM_MAXPATHLEN);
+ 270     return NULL;
+ 271   }
+ 272   // check if file exists
+ 273   struct stat st;
+ 274   if (os::stat(path, &amp;st) == 0) {
+ 275 #if INCLUDE_CDS
+ 276     if (DumpSharedSpaces) {
+ 277       // We have already check in ClassLoader::check_shared_classpath() that the directory is empty, so
+ 278       // we should never find a file underneath it -- unless user has added a new file while we are running
+ 279       // the dump, in which case let's quit!
+ 280       ShouldNotReachHere();
+ 281     }
+ 282 #endif
+ 283     // found file, open it
+ 284     int file_handle = os::open(path, 0, 0);
+ 285     if (file_handle != -1) {
+ 286       // read contents into resource array
+ 287       u1* buffer = NEW_RESOURCE_ARRAY(u1, st.st_size);
+ 288       size_t num_read = os::read(file_handle, (char*) buffer, st.st_size);
+ 289       // close file
+ 290       os::close(file_handle);
+ 291       // construct ClassFileStream
+ 292       if (num_read == (size_t)st.st_size) {
+ 293         if (UsePerfData) {
+ 294           ClassLoader::perf_sys_classfile_bytes_read()-&gt;inc(num_read);
+ 295         }
+ 296         FREE_RESOURCE_ARRAY(char, path, JVM_MAXPATHLEN);
+ 297         // Resource allocated
+ 298         return new ClassFileStream(buffer,
+ 299                                    st.st_size,
+ 300                                    _dir,
+ 301                                    ClassFileStream::verify);
+ 302       }
+ 303     }
+ 304   }
+ 305   FREE_RESOURCE_ARRAY(char, path, JVM_MAXPATHLEN);
+ 306   return NULL;
+ 307 }
+ 308 
+ 309 ClassPathZipEntry::ClassPathZipEntry(jzfile* zip, const char* zip_name, bool is_boot_append) : ClassPathEntry() {
+ 310   _zip = zip;
+ 311   char *copy = NEW_C_HEAP_ARRAY(char, strlen(zip_name)+1, mtClass);
+ 312   strcpy(copy, zip_name);
+ 313   _zip_name = copy;
+ 314   _is_boot_append = is_boot_append;
+ 315   _multi_versioned = _unknown;
+ 316 }
+ 317 
+ 318 ClassPathZipEntry::~ClassPathZipEntry() {
+ 319   if (ZipClose != NULL) {
+ 320     (*ZipClose)(_zip);
+ 321   }
+ 322   FREE_C_HEAP_ARRAY(char, _zip_name);
+ 323 }
+ 324 
+ 325 bool ClassPathZipEntry::stream_exists(const char* name) {
+ 326   // enable call to C land
+ 327   JavaThread* thread = JavaThread::current();
+ 328   ThreadToNativeFromVM ttn(thread);
+ 329   // check whether zip archive contains name
+ 330   jint name_len, filesize;
+ 331   jzentry* entry = (*FindEntry)(_zip, name, &amp;filesize, &amp;name_len);
+ 332   if (entry != NULL) {
+ 333     (*FreeEntry)(_zip, entry);
+ 334     return true;
+ 335   }
+ 336   return false;
+ 337 }
+ 338 
+ 339 u1* ClassPathZipEntry::open_entry(const char* name, jint* filesize, bool nul_terminate, TRAPS) {
+ 340     // enable call to C land
+ 341   JavaThread* thread = JavaThread::current();
+ 342   ThreadToNativeFromVM ttn(thread);
+ 343   // check whether zip archive contains name
+ 344   jint name_len;
+ 345   jzentry* entry = (*FindEntry)(_zip, name, filesize, &amp;name_len);
+ 346   if (entry == NULL) return NULL;
+ 347   u1* buffer;
+ 348   char name_buf[128];
+ 349   char* filename;
+ 350   if (name_len &lt; 128) {
+ 351     filename = name_buf;
+ 352   } else {
+ 353     filename = NEW_RESOURCE_ARRAY(char, name_len + 1);
+ 354   }
+ 355 
+<a name="3" id="anc3"></a><span class="removed"> 356   // file found, get pointer to the entry in mmapped jar file.</span>
+<span class="removed"> 357   if (ReadMappedEntry == NULL ||</span>
+<span class="removed"> 358       !(*ReadMappedEntry)(_zip, entry, &amp;buffer, filename)) {</span>
+<span class="removed"> 359       // mmapped access not available, perhaps due to compression,</span>
+ 360       // read contents into resource array
+ 361       int size = (*filesize) + ((nul_terminate) ? 1 : 0);
+ 362       buffer = NEW_RESOURCE_ARRAY(u1, size);
+ 363       if (!(*ReadEntry)(_zip, entry, buffer, filename)) return NULL;
+<a name="4" id="anc4"></a><span class="removed"> 364   }</span>
+ 365 
+ 366   // return result
+ 367   if (nul_terminate) {
+ 368     buffer[*filesize] = 0;
+ 369   }
+ 370   return buffer;
+ 371 }
+ 372 
+ 373 #if INCLUDE_CDS
+ 374 u1* ClassPathZipEntry::open_versioned_entry(const char* name, jint* filesize, TRAPS) {
+ 375   u1* buffer = NULL;
+ 376   if (DumpSharedSpaces &amp;&amp; !_is_boot_append) {
+ 377     // We presume default is multi-release enabled
+ 378     const char* multi_ver = Arguments::get_property("jdk.util.jar.enableMultiRelease");
+ 379     const char* verstr = Arguments::get_property("jdk.util.jar.version");
+ 380     bool is_multi_ver = (multi_ver == NULL ||
+ 381                          strcmp(multi_ver, "true") == 0 ||
+ 382                          strcmp(multi_ver, "force")  == 0) &amp;&amp;
+ 383                          is_multiple_versioned(THREAD);
+ 384     // command line version setting
+ 385     int version = 0;
+ 386     const int base_version = 8; // JDK8
+ 387     int cur_ver = JDK_Version::current().major_version();
+ 388     if (verstr != NULL) {
+ 389       version = atoi(verstr);
+ 390       if (version &lt; base_version || version &gt; cur_ver) {
+ 391         is_multi_ver = false;
+ 392         // print out warning, do not use assertion here since it will continue to look
+ 393         // for proper version.
+ 394         warning("JDK%d is not supported in multiple version jars", version);
+ 395       }
+ 396     }
+ 397 
+ 398     if (is_multi_ver) {
+ 399       int n;
+ 400       char* entry_name = NEW_RESOURCE_ARRAY_IN_THREAD(THREAD, char, JVM_MAXPATHLEN);
+ 401       if (version &gt; 0) {
+ 402         n = jio_snprintf(entry_name, JVM_MAXPATHLEN, "META-INF/versions/%d/%s", version, name);
+ 403         entry_name[n] = '\0';
+ 404         buffer = open_entry((const char*)entry_name, filesize, false, CHECK_NULL);
+ 405         if (buffer == NULL) {
+ 406           warning("Could not find %s in %s, try to find highest version instead", entry_name, _zip_name);
+ 407         }
+ 408       }
+ 409       if (buffer == NULL) {
+ 410         for (int i = cur_ver; i &gt;= base_version; i--) {
+ 411           n = jio_snprintf(entry_name, JVM_MAXPATHLEN, "META-INF/versions/%d/%s", i, name);
+ 412           entry_name[n] = '\0';
+ 413           buffer = open_entry((const char*)entry_name, filesize, false, CHECK_NULL);
+ 414           if (buffer != NULL) {
+ 415             break;
+ 416           }
+ 417         }
+ 418       }
+ 419       FREE_RESOURCE_ARRAY(char, entry_name, JVM_MAXPATHLEN);
+ 420     }
+ 421   }
+ 422   return buffer;
+ 423 }
+ 424 
+ 425 bool ClassPathZipEntry::is_multiple_versioned(TRAPS) {
+ 426   assert(DumpSharedSpaces, "called only at dump time");
+ 427   if (_multi_versioned != _unknown) {
+ 428     return (_multi_versioned == _yes) ? true : false;
+ 429   }
+ 430   jint size;
+ 431   char* buffer = (char*)open_entry("META-INF/MANIFEST.MF", &amp;size, true, CHECK_false);
+ 432   if (buffer != NULL) {
+ 433     char* p = buffer;
+ 434     for ( ; *p; ++p) *p = tolower(*p);
+ 435     if (strstr(buffer, "multi-release: true") != NULL) {
+ 436       _multi_versioned = _yes;
+ 437       return true;
+ 438     }
+ 439   }
+ 440   _multi_versioned = _no;
+ 441   return false;
+ 442 }
+ 443 #endif // INCLUDE_CDS
+ 444 
+ 445 ClassFileStream* ClassPathZipEntry::open_stream(const char* name, TRAPS) {
+ 446   jint filesize;
+ 447   u1* buffer = open_versioned_entry(name, &amp;filesize, CHECK_NULL);
+ 448   if (buffer == NULL) {
+ 449     buffer = open_entry(name, &amp;filesize, false, CHECK_NULL);
+ 450     if (buffer == NULL) {
+ 451       return NULL;
+ 452     }
+ 453   }
+ 454   if (UsePerfData) {
+ 455     ClassLoader::perf_sys_classfile_bytes_read()-&gt;inc(filesize);
+ 456   }
+ 457   // Resource allocated
+ 458   return new ClassFileStream(buffer,
+ 459                              filesize,
+ 460                              _zip_name,
+ 461                              ClassFileStream::verify);
+ 462 }
+ 463 
+ 464 // invoke function for each entry in the zip file
+ 465 void ClassPathZipEntry::contents_do(void f(const char* name, void* context), void* context) {
+ 466   JavaThread* thread = JavaThread::current();
+ 467   HandleMark  handle_mark(thread);
+ 468   ThreadToNativeFromVM ttn(thread);
+ 469   for (int n = 0; ; n++) {
+ 470     jzentry * ze = ((*GetNextEntry)(_zip, n));
+ 471     if (ze == NULL) break;
+ 472     (*f)(ze-&gt;name, context);
+ 473   }
+ 474 }
+ 475 
+ 476 ClassPathImageEntry::ClassPathImageEntry(JImageFile* jimage, const char* name) :
+ 477   ClassPathEntry(),
+ 478   _jimage(jimage) {
+ 479   guarantee(jimage != NULL, "jimage file is null");
+ 480   guarantee(name != NULL, "jimage file name is null");
+ 481   size_t len = strlen(name) + 1;
+ 482   _name = NEW_C_HEAP_ARRAY(const char, len, mtClass);
+ 483   strncpy((char *)_name, name, len);
+ 484 }
+ 485 
+ 486 ClassPathImageEntry::~ClassPathImageEntry() {
+ 487   if (_name != NULL) {
+ 488     FREE_C_HEAP_ARRAY(const char, _name);
+ 489     _name = NULL;
+ 490   }
+ 491   if (_jimage != NULL) {
+ 492     (*JImageClose)(_jimage);
+ 493     _jimage = NULL;
+ 494   }
+ 495 }
+ 496 
+ 497 // For a class in a named module, look it up in the jimage file using this syntax:
+ 498 //    /&lt;module-name&gt;/&lt;package-name&gt;/&lt;base-class&gt;
+ 499 //
+ 500 // Assumptions:
+ 501 //     1. There are no unnamed modules in the jimage file.
+ 502 //     2. A package is in at most one module in the jimage file.
+ 503 //
+ 504 ClassFileStream* ClassPathImageEntry::open_stream(const char* name, TRAPS) {
+ 505   jlong size;
+ 506   JImageLocationRef location = (*JImageFindResource)(_jimage, "", get_jimage_version_string(), name, &amp;size);
+ 507 
+ 508   if (location == 0) {
+ 509     ResourceMark rm;
+ 510     const char* pkg_name = ClassLoader::package_from_name(name);
+ 511 
+ 512     if (pkg_name != NULL) {
+ 513       if (!Universe::is_module_initialized()) {
+ 514         location = (*JImageFindResource)(_jimage, "java.base", get_jimage_version_string(), name, &amp;size);
+ 515 #if INCLUDE_CDS
+ 516         // CDS uses the boot class loader to load classes whose packages are in
+ 517         // modules defined for other class loaders.  So, for now, get their module
+ 518         // names from the "modules" jimage file.
+ 519         if (DumpSharedSpaces &amp;&amp; location == 0) {
+ 520           const char* module_name = (*JImagePackageToModule)(_jimage, pkg_name);
+ 521           if (module_name != NULL) {
+ 522             location = (*JImageFindResource)(_jimage, module_name, get_jimage_version_string(), name, &amp;size);
+ 523           }
+ 524         }
+ 525 #endif
+ 526 
+ 527       } else {
+ 528         PackageEntry* package_entry = get_package_entry(name, ClassLoaderData::the_null_class_loader_data(), CHECK_NULL);
+ 529         if (package_entry != NULL) {
+ 530           ResourceMark rm;
+ 531           // Get the module name
+ 532           ModuleEntry* module = package_entry-&gt;module();
+ 533           assert(module != NULL, "Boot classLoader package missing module");
+ 534           assert(module-&gt;is_named(), "Boot classLoader package is in unnamed module");
+ 535           const char* module_name = module-&gt;name()-&gt;as_C_string();
+ 536           if (module_name != NULL) {
+ 537             location = (*JImageFindResource)(_jimage, module_name, get_jimage_version_string(), name, &amp;size);
+ 538           }
+ 539         }
+ 540       }
+ 541     }
+ 542   }
+ 543   if (location != 0) {
+ 544     if (UsePerfData) {
+ 545       ClassLoader::perf_sys_classfile_bytes_read()-&gt;inc(size);
+ 546     }
+ 547     char* data = NEW_RESOURCE_ARRAY(char, size);
+ 548     (*JImageGetResource)(_jimage, location, data, size);
+ 549     // Resource allocated
+ 550     return new ClassFileStream((u1*)data,
+ 551                                (int)size,
+ 552                                _name,
+ 553                                ClassFileStream::verify);
+ 554   }
+ 555 
+ 556   return NULL;
+ 557 }
+ 558 
+ 559 #ifndef PRODUCT
+ 560 bool ctw_visitor(JImageFile* jimage,
+ 561         const char* module_name, const char* version, const char* package,
+ 562         const char* name, const char* extension, void* arg) {
+ 563   if (strcmp(extension, "class") == 0) {
+ 564     Thread* THREAD = Thread::current();
+ 565     ResourceMark rm(THREAD);
+ 566     char* path = NEW_RESOURCE_ARRAY_IN_THREAD(THREAD, char, JIMAGE_MAX_PATH);
+ 567     jio_snprintf(path, JIMAGE_MAX_PATH - 1, "%s/%s.class", package, name);
+ 568     ClassLoader::compile_the_world_in(path, *(Handle*)arg, THREAD);
+ 569     return !HAS_PENDING_EXCEPTION;
+ 570   }
+ 571   return true;
+ 572 }
+ 573 
+ 574 void ClassPathImageEntry::compile_the_world(Handle loader, TRAPS) {
+ 575   tty-&gt;print_cr("CompileTheWorld : Compiling all classes in %s", name());
+ 576   tty-&gt;cr();
+ 577   (*JImageResourceIterator)(_jimage, (JImageResourceVisitor_t)ctw_visitor, (void *)&amp;loader);
+ 578   if (HAS_PENDING_EXCEPTION) {
+ 579     if (PENDING_EXCEPTION-&gt;is_a(SystemDictionary::OutOfMemoryError_klass())) {
+ 580       CLEAR_PENDING_EXCEPTION;
+ 581       tty-&gt;print_cr("\nCompileTheWorld : Ran out of memory\n");
+ 582       tty-&gt;print_cr("Increase class metadata storage if a limit was set");
+ 583     } else {
+ 584       tty-&gt;print_cr("\nCompileTheWorld : Unexpected exception occurred\n");
+ 585     }
+ 586   }
+ 587 }
+ 588 #endif
+ 589 
+ 590 bool ClassPathImageEntry::is_jrt() {
+ 591   return ClassLoader::is_jrt(name());
+ 592 }
+ 593 
+ 594 #if INCLUDE_CDS
+ 595 void ClassLoader::exit_with_path_failure(const char* error, const char* message) {
+ 596   assert(DumpSharedSpaces, "only called at dump time");
+ 597   tty-&gt;print_cr("Hint: enable -Xlog:class+path=info to diagnose the failure");
+ 598   vm_exit_during_initialization(error, message);
+ 599 }
+ 600 #endif
+ 601 
+ 602 ModuleClassPathList::ModuleClassPathList(Symbol* module_name) {
+ 603   _module_name = module_name;
+ 604   _module_first_entry = NULL;
+ 605   _module_last_entry = NULL;
+ 606 }
+ 607 
+ 608 ModuleClassPathList::~ModuleClassPathList() {
+ 609   // Clean out each ClassPathEntry on list
+ 610   ClassPathEntry* e = _module_first_entry;
+ 611   while (e != NULL) {
+ 612     ClassPathEntry* next_entry = e-&gt;next();
+ 613     delete e;
+ 614     e = next_entry;
+ 615   }
+ 616 }
+ 617 
+ 618 void ModuleClassPathList::add_to_list(ClassPathEntry* new_entry) {
+ 619   if (new_entry != NULL) {
+ 620     if (_module_last_entry == NULL) {
+ 621       _module_first_entry = _module_last_entry = new_entry;
+ 622     } else {
+ 623       _module_last_entry-&gt;set_next(new_entry);
+ 624       _module_last_entry = new_entry;
+ 625     }
+ 626   }
+ 627 }
+ 628 
+ 629 void ClassLoader::trace_class_path(const char* msg, const char* name) {
+ 630   if (log_is_enabled(Info, class, path)) {
+ 631     ResourceMark rm;
+ 632     outputStream* out = Log(class, path)::info_stream();
+ 633     if (msg) {
+ 634       out-&gt;print("%s", msg);
+ 635     }
+ 636     if (name) {
+ 637       if (strlen(name) &lt; 256) {
+ 638         out-&gt;print("%s", name);
+ 639       } else {
+ 640         // For very long paths, we need to print each character separately,
+ 641         // as print_cr() has a length limit
+ 642         while (name[0] != '\0') {
+ 643           out-&gt;print("%c", name[0]);
+ 644           name++;
+ 645         }
+ 646       }
+ 647     }
+ 648     out-&gt;cr();
+ 649   }
+ 650 }
+ 651 
+ 652 #if INCLUDE_CDS
+ 653 void ClassLoader::check_shared_classpath(const char *path) {
+ 654   if (strcmp(path, "") == 0) {
+ 655     exit_with_path_failure("Cannot have empty path in archived classpaths", NULL);
+ 656   }
+ 657 
+ 658   struct stat st;
+ 659   if (os::stat(path, &amp;st) == 0) {
+ 660     if ((st.st_mode &amp; S_IFMT) != S_IFREG) { // is not a regular file
+ 661       if (!os::dir_is_empty(path)) {
+ 662         tty-&gt;print_cr("Error: non-empty directory '%s'", path);
+ 663         exit_with_path_failure("CDS allows only empty directories in archived classpaths", NULL);
+ 664       }
+ 665     }
+ 666   }
+ 667 }
+ 668 #endif
+ 669 
+ 670 void ClassLoader::setup_bootstrap_search_path() {
+ 671   const char* sys_class_path = Arguments::get_sysclasspath();
+ 672   const char* java_class_path = Arguments::get_appclasspath();
+ 673   if (PrintSharedArchiveAndExit) {
+ 674     // Don't print sys_class_path - this is the bootcp of this current VM process, not necessarily
+ 675     // the same as the bootcp of the shared archive.
+ 676   } else {
+ 677     trace_class_path("bootstrap loader class path=", sys_class_path);
+ 678     trace_class_path("classpath: ", java_class_path);
+ 679   }
+ 680 #if INCLUDE_CDS
+ 681   if (DumpSharedSpaces) {
+ 682     _shared_paths_misc_info-&gt;add_boot_classpath(sys_class_path);
+ 683   }
+ 684 #endif
+ 685   setup_search_path(sys_class_path, true);
+ 686 }
+ 687 
+ 688 #if INCLUDE_CDS
+ 689 int ClassLoader::get_shared_paths_misc_info_size() {
+ 690   return _shared_paths_misc_info-&gt;get_used_bytes();
+ 691 }
+ 692 
+ 693 void* ClassLoader::get_shared_paths_misc_info() {
+ 694   return _shared_paths_misc_info-&gt;buffer();
+ 695 }
+ 696 
+ 697 bool ClassLoader::check_shared_paths_misc_info(void *buf, int size) {
+ 698   SharedPathsMiscInfo* checker = SharedClassUtil::allocate_shared_paths_misc_info((char*)buf, size);
+ 699   bool result = checker-&gt;check();
+ 700   delete checker;
+ 701   return result;
+ 702 }
+ 703 #endif
+ 704 
+ 705 // Construct the array of module/path pairs as specified to --patch-module
+ 706 // for the boot loader to search ahead of the jimage, if the class being
+ 707 // loaded is defined to a module that has been specified to --patch-module.
+ 708 void ClassLoader::setup_patch_mod_entries() {
+ 709   Thread* THREAD = Thread::current();
+ 710   GrowableArray&lt;ModulePatchPath*&gt;* patch_mod_args = Arguments::get_patch_mod_prefix();
+ 711   int num_of_entries = patch_mod_args-&gt;length();
+ 712 
+ 713 
+ 714   // Set up the boot loader's _patch_mod_entries list
+ 715   _patch_mod_entries = new (ResourceObj::C_HEAP, mtModule) GrowableArray&lt;ModuleClassPathList*&gt;(num_of_entries, true);
+ 716 
+ 717   for (int i = 0; i &lt; num_of_entries; i++) {
+ 718     const char* module_name = (patch_mod_args-&gt;at(i))-&gt;module_name();
+ 719     Symbol* const module_sym = SymbolTable::lookup(module_name, (int)strlen(module_name), CHECK);
+ 720     assert(module_sym != NULL, "Failed to obtain Symbol for module name");
+ 721     ModuleClassPathList* module_cpl = new ModuleClassPathList(module_sym);
+ 722 
+ 723     char* class_path = (patch_mod_args-&gt;at(i))-&gt;path_string();
+ 724     int len = (int)strlen(class_path);
+ 725     int end = 0;
+ 726     // Iterate over the module's class path entries
+ 727     for (int start = 0; start &lt; len; start = end) {
+ 728       while (class_path[end] &amp;&amp; class_path[end] != os::path_separator()[0]) {
+ 729         end++;
+ 730       }
+ 731       EXCEPTION_MARK;
+ 732       ResourceMark rm(THREAD);
+ 733       char* path = NEW_RESOURCE_ARRAY(char, end - start + 1);
+ 734       strncpy(path, &amp;class_path[start], end - start);
+ 735       path[end - start] = '\0';
+ 736 
+ 737       struct stat st;
+ 738       if (os::stat(path, &amp;st) == 0) {
+ 739         // File or directory found
+ 740         Thread* THREAD = Thread::current();
+ 741         ClassPathEntry* new_entry = create_class_path_entry(path, &amp;st, false, false, CHECK);
+ 742         // If the path specification is valid, enter it into this module's list
+ 743         if (new_entry != NULL) {
+ 744           module_cpl-&gt;add_to_list(new_entry);
+ 745         }
+ 746       }
+ 747 
+ 748       while (class_path[end] == os::path_separator()[0]) {
+ 749         end++;
+ 750       }
+ 751     }
+ 752 
+ 753     // Record the module into the list of --patch-module entries only if
+ 754     // valid ClassPathEntrys have been created
+ 755     if (module_cpl-&gt;module_first_entry() != NULL) {
+ 756       _patch_mod_entries-&gt;push(module_cpl);
+ 757     }
+ 758   }
+ 759 }
+ 760 
+ 761 void ClassLoader::setup_search_path(const char *class_path, bool bootstrap_search) {
+ 762   int len = (int)strlen(class_path);
+ 763   int end = 0;
+ 764   bool set_base_piece = bootstrap_search;
+ 765 
+ 766   // Iterate over class path entries
+ 767   for (int start = 0; start &lt; len; start = end) {
+ 768     while (class_path[end] &amp;&amp; class_path[end] != os::path_separator()[0]) {
+ 769       end++;
+ 770     }
+ 771     EXCEPTION_MARK;
+ 772     ResourceMark rm(THREAD);
+ 773     char* path = NEW_RESOURCE_ARRAY(char, end - start + 1);
+ 774     strncpy(path, &amp;class_path[start], end - start);
+ 775     path[end - start] = '\0';
+ 776 
+ 777     // The first time through the bootstrap_search setup, it must be determined
+ 778     // what the base or core piece of the boot loader search is.  Either a java runtime
+ 779     // image is present or this is an exploded module build situation.
+ 780     if (set_base_piece) {
+ 781       assert(string_ends_with(path, MODULES_IMAGE_NAME) || string_ends_with(path, "java.base"),
+ 782              "Incorrect boot loader search path, no java runtime image or java.base exploded build");
+ 783       struct stat st;
+ 784       if (os::stat(path, &amp;st) == 0) {
+ 785         // Directory found
+ 786         Thread* THREAD = Thread::current();
+ 787         ClassPathEntry* new_entry = create_class_path_entry(path, &amp;st, false, false, CHECK);
+ 788 
+ 789         // Check for a jimage
+ 790         if (Arguments::has_jimage()) {
+ 791           assert(_jrt_entry == NULL, "should not setup bootstrap class search path twice");
+ 792           assert(new_entry != NULL &amp;&amp; new_entry-&gt;is_jrt(), "No java runtime image present");
+ 793           _jrt_entry = new_entry;
+ 794           ++_num_entries;
+ 795 #if INCLUDE_CDS
+ 796           if (DumpSharedSpaces) {
+ 797             JImageFile *jimage = _jrt_entry-&gt;jimage();
+ 798             assert(jimage != NULL, "No java runtime image file present");
+ 799             ClassLoader::initialize_module_loader_map(jimage);
+ 800           }
+ 801 #endif
+ 802         }
+ 803       } else {
+ 804         // If path does not exist, exit
+ 805         vm_exit_during_initialization("Unable to establish the boot loader search path", path);
+ 806       }
+ 807       set_base_piece = false;
+ 808     } else {
+ 809       // Every entry on the system boot class path after the initial base piece,
+ 810       // which is set by os::set_boot_path(), is considered an appended entry.
+ 811       update_class_path_entry_list(path, false, bootstrap_search);
+ 812     }
+ 813 
+ 814 #if INCLUDE_CDS
+ 815     if (DumpSharedSpaces) {
+ 816       check_shared_classpath(path);
+ 817     }
+ 818 #endif
+ 819     while (class_path[end] == os::path_separator()[0]) {
+ 820       end++;
+ 821     }
+ 822   }
+ 823 }
+ 824 
+ 825 // During an exploded modules build, each module defined to the boot loader
+ 826 // will be added to the ClassLoader::_exploded_entries array.
+ 827 void ClassLoader::add_to_exploded_build_list(Symbol* module_sym, TRAPS) {
+ 828   assert(!ClassLoader::has_jrt_entry(), "Exploded build not applicable");
+ 829 
+ 830   // Set up the boot loader's _exploded_entries list
+ 831   if (_exploded_entries == NULL) {
+ 832     _exploded_entries = new (ResourceObj::C_HEAP, mtModule) GrowableArray&lt;ModuleClassPathList*&gt;(EXPLODED_ENTRY_SIZE, true);
+ 833   }
+ 834 
+ 835   // Find the module's symbol
+ 836   ResourceMark rm(THREAD);
+ 837   const char *module_name = module_sym-&gt;as_C_string();
+ 838   const char *home = Arguments::get_java_home();
+ 839   const char file_sep = os::file_separator()[0];
+ 840   // 10 represents the length of "modules" + 2 file separators + \0
+ 841   size_t len = strlen(home) + strlen(module_name) + 10;
+ 842   char *path = NEW_C_HEAP_ARRAY(char, len, mtModule);
+ 843   jio_snprintf(path, len, "%s%cmodules%c%s", home, file_sep, file_sep, module_name);
+ 844 
+ 845   struct stat st;
+ 846   if (os::stat(path, &amp;st) == 0) {
+ 847     // Directory found
+ 848     ClassPathEntry* new_entry = create_class_path_entry(path, &amp;st, false, false, CHECK);
+ 849 
+ 850     // If the path specification is valid, enter it into this module's list.
+ 851     // There is no need to check for duplicate modules in the exploded entry list,
+ 852     // since no two modules with the same name can be defined to the boot loader.
+ 853     // This is checked at module definition time in Modules::define_module.
+ 854     if (new_entry != NULL) {
+ 855       ModuleClassPathList* module_cpl = new ModuleClassPathList(module_sym);
+ 856       module_cpl-&gt;add_to_list(new_entry);
+ 857       _exploded_entries-&gt;push(module_cpl);
+ 858       log_info(class, load)("path: %s", path);
+ 859     }
+ 860   }
+ 861   FREE_C_HEAP_ARRAY(char, path);
+ 862 }
+ 863 
+ 864 ClassPathEntry* ClassLoader::create_class_path_entry(const char *path, const struct stat* st,
+ 865                                                      bool throw_exception,
+ 866                                                      bool is_boot_append, TRAPS) {
+ 867   JavaThread* thread = JavaThread::current();
+ 868   ClassPathEntry* new_entry = NULL;
+ 869   if ((st-&gt;st_mode &amp; S_IFMT) == S_IFREG) {
+ 870     ResourceMark rm(thread);
+ 871     // Regular file, should be a zip or jimage file
+ 872     // Canonicalized filename
+ 873     char* canonical_path = NEW_RESOURCE_ARRAY_IN_THREAD(thread, char, JVM_MAXPATHLEN);
+ 874     if (!get_canonical_path(path, canonical_path, JVM_MAXPATHLEN)) {
+ 875       // This matches the classic VM
+ 876       if (throw_exception) {
+ 877         THROW_MSG_(vmSymbols::java_io_IOException(), "Bad pathname", NULL);
+ 878       } else {
+ 879         return NULL;
+ 880       }
+ 881     }
+ 882     jint error;
+ 883     JImageFile* jimage =(*JImageOpen)(canonical_path, &amp;error);
+ 884     if (jimage != NULL) {
+ 885       new_entry = new ClassPathImageEntry(jimage, canonical_path);
+ 886     } else {
+ 887       char* error_msg = NULL;
+ 888       jzfile* zip;
+ 889       {
+ 890         // enable call to C land
+ 891         ThreadToNativeFromVM ttn(thread);
+ 892         HandleMark hm(thread);
+ 893         zip = (*ZipOpen)(canonical_path, &amp;error_msg);
+ 894       }
+ 895       if (zip != NULL &amp;&amp; error_msg == NULL) {
+ 896         new_entry = new ClassPathZipEntry(zip, path, is_boot_append);
+ 897       } else {
+ 898         char *msg;
+ 899         if (error_msg == NULL) {
+ 900           msg = NEW_RESOURCE_ARRAY_IN_THREAD(thread, char, strlen(path) + 128); ;
+ 901           jio_snprintf(msg, strlen(path) + 127, "error in opening JAR file %s", path);
+ 902         } else {
+ 903           int len = (int)(strlen(path) + strlen(error_msg) + 128);
+ 904           msg = NEW_RESOURCE_ARRAY_IN_THREAD(thread, char, len); ;
+ 905           jio_snprintf(msg, len - 1, "error in opening JAR file &lt;%s&gt; %s", error_msg, path);
+ 906         }
+ 907         // Don't complain about bad jar files added via -Xbootclasspath/a:.
+ 908         if (throw_exception &amp;&amp; is_init_completed()) {
+ 909           THROW_MSG_(vmSymbols::java_lang_ClassNotFoundException(), msg, NULL);
+ 910         } else {
+ 911           return NULL;
+ 912         }
+ 913       }
+ 914     }
+ 915     log_info(class, path)("opened: %s", path);
+ 916     log_info(class, load)("opened: %s", path);
+ 917   } else {
+ 918     // Directory
+ 919     new_entry = new ClassPathDirEntry(path);
+ 920     log_info(class, load)("path: %s", path);
+ 921   }
+ 922   return new_entry;
+ 923 }
+ 924 
+ 925 
+ 926 // Create a class path zip entry for a given path (return NULL if not found
+ 927 // or zip/JAR file cannot be opened)
+ 928 ClassPathZipEntry* ClassLoader::create_class_path_zip_entry(const char *path, bool is_boot_append) {
+ 929   // check for a regular file
+ 930   struct stat st;
+ 931   if (os::stat(path, &amp;st) == 0) {
+ 932     if ((st.st_mode &amp; S_IFMT) == S_IFREG) {
+ 933       char canonical_path[JVM_MAXPATHLEN];
+ 934       if (get_canonical_path(path, canonical_path, JVM_MAXPATHLEN)) {
+ 935         char* error_msg = NULL;
+ 936         jzfile* zip;
+ 937         {
+ 938           // enable call to C land
+ 939           JavaThread* thread = JavaThread::current();
+ 940           ThreadToNativeFromVM ttn(thread);
+ 941           HandleMark hm(thread);
+ 942           zip = (*ZipOpen)(canonical_path, &amp;error_msg);
+ 943         }
+ 944         if (zip != NULL &amp;&amp; error_msg == NULL) {
+ 945           // create using canonical path
+ 946           return new ClassPathZipEntry(zip, canonical_path, is_boot_append);
+ 947         }
+ 948       }
+ 949     }
+ 950   }
+ 951   return NULL;
+ 952 }
+ 953 
+ 954 // returns true if entry already on class path
+ 955 bool ClassLoader::contains_entry(ClassPathEntry *entry) {
+ 956   ClassPathEntry* e = _first_append_entry;
+ 957   while (e != NULL) {
+ 958     // assume zip entries have been canonicalized
+ 959     if (strcmp(entry-&gt;name(), e-&gt;name()) == 0) {
+ 960       return true;
+ 961     }
+ 962     e = e-&gt;next();
+ 963   }
+ 964   return false;
+ 965 }
+ 966 
+ 967 void ClassLoader::add_to_list(ClassPathEntry *new_entry) {
+ 968   if (new_entry != NULL) {
+ 969     if (_last_append_entry == NULL) {
+ 970       assert(_first_append_entry == NULL, "boot loader's append class path entry list not empty");
+ 971       _first_append_entry = _last_append_entry = new_entry;
+ 972     } else {
+ 973       _last_append_entry-&gt;set_next(new_entry);
+ 974       _last_append_entry = new_entry;
+ 975     }
+ 976   }
+ 977   _num_entries++;
+ 978 }
+ 979 
+ 980 void ClassLoader::add_to_list(const char *apath) {
+ 981   update_class_path_entry_list((char*)apath, false, false);
+ 982 }
+ 983 
+ 984 // Returns true IFF the file/dir exists and the entry was successfully created.
+ 985 bool ClassLoader::update_class_path_entry_list(const char *path,
+ 986                                                bool check_for_duplicates,
+ 987                                                bool is_boot_append,
+ 988                                                bool throw_exception) {
+ 989   struct stat st;
+ 990   if (os::stat(path, &amp;st) == 0) {
+ 991     // File or directory found
+ 992     ClassPathEntry* new_entry = NULL;
+ 993     Thread* THREAD = Thread::current();
+ 994     new_entry = create_class_path_entry(path, &amp;st, throw_exception, is_boot_append, CHECK_(false));
+ 995     if (new_entry == NULL) {
+ 996       return false;
+ 997     }
+ 998 
+ 999     // Do not reorder the bootclasspath which would break get_system_package().
+1000     // Add new entry to linked list
+1001     if (!check_for_duplicates || !contains_entry(new_entry)) {
+1002       ClassLoaderExt::add_class_path_entry(path, check_for_duplicates, new_entry);
+1003     }
+1004     return true;
+1005   } else {
+1006 #if INCLUDE_CDS
+1007     if (DumpSharedSpaces) {
+1008       _shared_paths_misc_info-&gt;add_nonexist_path(path);
+1009     }
+1010 #endif
+1011     return false;
+1012   }
+1013 }
+1014 
+1015 static void print_module_entry_table(const GrowableArray&lt;ModuleClassPathList*&gt;* const module_list) {
+1016   ResourceMark rm;
+1017   int num_of_entries = module_list-&gt;length();
+1018   for (int i = 0; i &lt; num_of_entries; i++) {
+1019     ClassPathEntry* e;
+1020     ModuleClassPathList* mpl = module_list-&gt;at(i);
+1021     tty-&gt;print("%s=", mpl-&gt;module_name()-&gt;as_C_string());
+1022     e = mpl-&gt;module_first_entry();
+1023     while (e != NULL) {
+1024       tty-&gt;print("%s", e-&gt;name());
+1025       e = e-&gt;next();
+1026       if (e != NULL) {
+1027         tty-&gt;print("%s", os::path_separator());
+1028       }
+1029     }
+1030     tty-&gt;print(" ;");
+1031   }
+1032 }
+1033 
+1034 void ClassLoader::print_bootclasspath() {
+1035   ClassPathEntry* e;
+1036   tty-&gt;print("[bootclasspath= ");
+1037 
+1038   // Print --patch-module module/path specifications first
+1039   if (_patch_mod_entries != NULL) {
+1040     print_module_entry_table(_patch_mod_entries);
+1041   }
+1042 
+1043   // [jimage | exploded modules build]
+1044   if (has_jrt_entry()) {
+1045     // Print the location of the java runtime image
+1046     tty-&gt;print("%s ;", _jrt_entry-&gt;name());
+1047   } else {
+1048     // Print exploded module build path specifications
+1049     if (_exploded_entries != NULL) {
+1050       print_module_entry_table(_exploded_entries);
+1051     }
+1052   }
+1053 
+1054   // appended entries
+1055   e = _first_append_entry;
+1056   while (e != NULL) {
+1057     tty-&gt;print("%s ;", e-&gt;name());
+1058     e = e-&gt;next();
+1059   }
+1060   tty-&gt;print_cr("]");
+1061 }
+1062 
+1063 void ClassLoader::load_zip_library() {
+1064   assert(ZipOpen == NULL, "should not load zip library twice");
+1065   // First make sure native library is loaded
+1066   os::native_java_library();
+1067   // Load zip library
+1068   char path[JVM_MAXPATHLEN];
+1069   char ebuf[1024];
+1070   void* handle = NULL;
+1071   if (os::dll_build_name(path, sizeof(path), Arguments::get_dll_dir(), "zip")) {
+1072     handle = os::dll_load(path, ebuf, sizeof ebuf);
+1073   }
+1074   if (handle == NULL) {
+1075     vm_exit_during_initialization("Unable to load ZIP library", path);
+1076   }
+1077   // Lookup zip entry points
+1078   ZipOpen      = CAST_TO_FN_PTR(ZipOpen_t, os::dll_lookup(handle, "ZIP_Open"));
+1079   ZipClose     = CAST_TO_FN_PTR(ZipClose_t, os::dll_lookup(handle, "ZIP_Close"));
+1080   FindEntry    = CAST_TO_FN_PTR(FindEntry_t, os::dll_lookup(handle, "ZIP_FindEntry"));
+1081   ReadEntry    = CAST_TO_FN_PTR(ReadEntry_t, os::dll_lookup(handle, "ZIP_ReadEntry"));
+<a name="5" id="anc5"></a><span class="removed">1082   ReadMappedEntry = CAST_TO_FN_PTR(ReadMappedEntry_t, os::dll_lookup(handle, "ZIP_ReadMappedEntry"));</span>
+1083   GetNextEntry = CAST_TO_FN_PTR(GetNextEntry_t, os::dll_lookup(handle, "ZIP_GetNextEntry"));
+1084   ZipInflateFully = CAST_TO_FN_PTR(ZipInflateFully_t, os::dll_lookup(handle, "ZIP_InflateFully"));
+1085   Crc32        = CAST_TO_FN_PTR(Crc32_t, os::dll_lookup(handle, "ZIP_CRC32"));
+1086   FreeEntry    = CAST_TO_FN_PTR(FreeEntry_t, os::dll_lookup(handle, "ZIP_FreeEntry"));
+1087 
+1088   // ZIP_Close is not exported on Windows in JDK5.0 so don't abort if ZIP_Close is NULL
+1089   if (ZipOpen == NULL || FindEntry == NULL || ReadEntry == NULL ||
+1090       GetNextEntry == NULL || Crc32 == NULL) {
+1091     vm_exit_during_initialization("Corrupted ZIP library", path);
+1092   }
+1093 
+1094   if (ZipInflateFully == NULL) {
+1095     vm_exit_during_initialization("Corrupted ZIP library ZIP_InflateFully missing", path);
+1096   }
+1097 
+1098   // Lookup canonicalize entry in libjava.dll
+1099   void *javalib_handle = os::native_java_library();
+1100   CanonicalizeEntry = CAST_TO_FN_PTR(canonicalize_fn_t, os::dll_lookup(javalib_handle, "Canonicalize"));
+1101   // This lookup only works on 1.3. Do not check for non-null here
+1102 }
+1103 
+1104 void ClassLoader::load_jimage_library() {
+1105   // First make sure native library is loaded
+1106   os::native_java_library();
+1107   // Load jimage library
+1108   char path[JVM_MAXPATHLEN];
+1109   char ebuf[1024];
+1110   void* handle = NULL;
+1111   if (os::dll_build_name(path, sizeof(path), Arguments::get_dll_dir(), "jimage")) {
+1112     handle = os::dll_load(path, ebuf, sizeof ebuf);
+1113   }
+1114   if (handle == NULL) {
+1115     vm_exit_during_initialization("Unable to load jimage library", path);
+1116   }
+1117 
+1118   // Lookup jimage entry points
+1119   JImageOpen = CAST_TO_FN_PTR(JImageOpen_t, os::dll_lookup(handle, "JIMAGE_Open"));
+1120   guarantee(JImageOpen != NULL, "function JIMAGE_Open not found");
+1121   JImageClose = CAST_TO_FN_PTR(JImageClose_t, os::dll_lookup(handle, "JIMAGE_Close"));
+1122   guarantee(JImageClose != NULL, "function JIMAGE_Close not found");
+1123   JImagePackageToModule = CAST_TO_FN_PTR(JImagePackageToModule_t, os::dll_lookup(handle, "JIMAGE_PackageToModule"));
+1124   guarantee(JImagePackageToModule != NULL, "function JIMAGE_PackageToModule not found");
+1125   JImageFindResource = CAST_TO_FN_PTR(JImageFindResource_t, os::dll_lookup(handle, "JIMAGE_FindResource"));
+1126   guarantee(JImageFindResource != NULL, "function JIMAGE_FindResource not found");
+1127   JImageGetResource = CAST_TO_FN_PTR(JImageGetResource_t, os::dll_lookup(handle, "JIMAGE_GetResource"));
+1128   guarantee(JImageGetResource != NULL, "function JIMAGE_GetResource not found");
+1129   JImageResourceIterator = CAST_TO_FN_PTR(JImageResourceIterator_t, os::dll_lookup(handle, "JIMAGE_ResourceIterator"));
+1130   guarantee(JImageResourceIterator != NULL, "function JIMAGE_ResourceIterator not found");
+1131   JImageResourcePath = CAST_TO_FN_PTR(JImage_ResourcePath_t, os::dll_lookup(handle, "JIMAGE_ResourcePath"));
+1132   guarantee(JImageResourcePath != NULL, "function JIMAGE_ResourcePath not found");
+1133 }
+1134 
+1135 jboolean ClassLoader::decompress(void *in, u8 inSize, void *out, u8 outSize, char **pmsg) {
+1136   return (*ZipInflateFully)(in, inSize, out, outSize, pmsg);
+1137 }
+1138 
+1139 int ClassLoader::crc32(int crc, const char* buf, int len) {
+1140   assert(Crc32 != NULL, "ZIP_CRC32 is not found");
+1141   return (*Crc32)(crc, (const jbyte*)buf, len);
+1142 }
+1143 
+1144 #if INCLUDE_CDS
+1145 void ClassLoader::initialize_module_loader_map(JImageFile* jimage) {
+1146   if (!DumpSharedSpaces) {
+1147     return; // only needed for CDS dump time
+1148   }
+1149 
+1150   ResourceMark rm;
+1151   jlong size;
+1152   JImageLocationRef location = (*JImageFindResource)(jimage, "java.base", get_jimage_version_string(), MODULE_LOADER_MAP, &amp;size);
+1153   if (location == 0) {
+1154     vm_exit_during_initialization(
+1155       "Cannot find ModuleLoaderMap location from modules jimage.", NULL);
+1156   }
+1157   char* buffer = NEW_RESOURCE_ARRAY(char, size + 1);
+1158   buffer[size] = '\0';
+1159   jlong read = (*JImageGetResource)(jimage, location, buffer, size);
+1160   if (read != size) {
+1161     vm_exit_during_initialization(
+1162       "Cannot find ModuleLoaderMap resource from modules jimage.", NULL);
+1163   }
+1164   char* char_buf = (char*)buffer;
+1165   int buflen = (int)strlen(char_buf);
+1166   char* begin_ptr = char_buf;
+1167   char* end_ptr = strchr(begin_ptr, '\n');
+1168   bool process_boot_modules = false;
+1169   _boot_modules_array = new (ResourceObj::C_HEAP, mtModule)
+1170     GrowableArray&lt;char*&gt;(INITIAL_BOOT_MODULES_ARRAY_SIZE, true);
+1171   _platform_modules_array = new (ResourceObj::C_HEAP, mtModule)
+1172     GrowableArray&lt;char*&gt;(INITIAL_PLATFORM_MODULES_ARRAY_SIZE, true);
+1173   while (end_ptr != NULL &amp;&amp; (end_ptr - char_buf) &lt; buflen) {
+1174     // Allocate a buffer from the C heap to be appended to the _boot_modules_array
+1175     // or the _platform_modules_array.
+1176     char* temp_name = NEW_C_HEAP_ARRAY(char, (size_t)(end_ptr - begin_ptr + 1), mtInternal);
+1177     strncpy(temp_name, begin_ptr, end_ptr - begin_ptr);
+1178     temp_name[end_ptr - begin_ptr] = '\0';
+1179     if (strncmp(temp_name, "BOOT", 4) == 0) {
+1180       process_boot_modules = true;
+1181       FREE_C_HEAP_ARRAY(char, temp_name);
+1182     } else if (strncmp(temp_name, "PLATFORM", 8) == 0) {
+1183       process_boot_modules = false;
+1184       FREE_C_HEAP_ARRAY(char, temp_name);
+1185     } else {
+1186       // module name
+1187       if (process_boot_modules) {
+1188         _boot_modules_array-&gt;append(temp_name);
+1189       } else {
+1190         _platform_modules_array-&gt;append(temp_name);
+1191       }
+1192     }
+1193     begin_ptr = ++end_ptr;
+1194     end_ptr = strchr(begin_ptr, '\n');
+1195   }
+1196 }
+1197 #endif
+1198 
+1199 // Function add_package extracts the package from the fully qualified class name
+1200 // and checks if the package is in the boot loader's package entry table.  If so,
+1201 // then it sets the classpath_index in the package entry record.
+1202 //
+1203 // The classpath_index field is used to find the entry on the boot loader class
+1204 // path for packages with classes loaded by the boot loader from -Xbootclasspath/a
+1205 // in an unnamed module.  It is also used to indicate (for all packages whose
+1206 // classes are loaded by the boot loader) that at least one of the package's
+1207 // classes has been loaded.
+1208 bool ClassLoader::add_package(const char *fullq_class_name, s2 classpath_index, TRAPS) {
+1209   assert(fullq_class_name != NULL, "just checking");
+1210 
+1211   // Get package name from fully qualified class name.
+1212   ResourceMark rm;
+1213   const char *cp = package_from_name(fullq_class_name);
+1214   if (cp != NULL) {
+1215     PackageEntryTable* pkg_entry_tbl = ClassLoaderData::the_null_class_loader_data()-&gt;packages();
+1216     TempNewSymbol pkg_symbol = SymbolTable::new_symbol(cp, CHECK_false);
+1217     PackageEntry* pkg_entry = pkg_entry_tbl-&gt;lookup_only(pkg_symbol);
+1218     if (pkg_entry != NULL) {
+1219       assert(classpath_index != -1, "Unexpected classpath_index");
+1220       pkg_entry-&gt;set_classpath_index(classpath_index);
+1221     } else {
+1222       return false;
+1223     }
+1224   }
+1225   return true;
+1226 }
+1227 
+1228 oop ClassLoader::get_system_package(const char* name, TRAPS) {
+1229   // Look up the name in the boot loader's package entry table.
+1230   if (name != NULL) {
+1231     TempNewSymbol package_sym = SymbolTable::new_symbol(name, (int)strlen(name), CHECK_NULL);
+1232     // Look for the package entry in the boot loader's package entry table.
+1233     PackageEntry* package =
+1234       ClassLoaderData::the_null_class_loader_data()-&gt;packages()-&gt;lookup_only(package_sym);
+1235 
+1236     // Return NULL if package does not exist or if no classes in that package
+1237     // have been loaded.
+1238     if (package != NULL &amp;&amp; package-&gt;has_loaded_class()) {
+1239       ModuleEntry* module = package-&gt;module();
+1240       if (module-&gt;location() != NULL) {
+1241         ResourceMark rm(THREAD);
+1242         Handle ml = java_lang_String::create_from_str(
+1243           module-&gt;location()-&gt;as_C_string(), THREAD);
+1244         return ml();
+1245       }
+1246       // Return entry on boot loader class path.
+1247       Handle cph = java_lang_String::create_from_str(
+1248         ClassLoader::classpath_entry(package-&gt;classpath_index())-&gt;name(), THREAD);
+1249       return cph();
+1250     }
+1251   }
+1252   return NULL;
+1253 }
+1254 
+1255 objArrayOop ClassLoader::get_system_packages(TRAPS) {
+1256   ResourceMark rm(THREAD);
+1257   // List of pointers to PackageEntrys that have loaded classes.
+1258   GrowableArray&lt;PackageEntry*&gt;* loaded_class_pkgs = new GrowableArray&lt;PackageEntry*&gt;(50);
+1259   {
+1260     MutexLocker ml(Module_lock, THREAD);
+1261 
+1262     PackageEntryTable* pe_table =
+1263       ClassLoaderData::the_null_class_loader_data()-&gt;packages();
+1264 
+1265     // Collect the packages that have at least one loaded class.
+1266     for (int x = 0; x &lt; pe_table-&gt;table_size(); x++) {
+1267       for (PackageEntry* package_entry = pe_table-&gt;bucket(x);
+1268            package_entry != NULL;
+1269            package_entry = package_entry-&gt;next()) {
+1270         if (package_entry-&gt;has_loaded_class()) {
+1271           loaded_class_pkgs-&gt;append(package_entry);
+1272         }
+1273       }
+1274     }
+1275   }
+1276 
+1277 
+1278   // Allocate objArray and fill with java.lang.String
+1279   objArrayOop r = oopFactory::new_objArray(SystemDictionary::String_klass(),
+1280                                            loaded_class_pkgs-&gt;length(), CHECK_NULL);
+1281   objArrayHandle result(THREAD, r);
+1282   for (int x = 0; x &lt; loaded_class_pkgs-&gt;length(); x++) {
+1283     PackageEntry* package_entry = loaded_class_pkgs-&gt;at(x);
+1284     Handle str = java_lang_String::create_from_symbol(package_entry-&gt;name(), CHECK_NULL);
+1285     result-&gt;obj_at_put(x, str());
+1286   }
+1287   return result();
+1288 }
+1289 
+1290 #if INCLUDE_CDS
+1291 s2 ClassLoader::module_to_classloader(const char* module_name) {
+1292 
+1293   assert(DumpSharedSpaces, "dump time only");
+1294   assert(_boot_modules_array != NULL, "_boot_modules_array is NULL");
+1295   assert(_platform_modules_array != NULL, "_platform_modules_array is NULL");
+1296 
+1297   int array_size = _boot_modules_array-&gt;length();
+1298   for (int i = 0; i &lt; array_size; i++) {
+1299     if (strcmp(module_name, _boot_modules_array-&gt;at(i)) == 0) {
+1300       return BOOT_LOADER;
+1301     }
+1302   }
+1303 
+1304   array_size = _platform_modules_array-&gt;length();
+1305   for (int i = 0; i &lt; array_size; i++) {
+1306     if (strcmp(module_name, _platform_modules_array-&gt;at(i)) == 0) {
+1307       return PLATFORM_LOADER;
+1308     }
+1309   }
+1310 
+1311   return APP_LOADER;
+1312 }
+1313 
+1314 s2 ClassLoader::classloader_type(Symbol* class_name, ClassPathEntry* e, int classpath_index, TRAPS) {
+1315   assert(DumpSharedSpaces, "Only used for CDS dump time");
+1316 
+1317   // obtain the classloader type based on the class name.
+1318   // First obtain the package name based on the class name. Then obtain
+1319   // the classloader type based on the package name from the jimage using
+1320   // a jimage API. If the classloader type cannot be found from the
+1321   // jimage, it is determined by the class path entry.
+1322   jshort loader_type = ClassLoader::APP_LOADER;
+1323   if (e-&gt;is_jrt()) {
+1324     ResourceMark rm;
+1325     TempNewSymbol pkg_name = InstanceKlass::package_from_name(class_name, CHECK_0);
+1326     if (pkg_name != NULL) {
+1327       const char* pkg_name_C_string = (const char*)(pkg_name-&gt;as_C_string());
+1328       ClassPathImageEntry* cpie = (ClassPathImageEntry*)e;
+1329       JImageFile* jimage = cpie-&gt;jimage();
+1330       char* module_name = (char*)(*JImagePackageToModule)(jimage, pkg_name_C_string);
+1331       if (module_name != NULL) {
+1332         loader_type = ClassLoader::module_to_classloader(module_name);
+1333       }
+1334     }
+1335   } else if (ClassLoaderExt::is_boot_classpath(classpath_index)) {
+1336     loader_type = ClassLoader::BOOT_LOADER;
+1337   }
+1338   return loader_type;
+1339 }
+1340 #endif
+1341 
+1342 // caller needs ResourceMark
+1343 const char* ClassLoader::file_name_for_class_name(const char* class_name,
+1344                                                   int class_name_len) {
+1345   assert(class_name != NULL, "invariant");
+1346   assert((int)strlen(class_name) == class_name_len, "invariant");
+1347 
+1348   static const char class_suffix[] = ".class";
+1349 
+1350   char* const file_name = NEW_RESOURCE_ARRAY(char,
+1351                                              class_name_len +
+1352                                              sizeof(class_suffix)); // includes term NULL
+1353 
+1354   strncpy(file_name, class_name, class_name_len);
+1355   strncpy(&amp;file_name[class_name_len], class_suffix, sizeof(class_suffix));
+1356 
+1357   return file_name;
+1358 }
+1359 
+1360 // Search either the patch-module or exploded build entries for class
+1361 ClassFileStream* ClassLoader::search_module_entries(const GrowableArray&lt;ModuleClassPathList*&gt;* const module_list,
+1362                                                     const char* const class_name, const char* const file_name, TRAPS) {
+1363   ClassFileStream* stream = NULL;
+1364 
+1365   // Find the class' defining module in the boot loader's module entry table
+1366   PackageEntry* pkg_entry = get_package_entry(class_name, ClassLoaderData::the_null_class_loader_data(), CHECK_NULL);
+1367   ModuleEntry* mod_entry = (pkg_entry != NULL) ? pkg_entry-&gt;module() : NULL;
+1368 
+1369   // If the module system has not defined java.base yet, then
+1370   // classes loaded are assumed to be defined to java.base.
+1371   // When java.base is eventually defined by the module system,
+1372   // all packages of classes that have been previously loaded
+1373   // are verified in ModuleEntryTable::verify_javabase_packages().
+1374   if (!Universe::is_module_initialized() &amp;&amp;
+1375       !ModuleEntryTable::javabase_defined() &amp;&amp;
+1376       mod_entry == NULL) {
+1377     mod_entry = ModuleEntryTable::javabase_moduleEntry();
+1378   }
+1379 
+1380   // The module must be a named module
+1381   if (mod_entry != NULL &amp;&amp; mod_entry-&gt;is_named()) {
+1382     int num_of_entries = module_list-&gt;length();
+1383     const Symbol* class_module_name = mod_entry-&gt;name();
+1384 
+1385     // Loop through all the modules in either the patch-module or exploded entries looking for module
+1386     for (int i = 0; i &lt; num_of_entries; i++) {
+1387       ModuleClassPathList* module_cpl = module_list-&gt;at(i);
+1388       Symbol* module_cpl_name = module_cpl-&gt;module_name();
+1389 
+1390       if (module_cpl_name-&gt;fast_compare(class_module_name) == 0) {
+1391         // Class' module has been located, attempt to load
+1392         // the class from the module's ClassPathEntry list.
+1393         ClassPathEntry* e = module_cpl-&gt;module_first_entry();
+1394         while (e != NULL) {
+1395           stream = e-&gt;open_stream(file_name, CHECK_NULL);
+1396           // No context.check is required since CDS is not supported
+1397           // for an exploded modules build or if --patch-module is specified.
+1398           if (NULL != stream) {
+1399             return stream;
+1400           }
+1401           e = e-&gt;next();
+1402         }
+1403         // If the module was located, break out even if the class was not
+1404         // located successfully from that module's ClassPathEntry list.
+1405         // There will not be another valid entry for that module.
+1406         return NULL;
+1407       }
+1408     }
+1409   }
+1410 
+1411   return NULL;
+1412 }
+1413 
+1414 #if INCLUDE_CDS
+1415 // The following function is only used during CDS dump time.
+1416 // It checks if a class can be found in the jar entries of the _patch_mod_entries.
+1417 // It does not support non-jar entries.
+1418 bool ClassLoader::is_in_patch_module(const char* const file_name) {
+1419   assert(DumpSharedSpaces, "dump time only");
+1420   if (_patch_mod_entries == NULL) {
+1421     return false;
+1422   }
+1423 
+1424   int num_of_entries = _patch_mod_entries-&gt;length();
+1425   char* class_module_name = NULL;
+1426   ResourceMark rm;
+1427   const char *pkg_name = package_from_name(file_name);
+1428   // Using the jimage to obtain the class' module name.
+1429   // The ModuleEntryTable cannot be used at this point during dump time
+1430   // because the module system hasn't been initialized yet.
+1431   if (pkg_name != NULL) {
+1432     JImageFile *jimage = _jrt_entry-&gt;jimage();
+1433     class_module_name = (char*)(*JImagePackageToModule)(jimage, pkg_name);
+1434   }
+1435 
+1436   if (class_module_name == NULL) {
+1437     return false;
+1438   }
+1439 
+1440   // Loop through all the patch module entries looking for module
+1441   for (int i = 0; i &lt; num_of_entries; i++) {
+1442     ModuleClassPathList* module_cpl = _patch_mod_entries-&gt;at(i);
+1443     Symbol* module_cpl_name = module_cpl-&gt;module_name();
+1444 
+1445     if (strcmp(module_cpl_name-&gt;as_C_string(), class_module_name) == 0) {
+1446       // Class' module has been located, attempt to locate
+1447       // the class from the module's ClassPathEntry list.
+1448       ClassPathEntry* e = module_cpl-&gt;module_first_entry();
+1449       while (e != NULL) {
+1450         if (e-&gt;is_jar_file()) {
+1451           if (e-&gt;stream_exists(file_name)) {
+1452             return true;
+1453           } else {
+1454             e = e-&gt;next();
+1455           }
+1456         }
+1457       }
+1458     }
+1459   }
+1460 
+1461   return false;
+1462 }
+1463 #endif // INCLUDE_CDS
+1464 
+1465 instanceKlassHandle ClassLoader::load_class(Symbol* name, bool search_append_only, TRAPS) {
+1466   assert(name != NULL, "invariant");
+1467   assert(THREAD-&gt;is_Java_thread(), "must be a JavaThread");
+1468 
+1469   ResourceMark rm(THREAD);
+1470   HandleMark hm(THREAD);
+1471 
+1472   const char* const class_name = name-&gt;as_C_string();
+1473 
+1474   EventMark m("loading class %s", class_name);
+1475   ThreadProfilerMark tpm(ThreadProfilerMark::classLoaderRegion);
+1476 
+1477   const char* const file_name = file_name_for_class_name(class_name,
+1478                                                          name-&gt;utf8_length());
+1479   assert(file_name != NULL, "invariant");
+1480 
+1481   ClassLoaderExt::Context context(class_name, file_name, THREAD);
+1482 
+1483   // Lookup stream for parsing .class file
+1484   ClassFileStream* stream = NULL;
+1485   s2 classpath_index = 0;
+1486   ClassPathEntry* e = NULL;
+1487 
+1488   // If DumpSharedSpaces is true boot loader visibility boundaries are set to:
+1489   //   - [jimage] + [_first_append_entry to _last_append_entry] (all path entries).
+1490   // If a class is found in the --patch-module entries, the class will not be included in the
+1491   // CDS archive. Also, CDS is not supported if exploded module builds are used.
+1492   //
+1493   // If search_append_only is true, boot loader visibility boundaries are
+1494   // set to be _first_append_entry to the end. This includes:
+1495   //   [-Xbootclasspath/a]; [jvmti appended entries]
+1496   //
+1497   // If both DumpSharedSpaces and search_append_only are false, boot loader
+1498   // visibility boundaries are set to be the --patch-module entries plus the base piece.
+1499   // This would include:
+1500   //   [--patch-module=&lt;module&gt;=&lt;file&gt;(&lt;pathsep&gt;&lt;file&gt;)*]; [jimage | exploded module build]
+1501   //
+1502   // DumpSharedSpaces and search_append_only are mutually exclusive and cannot
+1503   // be true at the same time.
+1504   assert(!(DumpSharedSpaces &amp;&amp; search_append_only), "DumpSharedSpaces and search_append_only are both true");
+1505 
+1506   // Load Attempt #1: --patch-module
+1507   // Determine the class' defining module.  If it appears in the _patch_mod_entries,
+1508   // attempt to load the class from those locations specific to the module.
+1509   // Specifications to --patch-module can contain a partial number of classes
+1510   // that are part of the overall module definition.  So if a particular class is not
+1511   // found within its module specification, the search should continue to Load Attempt #2.
+1512   // Note: The --patch-module entries are never searched if the boot loader's
+1513   //       visibility boundary is limited to only searching the append entries.
+1514   if (_patch_mod_entries != NULL &amp;&amp; !search_append_only) {
+1515     if (!DumpSharedSpaces) {
+1516       stream = search_module_entries(_patch_mod_entries, class_name, file_name, CHECK_NULL);
+1517     } else {
+1518 #if INCLUDE_CDS
+1519       if (is_in_patch_module(file_name)) {
+1520         tty-&gt;print_cr("Preload Warning: Skip archiving class %s found in --patch-module entry", class_name);
+1521         return NULL;
+1522       }
+1523 #endif
+1524     }
+1525   }
+1526 
+1527   // Load Attempt #2: [jimage | exploded build]
+1528   if (!search_append_only &amp;&amp; (NULL == stream)) {
+1529     if (has_jrt_entry()) {
+1530       e = _jrt_entry;
+1531       stream = _jrt_entry-&gt;open_stream(file_name, CHECK_NULL);
+1532       if (!context.check(stream, classpath_index)) {
+1533         return NULL;
+1534       }
+1535     } else {
+1536       // Exploded build - attempt to locate class in its defining module's location.
+1537       assert(_exploded_entries != NULL, "No exploded build entries present");
+1538       stream = search_module_entries(_exploded_entries, class_name, file_name, CHECK_NULL);
+1539     }
+1540   }
+1541 
+1542   // Load Attempt #3: [-Xbootclasspath/a]; [jvmti appended entries]
+1543   if ((search_append_only || DumpSharedSpaces) &amp;&amp; (NULL == stream)) {
+1544     // For the boot loader append path search, the starting classpath_index
+1545     // for the appended piece is always 1 to account for either the
+1546     // _jrt_entry or the _exploded_entries.
+1547     assert(classpath_index == 0, "The classpath_index has been incremented incorrectly");
+1548     classpath_index = 1;
+1549 
+1550     e = _first_append_entry;
+1551     while (e != NULL) {
+1552       stream = e-&gt;open_stream(file_name, CHECK_NULL);
+1553       if (!context.check(stream, classpath_index)) {
+1554         return NULL;
+1555       }
+1556       if (NULL != stream) {
+1557         break;
+1558       }
+1559       e = e-&gt;next();
+1560       ++classpath_index;
+1561     }
+1562   }
+1563 
+1564   if (NULL == stream) {
+1565     if (DumpSharedSpaces) {
+1566       tty-&gt;print_cr("Preload Warning: Cannot find %s", class_name);
+1567     }
+1568     return NULL;
+1569   }
+1570 
+1571   stream-&gt;set_verify(context.should_verify(classpath_index));
+1572 
+1573   ClassLoaderData* loader_data = ClassLoaderData::the_null_class_loader_data();
+1574   Handle protection_domain;
+1575 
+1576   instanceKlassHandle result = KlassFactory::create_from_stream(stream,
+1577                                                                 name,
+1578                                                                 loader_data,
+1579                                                                 protection_domain,
+1580                                                                 NULL, // host_klass
+1581                                                                 NULL, // cp_patches
+1582                                                                 THREAD);
+1583   if (HAS_PENDING_EXCEPTION) {
+1584     if (DumpSharedSpaces) {
+1585       tty-&gt;print_cr("Preload Error: Failed to load %s", class_name);
+1586     }
+1587     return NULL;
+1588   }
+1589 
+1590   return context.record_result(name, e, classpath_index, result, THREAD);
+1591 }
+1592 
+1593 // Initialize the class loader's access to methods in libzip.  Parse and
+1594 // process the boot classpath into a list ClassPathEntry objects.  Once
+1595 // this list has been created, it must not change order (see class PackageInfo)
+1596 // it can be appended to and is by jvmti and the kernel vm.
+1597 
+1598 void ClassLoader::initialize() {
+1599   EXCEPTION_MARK;
+1600 
+1601   if (UsePerfData) {
+1602     // jvmstat performance counters
+1603     NEWPERFTICKCOUNTER(_perf_accumulated_time, SUN_CLS, "time");
+1604     NEWPERFTICKCOUNTER(_perf_class_init_time, SUN_CLS, "classInitTime");
+1605     NEWPERFTICKCOUNTER(_perf_class_init_selftime, SUN_CLS, "classInitTime.self");
+1606     NEWPERFTICKCOUNTER(_perf_class_verify_time, SUN_CLS, "classVerifyTime");
+1607     NEWPERFTICKCOUNTER(_perf_class_verify_selftime, SUN_CLS, "classVerifyTime.self");
+1608     NEWPERFTICKCOUNTER(_perf_class_link_time, SUN_CLS, "classLinkedTime");
+1609     NEWPERFTICKCOUNTER(_perf_class_link_selftime, SUN_CLS, "classLinkedTime.self");
+1610     NEWPERFEVENTCOUNTER(_perf_classes_inited, SUN_CLS, "initializedClasses");
+1611     NEWPERFEVENTCOUNTER(_perf_classes_linked, SUN_CLS, "linkedClasses");
+1612     NEWPERFEVENTCOUNTER(_perf_classes_verified, SUN_CLS, "verifiedClasses");
+1613 
+1614     NEWPERFTICKCOUNTER(_perf_class_parse_time, SUN_CLS, "parseClassTime");
+1615     NEWPERFTICKCOUNTER(_perf_class_parse_selftime, SUN_CLS, "parseClassTime.self");
+1616     NEWPERFTICKCOUNTER(_perf_sys_class_lookup_time, SUN_CLS, "lookupSysClassTime");
+1617     NEWPERFTICKCOUNTER(_perf_shared_classload_time, SUN_CLS, "sharedClassLoadTime");
+1618     NEWPERFTICKCOUNTER(_perf_sys_classload_time, SUN_CLS, "sysClassLoadTime");
+1619     NEWPERFTICKCOUNTER(_perf_app_classload_time, SUN_CLS, "appClassLoadTime");
+1620     NEWPERFTICKCOUNTER(_perf_app_classload_selftime, SUN_CLS, "appClassLoadTime.self");
+1621     NEWPERFEVENTCOUNTER(_perf_app_classload_count, SUN_CLS, "appClassLoadCount");
+1622     NEWPERFTICKCOUNTER(_perf_define_appclasses, SUN_CLS, "defineAppClasses");
+1623     NEWPERFTICKCOUNTER(_perf_define_appclass_time, SUN_CLS, "defineAppClassTime");
+1624     NEWPERFTICKCOUNTER(_perf_define_appclass_selftime, SUN_CLS, "defineAppClassTime.self");
+1625     NEWPERFBYTECOUNTER(_perf_app_classfile_bytes_read, SUN_CLS, "appClassBytes");
+1626     NEWPERFBYTECOUNTER(_perf_sys_classfile_bytes_read, SUN_CLS, "sysClassBytes");
+1627 
+1628 
+1629     // The following performance counters are added for measuring the impact
+1630     // of the bug fix of 6365597. They are mainly focused on finding out
+1631     // the behavior of system &amp; user-defined classloader lock, whether
+1632     // ClassLoader.loadClass/findClass is being called synchronized or not.
+1633     // Also two additional counters are created to see whether 'UnsyncloadClass'
+1634     // flag is being set or not and how many times load_instance_class call
+1635     // fails with linkageError etc.
+1636     NEWPERFEVENTCOUNTER(_sync_systemLoaderLockContentionRate, SUN_CLS,
+1637                         "systemLoaderLockContentionRate");
+1638     NEWPERFEVENTCOUNTER(_sync_nonSystemLoaderLockContentionRate, SUN_CLS,
+1639                         "nonSystemLoaderLockContentionRate");
+1640     NEWPERFEVENTCOUNTER(_sync_JVMFindLoadedClassLockFreeCounter, SUN_CLS,
+1641                         "jvmFindLoadedClassNoLockCalls");
+1642     NEWPERFEVENTCOUNTER(_sync_JVMDefineClassLockFreeCounter, SUN_CLS,
+1643                         "jvmDefineClassNoLockCalls");
+1644 
+1645     NEWPERFEVENTCOUNTER(_sync_JNIDefineClassLockFreeCounter, SUN_CLS,
+1646                         "jniDefineClassNoLockCalls");
+1647 
+1648     NEWPERFEVENTCOUNTER(_unsafe_defineClassCallCounter, SUN_CLS,
+1649                         "unsafeDefineClassCalls");
+1650 
+1651     NEWPERFEVENTCOUNTER(_isUnsyncloadClass, SUN_CLS, "isUnsyncloadClassSet");
+1652     NEWPERFEVENTCOUNTER(_load_instance_class_failCounter, SUN_CLS,
+1653                         "loadInstanceClassFailRate");
+1654 
+1655     // increment the isUnsyncloadClass counter if UnsyncloadClass is set.
+1656     if (UnsyncloadClass) {
+1657       _isUnsyncloadClass-&gt;inc();
+1658     }
+1659   }
+1660 
+1661   // lookup zip library entry points
+1662   load_zip_library();
+1663   // lookup jimage library entry points
+1664   load_jimage_library();
+1665 #if INCLUDE_CDS
+1666   // initialize search path
+1667   if (DumpSharedSpaces) {
+1668     _shared_paths_misc_info = SharedClassUtil::allocate_shared_paths_misc_info();
+1669   }
+1670 #endif
+1671   setup_bootstrap_search_path();
+1672 }
+1673 
+1674 #if INCLUDE_CDS
+1675 // Capture all the --patch-module entries specified during CDS dump time.
+1676 // It also captures the non-existing path(s) and the required file(s) during inspecting
+1677 // the entries.
+1678 void ClassLoader::setup_patch_mod_path() {
+1679   assert(DumpSharedSpaces, "only used with -Xshare:dump");
+1680   ResourceMark rm;
+1681   GrowableArray&lt;ModulePatchPath*&gt;* patch_mod_args = Arguments::get_patch_mod_prefix();
+1682   if (patch_mod_args != NULL) {
+1683     int num_of_entries = patch_mod_args-&gt;length();
+1684     for (int i = 0; i &lt; num_of_entries; i++) {
+1685       const char* module_name = (patch_mod_args-&gt;at(i))-&gt;module_name();
+1686       const char* module_path = (patch_mod_args-&gt;at(i))-&gt;path_string();
+1687       int path_len = (int)strlen(module_path);
+1688       int name_len = (int)strlen(module_name);
+1689       int buf_len = name_len + path_len + 2; // add 2 for the '=' and NULL terminator
+1690       int end = 0;
+1691       char* buf = NEW_C_HEAP_ARRAY(char, buf_len, mtInternal);
+1692       // Iterate over the module's class path entries
+1693       for (int start = 0; start &lt; path_len; start = end) {
+1694         while (module_path[end] &amp;&amp; module_path[end] != os::path_separator()[0]) {
+1695           end++;
+1696         }
+1697         strncpy(buf, &amp;module_path[start], end - start);
+1698         buf[end - start] = '\0';
+1699         struct stat st;
+1700         if (os::stat(buf, &amp;st) != 0) {
+1701           // File not found
+1702           _shared_paths_misc_info-&gt;add_nonexist_path(buf);
+1703         } else {
+1704           if ((st.st_mode &amp; S_IFMT) != S_IFREG) { // is not a regular file
+1705             vm_exit_during_initialization(
+1706               "--patch-module requires a regular file during dumping", buf);
+1707           } else {
+1708             _shared_paths_misc_info-&gt;add_required_file(buf);
+1709           }
+1710         }
+1711         while (module_path[end] == os::path_separator()[0]) {
+1712           end++;
+1713         }
+1714       };
+1715       jio_snprintf(buf, buf_len, "%s=%s", module_name, module_path);
+1716       _shared_paths_misc_info-&gt;add_patch_mod_classpath((const char*)buf);
+1717       _num_patch_mod_prefixes++;
+1718       FREE_C_HEAP_ARRAY(char, buf);
+1719     }
+1720   }
+1721 }
+1722 
+1723 void ClassLoader::initialize_shared_path() {
+1724   if (DumpSharedSpaces) {
+1725     setup_patch_mod_path();
+1726     ClassLoaderExt::setup_search_paths();
+1727     _shared_paths_misc_info-&gt;write_jint(0); // see comments in SharedPathsMiscInfo::check()
+1728   }
+1729 }
+1730 #endif
+1731 
+1732 jlong ClassLoader::classloader_time_ms() {
+1733   return UsePerfData ?
+1734     Management::ticks_to_ms(_perf_accumulated_time-&gt;get_value()) : -1;
+1735 }
+1736 
+1737 jlong ClassLoader::class_init_count() {
+1738   return UsePerfData ? _perf_classes_inited-&gt;get_value() : -1;
+1739 }
+1740 
+1741 jlong ClassLoader::class_init_time_ms() {
+1742   return UsePerfData ?
+1743     Management::ticks_to_ms(_perf_class_init_time-&gt;get_value()) : -1;
+1744 }
+1745 
+1746 jlong ClassLoader::class_verify_time_ms() {
+1747   return UsePerfData ?
+1748     Management::ticks_to_ms(_perf_class_verify_time-&gt;get_value()) : -1;
+1749 }
+1750 
+1751 jlong ClassLoader::class_link_count() {
+1752   return UsePerfData ? _perf_classes_linked-&gt;get_value() : -1;
+1753 }
+1754 
+1755 jlong ClassLoader::class_link_time_ms() {
+1756   return UsePerfData ?
+1757     Management::ticks_to_ms(_perf_class_link_time-&gt;get_value()) : -1;
+1758 }
+1759 
+1760 int ClassLoader::compute_Object_vtable() {
+1761   // hardwired for JDK1.2 -- would need to duplicate class file parsing
+1762   // code to determine actual value from file
+1763   // Would be value '11' if finals were in vtable
+1764   int JDK_1_2_Object_vtable_size = 5;
+1765   return JDK_1_2_Object_vtable_size * vtableEntry::size();
+1766 }
+1767 
+1768 
+1769 void classLoader_init1() {
+1770   ClassLoader::initialize();
+1771 }
+1772 
+1773 // Complete the ClassPathEntry setup for the boot loader
+1774 void ClassLoader::classLoader_init2(TRAPS) {
+1775   // Create the moduleEntry for java.base
+1776   create_javabase();
+1777 
+1778   // Setup the list of module/path pairs for --patch-module processing
+1779   // This must be done after the SymbolTable is created in order
+1780   // to use fast_compare on module names instead of a string compare.
+1781   if (Arguments::get_patch_mod_prefix() != NULL) {
+1782     setup_patch_mod_entries();
+1783   }
+1784 
+1785   // Setup the initial java.base/path pair for the exploded build entries.
+1786   // As more modules are defined during module system initialization, more
+1787   // entries will be added to the exploded build array.
+1788   if (!has_jrt_entry()) {
+1789     assert(!DumpSharedSpaces, "DumpSharedSpaces not supported with exploded module builds");
+1790     assert(!UseSharedSpaces, "UsedSharedSpaces not supported with exploded module builds");
+1791     add_to_exploded_build_list(vmSymbols::java_base(), CHECK);
+1792   }
+1793 }
+1794 
+1795 
+1796 bool ClassLoader::get_canonical_path(const char* orig, char* out, int len) {
+1797   assert(orig != NULL &amp;&amp; out != NULL &amp;&amp; len &gt; 0, "bad arguments");
+1798   if (CanonicalizeEntry != NULL) {
+1799     JavaThread* THREAD = JavaThread::current();
+1800     JNIEnv* env = THREAD-&gt;jni_environment();
+1801     ResourceMark rm(THREAD);
+1802 
+1803     // os::native_path writes into orig_copy
+1804     char* orig_copy = NEW_RESOURCE_ARRAY_IN_THREAD(THREAD, char, strlen(orig)+1);
+1805     strcpy(orig_copy, orig);
+1806     if ((CanonicalizeEntry)(env, os::native_path(orig_copy), out, len) &lt; 0) {
+1807       return false;
+1808     }
+1809   } else {
+1810     // On JDK 1.2.2 the Canonicalize does not exist, so just do nothing
+1811     strncpy(out, orig, len);
+1812     out[len - 1] = '\0';
+1813   }
+1814   return true;
+1815 }
+1816 
+1817 void ClassLoader::create_javabase() {
+1818   Thread* THREAD = Thread::current();
+1819 
+1820   // Create java.base's module entry for the boot
+1821   // class loader prior to loading j.l.Ojbect.
+1822   ClassLoaderData* null_cld = ClassLoaderData::the_null_class_loader_data();
+1823 
+1824   // Get module entry table
+1825   ModuleEntryTable* null_cld_modules = null_cld-&gt;modules();
+1826   if (null_cld_modules == NULL) {
+1827     vm_exit_during_initialization("No ModuleEntryTable for the boot class loader");
+1828   }
+1829 
+1830   {
+1831     MutexLocker ml(Module_lock, THREAD);
+1832     ModuleEntry* jb_module = null_cld_modules-&gt;locked_create_entry_or_null(Handle(NULL), vmSymbols::java_base(), NULL, NULL, null_cld);
+1833     if (jb_module == NULL) {
+1834       vm_exit_during_initialization("Unable to create ModuleEntry for java.base");
+1835     }
+1836     ModuleEntryTable::set_javabase_moduleEntry(jb_module);
+1837   }
+1838 }
+1839 
+1840 #ifndef PRODUCT
+1841 
+1842 // CompileTheWorld
+1843 //
+1844 // Iterates over all class path entries and forces compilation of all methods
+1845 // in all classes found. Currently, only zip/jar archives are searched.
+1846 //
+1847 // The classes are loaded by the Java level bootstrap class loader, and the
+1848 // initializer is called. If DelayCompilationDuringStartup is true (default),
+1849 // the interpreter will run the initialization code. Note that forcing
+1850 // initialization in this way could potentially lead to initialization order
+1851 // problems, in which case we could just force the initialization bit to be set.
+1852 
+1853 
+1854 // We need to iterate over the contents of a zip/jar file, so we replicate the
+1855 // jzcell and jzfile definitions from zip_util.h but rename jzfile to real_jzfile,
+1856 // since jzfile already has a void* definition.
+1857 //
+1858 // Note that this is only used in debug mode.
+1859 //
+1860 // HotSpot integration note:
+1861 // Matches zip_util.h 1.14 99/06/01 from jdk1.3 beta H build
+1862 
+1863 
+1864 // JDK 1.3 version
+1865 typedef struct real_jzentry {         /* Zip file entry */
+1866     char *name;                 /* entry name */
+1867     jint time;                  /* modification time */
+1868     jint size;                  /* size of uncompressed data */
+1869     jint csize;                 /* size of compressed data (zero if uncompressed) */
+1870     jint crc;                   /* crc of uncompressed data */
+1871     char *comment;              /* optional zip file comment */
+1872     jbyte *extra;               /* optional extra data */
+1873     jint pos;                   /* position of LOC header (if negative) or data */
+1874 } real_jzentry;
+1875 
+1876 typedef struct real_jzfile {  /* Zip file */
+1877     char *name;                 /* zip file name */
+1878     jint refs;                  /* number of active references */
+1879     jint fd;                    /* open file descriptor */
+1880     void *lock;                 /* read lock */
+1881     char *comment;              /* zip file comment */
+1882     char *msg;                  /* zip error message */
+1883     void *entries;              /* array of hash cells */
+1884     jint total;                 /* total number of entries */
+1885     unsigned short *table;      /* Hash chain heads: indexes into entries */
+1886     jint tablelen;              /* number of hash eads */
+1887     real_jzfile *next;        /* next zip file in search list */
+1888     jzentry *cache;             /* we cache the most recently freed jzentry */
+1889     /* Information on metadata names in META-INF directory */
+1890     char **metanames;           /* array of meta names (may have null names) */
+1891     jint metacount;             /* number of slots in metanames array */
+1892     /* If there are any per-entry comments, they are in the comments array */
+1893     char **comments;
+1894 } real_jzfile;
+1895 
+1896 void ClassPathDirEntry::compile_the_world(Handle loader, TRAPS) {
+1897   // For now we only compile all methods in all classes in zip/jar files
+1898   tty-&gt;print_cr("CompileTheWorld : Skipped classes in %s", _dir);
+1899   tty-&gt;cr();
+1900 }
+1901 
+1902 void ClassPathZipEntry::compile_the_world(Handle loader, TRAPS) {
+1903   real_jzfile* zip = (real_jzfile*) _zip;
+1904   tty-&gt;print_cr("CompileTheWorld : Compiling all classes in %s", zip-&gt;name);
+1905   tty-&gt;cr();
+1906   // Iterate over all entries in zip file
+1907   for (int n = 0; ; n++) {
+1908     real_jzentry * ze = (real_jzentry *)((*GetNextEntry)(_zip, n));
+1909     if (ze == NULL) break;
+1910     ClassLoader::compile_the_world_in(ze-&gt;name, loader, CHECK);
+1911   }
+1912   if (HAS_PENDING_EXCEPTION) {
+1913     if (PENDING_EXCEPTION-&gt;is_a(SystemDictionary::OutOfMemoryError_klass())) {
+1914       CLEAR_PENDING_EXCEPTION;
+1915       tty-&gt;print_cr("\nCompileTheWorld : Ran out of memory\n");
+1916       tty-&gt;print_cr("Increase class metadata storage if a limit was set");
+1917     } else {
+1918       tty-&gt;print_cr("\nCompileTheWorld : Unexpected exception occurred\n");
+1919     }
+1920   }
+1921 }
+1922 
+1923 void ClassLoader::compile_the_world() {
+1924   EXCEPTION_MARK;
+1925   HandleMark hm(THREAD);
+1926   ResourceMark rm(THREAD);
+1927 
+1928   assert(has_jrt_entry(), "Compile The World not supported with exploded module build");
+1929 
+1930   // Find bootstrap loader
+1931   Handle system_class_loader (THREAD, SystemDictionary::java_system_loader());
+1932   jlong start = os::javaTimeMillis();
+1933 
+1934   // Compile the world for the modular java runtime image
+1935   _jrt_entry-&gt;compile_the_world(system_class_loader, CATCH);
+1936 
+1937   // Iterate over all bootstrap class path appended entries
+1938   ClassPathEntry* e = _first_append_entry;
+1939   while (e != NULL) {
+1940     assert(!e-&gt;is_jrt(), "A modular java runtime image is present on the list of appended entries");
+1941     e-&gt;compile_the_world(system_class_loader, CATCH);
+1942     e = e-&gt;next();
+1943   }
+1944   jlong end = os::javaTimeMillis();
+1945   tty-&gt;print_cr("CompileTheWorld : Done (%d classes, %d methods, " JLONG_FORMAT " ms)",
+1946                 _compile_the_world_class_counter, _compile_the_world_method_counter, (end - start));
+1947   {
+1948     // Print statistics as if before normal exit:
+1949     extern void print_statistics();
+1950     print_statistics();
+1951   }
+1952   vm_exit(0);
+1953 }
+1954 
+1955 int ClassLoader::_compile_the_world_class_counter = 0;
+1956 int ClassLoader::_compile_the_world_method_counter = 0;
+1957 static int _codecache_sweep_counter = 0;
+1958 
+1959 // Filter out all exceptions except OOMs
+1960 static void clear_pending_exception_if_not_oom(TRAPS) {
+1961   if (HAS_PENDING_EXCEPTION &amp;&amp;
+1962       !PENDING_EXCEPTION-&gt;is_a(SystemDictionary::OutOfMemoryError_klass())) {
+1963     CLEAR_PENDING_EXCEPTION;
+1964   }
+1965   // The CHECK at the caller will propagate the exception out
+1966 }
+1967 
+1968 /**
+1969  * Returns if the given method should be compiled when doing compile-the-world.
+1970  *
+1971  * TODO:  This should be a private method in a CompileTheWorld class.
+1972  */
+1973 static bool can_be_compiled(methodHandle m, int comp_level) {
+1974   assert(CompileTheWorld, "must be");
+1975 
+1976   // It's not valid to compile a native wrapper for MethodHandle methods
+1977   // that take a MemberName appendix since the bytecode signature is not
+1978   // correct.
+1979   vmIntrinsics::ID iid = m-&gt;intrinsic_id();
+1980   if (MethodHandles::is_signature_polymorphic(iid) &amp;&amp; MethodHandles::has_member_arg(iid)) {
+1981     return false;
+1982   }
+1983 
+1984   return CompilationPolicy::can_be_compiled(m, comp_level);
+1985 }
+1986 
+1987 void ClassLoader::compile_the_world_in(char* name, Handle loader, TRAPS) {
+1988   if (string_ends_with(name, ".class")) {
+1989     // We have a .class file
+1990     int len = (int)strlen(name);
+1991     char buffer[2048];
+1992     strncpy(buffer, name, len - 6);
+1993     buffer[len-6] = 0;
+1994     // If the file has a period after removing .class, it's not really a
+1995     // valid class file.  The class loader will check everything else.
+1996     if (strchr(buffer, '.') == NULL) {
+1997       _compile_the_world_class_counter++;
+1998       if (_compile_the_world_class_counter &gt; CompileTheWorldStopAt) return;
+1999 
+2000       // Construct name without extension
+2001       TempNewSymbol sym = SymbolTable::new_symbol(buffer, CHECK);
+2002       // Use loader to load and initialize class
+2003       Klass* ik = SystemDictionary::resolve_or_null(sym, loader, Handle(), THREAD);
+2004       instanceKlassHandle k (THREAD, ik);
+2005       if (k.not_null() &amp;&amp; !HAS_PENDING_EXCEPTION) {
+2006         k-&gt;initialize(THREAD);
+2007       }
+2008       bool exception_occurred = HAS_PENDING_EXCEPTION;
+2009       clear_pending_exception_if_not_oom(CHECK);
+2010       if (CompileTheWorldPreloadClasses &amp;&amp; k.not_null()) {
+2011         ConstantPool::preload_and_initialize_all_classes(k-&gt;constants(), THREAD);
+2012         if (HAS_PENDING_EXCEPTION) {
+2013           // If something went wrong in preloading we just ignore it
+2014           clear_pending_exception_if_not_oom(CHECK);
+2015           tty-&gt;print_cr("Preloading failed for (%d) %s", _compile_the_world_class_counter, buffer);
+2016         }
+2017       }
+2018 
+2019       if (_compile_the_world_class_counter &gt;= CompileTheWorldStartAt) {
+2020         if (k.is_null() || exception_occurred) {
+2021           // If something went wrong (e.g. ExceptionInInitializerError) we skip this class
+2022           tty-&gt;print_cr("CompileTheWorld (%d) : Skipping %s", _compile_the_world_class_counter, buffer);
+2023         } else {
+2024           tty-&gt;print_cr("CompileTheWorld (%d) : %s", _compile_the_world_class_counter, buffer);
+2025           // Preload all classes to get around uncommon traps
+2026           // Iterate over all methods in class
+2027           int comp_level = CompilationPolicy::policy()-&gt;initial_compile_level();
+2028           for (int n = 0; n &lt; k-&gt;methods()-&gt;length(); n++) {
+2029             methodHandle m (THREAD, k-&gt;methods()-&gt;at(n));
+2030             if (can_be_compiled(m, comp_level)) {
+2031               if (++_codecache_sweep_counter == CompileTheWorldSafepointInterval) {
+2032                 // Give sweeper a chance to keep up with CTW
+2033                 VM_ForceSafepoint op;
+2034                 VMThread::execute(&amp;op);
+2035                 _codecache_sweep_counter = 0;
+2036               }
+2037               // Force compilation
+2038               CompileBroker::compile_method(m, InvocationEntryBci, comp_level,
+2039                                             methodHandle(), 0, CompileTask::Reason_CTW, THREAD);
+2040               if (HAS_PENDING_EXCEPTION) {
+2041                 clear_pending_exception_if_not_oom(CHECK);
+2042                 tty-&gt;print_cr("CompileTheWorld (%d) : Skipping method: %s", _compile_the_world_class_counter, m-&gt;name_and_sig_as_C_string());
+2043               } else {
+2044                 _compile_the_world_method_counter++;
+2045               }
+2046               if (TieredCompilation &amp;&amp; TieredStopAtLevel &gt;= CompLevel_full_optimization) {
+2047                 // Clobber the first compile and force second tier compilation
+2048                 CompiledMethod* nm = m-&gt;code();
+2049                 if (nm != NULL &amp;&amp; !m-&gt;is_method_handle_intrinsic()) {
+2050                   // Throw out the code so that the code cache doesn't fill up
+2051                   nm-&gt;make_not_entrant();
+2052                   m-&gt;clear_code();
+2053                 }
+2054                 CompileBroker::compile_method(m, InvocationEntryBci, CompLevel_full_optimization,
+2055                                               methodHandle(), 0, CompileTask::Reason_CTW, THREAD);
+2056                 if (HAS_PENDING_EXCEPTION) {
+2057                   clear_pending_exception_if_not_oom(CHECK);
+2058                   tty-&gt;print_cr("CompileTheWorld (%d) : Skipping method: %s", _compile_the_world_class_counter, m-&gt;name_and_sig_as_C_string());
+2059                 } else {
+2060                   _compile_the_world_method_counter++;
+2061                 }
+2062               }
+2063             } else {
+2064               tty-&gt;print_cr("CompileTheWorld (%d) : Skipping method: %s", _compile_the_world_class_counter, m-&gt;name_and_sig_as_C_string());
+2065             }
+2066 
+2067             CompiledMethod* nm = m-&gt;code();
+2068             if (nm != NULL &amp;&amp; !m-&gt;is_method_handle_intrinsic()) {
+2069               // Throw out the code so that the code cache doesn't fill up
+2070               nm-&gt;make_not_entrant();
+2071               m-&gt;clear_code();
+2072             }
+2073           }
+2074         }
+2075       }
+2076     }
+2077   }
+2078 }
+2079 
+2080 #endif //PRODUCT
+2081 
+2082 // Please keep following two functions at end of this file. With them placed at top or in middle of the file,
+2083 // they could get inlined by agressive compiler, an unknown trick, see bug 6966589.
+2084 void PerfClassTraceTime::initialize() {
+2085   if (!UsePerfData) return;
+2086 
+2087   if (_eventp != NULL) {
+2088     // increment the event counter
+2089     _eventp-&gt;inc();
+2090   }
+2091 
+2092   // stop the current active thread-local timer to measure inclusive time
+2093   _prev_active_event = -1;
+2094   for (int i=0; i &lt; EVENT_TYPE_COUNT; i++) {
+2095      if (_timers[i].is_active()) {
+2096        assert(_prev_active_event == -1, "should have only one active timer");
+2097        _prev_active_event = i;
+2098        _timers[i].stop();
+2099      }
+2100   }
+2101 
+2102   if (_recursion_counters == NULL || (_recursion_counters[_event_type])++ == 0) {
+2103     // start the inclusive timer if not recursively called
+2104     _t.start();
+2105   }
+2106 
+2107   // start thread-local timer of the given event type
+2108    if (!_timers[_event_type].is_active()) {
+2109     _timers[_event_type].start();
+2110   }
+2111 }
+2112 
+2113 PerfClassTraceTime::~PerfClassTraceTime() {
+2114   if (!UsePerfData) return;
+2115 
+2116   // stop the thread-local timer as the event completes
+2117   // and resume the thread-local timer of the event next on the stack
+2118   _timers[_event_type].stop();
+2119   jlong selftime = _timers[_event_type].ticks();
+2120 
+2121   if (_prev_active_event &gt;= 0) {
+2122     _timers[_prev_active_event].start();
+2123   }
+2124 
+2125   if (_recursion_counters != NULL &amp;&amp; --(_recursion_counters[_event_type]) &gt; 0) return;
+2126 
+2127   // increment the counters only on the leaf call
+2128   _t.stop();
+2129   _timep-&gt;inc(_t.ticks());
+2130   if (_selftimep != NULL) {
+2131     _selftimep-&gt;inc(selftime);
+2132   }
+2133   // add all class loading related event selftime to the accumulated time counter
+2134   ClassLoader::perf_accumulated_time()-&gt;inc(selftime);
+2135 
+2136   // reset the timer
+2137   _timers[_event_type].reset();
+2138 }
+<a name="6" id="anc6"></a><b style="font-size: large; color: red">--- EOF ---</b>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</pre><form name="eof"><input name="value" value="6" type="hidden" /></form></body></html>
