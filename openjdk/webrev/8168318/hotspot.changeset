@@ -2,9 +2,9 @@
 # User Igor Nunes  <igor.nunes@eldorado.org.br>
 # Date 1476968263 7200
 #      Thu Oct 20 10:57:43 2016 -0200
-# Node ID d13eaccb139d17e0307c4bf1ed2861709181f307
+# Node ID 8a707afb71c6bff90ed5e51d94db445b470f44e0
 # Parent  b2b2ec149a24b487ace20ef05dec8fdb746bf5e3
-Implement cmpP_reg_null por ppc.ad
+PPC64: Use cmpldi instead of li/cmpld
 
 diff --git a/src/cpu/ppc/vm/ppc.ad b/src/cpu/ppc/vm/ppc.ad
 --- a/src/cpu/ppc/vm/ppc.ad
