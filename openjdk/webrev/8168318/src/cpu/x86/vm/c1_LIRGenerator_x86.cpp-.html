@@ -1,0 +1,1772 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>Old src/cpu/x86/vm/c1_LIRGenerator_x86.cpp</title>
+<body id="SUNWwebrev">
+<pre>
+   1 /*
+   2  * Copyright (c) 2005, 2016, Oracle and/or its affiliates. All rights reserved.
+   3  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+   4  *
+   5  * This code is free software; you can redistribute it and/or modify it
+   6  * under the terms of the GNU General Public License version 2 only, as
+   7  * published by the Free Software Foundation.
+   8  *
+   9  * This code is distributed in the hope that it will be useful, but WITHOUT
+  10  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+  11  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+  12  * version 2 for more details (a copy is included in the LICENSE file that
+  13  * accompanied this code).
+  14  *
+  15  * You should have received a copy of the GNU General Public License version
+  16  * 2 along with this work; if not, write to the Free Software Foundation,
+  17  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+  18  *
+  19  * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+  20  * or visit www.oracle.com if you need additional information or have any
+  21  * questions.
+  22  *
+  23  */
+  24 
+  25 #include "precompiled.hpp"
+  26 #include "c1/c1_Compilation.hpp"
+  27 #include "c1/c1_FrameMap.hpp"
+  28 #include "c1/c1_Instruction.hpp"
+  29 #include "c1/c1_LIRAssembler.hpp"
+  30 #include "c1/c1_LIRGenerator.hpp"
+  31 #include "c1/c1_Runtime1.hpp"
+  32 #include "c1/c1_ValueStack.hpp"
+  33 #include "ci/ciArray.hpp"
+  34 #include "ci/ciObjArrayKlass.hpp"
+  35 #include "ci/ciTypeArrayKlass.hpp"
+  36 #include "runtime/sharedRuntime.hpp"
+  37 #include "runtime/stubRoutines.hpp"
+  38 #include "vmreg_x86.inline.hpp"
+  39 
+  40 #ifdef ASSERT
+  41 #define __ gen()-&gt;lir(__FILE__, __LINE__)-&gt;
+  42 #else
+  43 #define __ gen()-&gt;lir()-&gt;
+  44 #endif
+  45 
+  46 // Item will be loaded into a byte register; Intel only
+  47 void LIRItem::load_byte_item() {
+  48   load_item();
+  49   LIR_Opr res = result();
+  50 
+  51   if (!res-&gt;is_virtual() || !_gen-&gt;is_vreg_flag_set(res, LIRGenerator::byte_reg)) {
+  52     // make sure that it is a byte register
+  53     assert(!value()-&gt;type()-&gt;is_float() &amp;&amp; !value()-&gt;type()-&gt;is_double(),
+  54            "can't load floats in byte register");
+  55     LIR_Opr reg = _gen-&gt;rlock_byte(T_BYTE);
+  56     __ move(res, reg);
+  57 
+  58     _result = reg;
+  59   }
+  60 }
+  61 
+  62 
+  63 void LIRItem::load_nonconstant() {
+  64   LIR_Opr r = value()-&gt;operand();
+  65   if (r-&gt;is_constant()) {
+  66     _result = r;
+  67   } else {
+  68     load_item();
+  69   }
+  70 }
+  71 
+  72 //--------------------------------------------------------------
+  73 //               LIRGenerator
+  74 //--------------------------------------------------------------
+  75 
+  76 
+  77 LIR_Opr LIRGenerator::exceptionOopOpr() { return FrameMap::rax_oop_opr; }
+  78 LIR_Opr LIRGenerator::exceptionPcOpr()  { return FrameMap::rdx_opr; }
+  79 LIR_Opr LIRGenerator::divInOpr()        { return FrameMap::rax_opr; }
+  80 LIR_Opr LIRGenerator::divOutOpr()       { return FrameMap::rax_opr; }
+  81 LIR_Opr LIRGenerator::remOutOpr()       { return FrameMap::rdx_opr; }
+  82 LIR_Opr LIRGenerator::shiftCountOpr()   { return FrameMap::rcx_opr; }
+  83 LIR_Opr LIRGenerator::syncLockOpr()     { return new_register(T_INT); }
+  84 LIR_Opr LIRGenerator::syncTempOpr()     { return FrameMap::rax_opr; }
+  85 LIR_Opr LIRGenerator::getThreadTemp()   { return LIR_OprFact::illegalOpr; }
+  86 
+  87 
+  88 LIR_Opr LIRGenerator::result_register_for(ValueType* type, bool callee) {
+  89   LIR_Opr opr;
+  90   switch (type-&gt;tag()) {
+  91     case intTag:     opr = FrameMap::rax_opr;          break;
+  92     case objectTag:  opr = FrameMap::rax_oop_opr;      break;
+  93     case longTag:    opr = FrameMap::long0_opr;        break;
+  94     case floatTag:   opr = UseSSE &gt;= 1 ? FrameMap::xmm0_float_opr  : FrameMap::fpu0_float_opr;  break;
+  95     case doubleTag:  opr = UseSSE &gt;= 2 ? FrameMap::xmm0_double_opr : FrameMap::fpu0_double_opr;  break;
+  96 
+  97     case addressTag:
+  98     default: ShouldNotReachHere(); return LIR_OprFact::illegalOpr;
+  99   }
+ 100 
+ 101   assert(opr-&gt;type_field() == as_OprType(as_BasicType(type)), "type mismatch");
+ 102   return opr;
+ 103 }
+ 104 
+ 105 
+ 106 LIR_Opr LIRGenerator::rlock_byte(BasicType type) {
+ 107   LIR_Opr reg = new_register(T_INT);
+ 108   set_vreg_flag(reg, LIRGenerator::byte_reg);
+ 109   return reg;
+ 110 }
+ 111 
+ 112 
+ 113 //--------- loading items into registers --------------------------------
+ 114 
+ 115 
+ 116 // i486 instructions can inline constants
+ 117 bool LIRGenerator::can_store_as_constant(Value v, BasicType type) const {
+ 118   if (type == T_SHORT || type == T_CHAR) {
+ 119     // there is no immediate move of word values in asembler_i486.?pp
+ 120     return false;
+ 121   }
+ 122   Constant* c = v-&gt;as_Constant();
+ 123   if (c &amp;&amp; c-&gt;state_before() == NULL) {
+ 124     // constants of any type can be stored directly, except for
+ 125     // unloaded object constants.
+ 126     return true;
+ 127   }
+ 128   return false;
+ 129 }
+ 130 
+ 131 
+ 132 bool LIRGenerator::can_inline_as_constant(Value v) const {
+ 133   if (v-&gt;type()-&gt;tag() == longTag) return false;
+ 134   return v-&gt;type()-&gt;tag() != objectTag ||
+ 135     (v-&gt;type()-&gt;is_constant() &amp;&amp; v-&gt;type()-&gt;as_ObjectType()-&gt;constant_value()-&gt;is_null_object());
+ 136 }
+ 137 
+ 138 
+ 139 bool LIRGenerator::can_inline_as_constant(LIR_Const* c) const {
+ 140   if (c-&gt;type() == T_LONG) return false;
+ 141   return c-&gt;type() != T_OBJECT || c-&gt;as_jobject() == NULL;
+ 142 }
+ 143 
+ 144 
+ 145 LIR_Opr LIRGenerator::safepoint_poll_register() {
+ 146   return LIR_OprFact::illegalOpr;
+ 147 }
+ 148 
+ 149 
+ 150 LIR_Address* LIRGenerator::generate_address(LIR_Opr base, LIR_Opr index,
+ 151                                             int shift, int disp, BasicType type) {
+ 152   assert(base-&gt;is_register(), "must be");
+ 153   if (index-&gt;is_constant()) {
+ 154     return new LIR_Address(base,
+ 155                            (index-&gt;as_constant_ptr()-&gt;as_jint() &lt;&lt; shift) + disp,
+ 156                            type);
+ 157   } else {
+ 158     return new LIR_Address(base, index, (LIR_Address::Scale)shift, disp, type);
+ 159   }
+ 160 }
+ 161 
+ 162 
+ 163 LIR_Address* LIRGenerator::emit_array_address(LIR_Opr array_opr, LIR_Opr index_opr,
+ 164                                               BasicType type, bool needs_card_mark) {
+ 165   int offset_in_bytes = arrayOopDesc::base_offset_in_bytes(type);
+ 166 
+ 167   LIR_Address* addr;
+ 168   if (index_opr-&gt;is_constant()) {
+ 169     int elem_size = type2aelembytes(type);
+ 170     addr = new LIR_Address(array_opr,
+ 171                            offset_in_bytes + index_opr-&gt;as_jint() * elem_size, type);
+ 172   } else {
+ 173 #ifdef _LP64
+ 174     if (index_opr-&gt;type() == T_INT) {
+ 175       LIR_Opr tmp = new_register(T_LONG);
+ 176       __ convert(Bytecodes::_i2l, index_opr, tmp);
+ 177       index_opr = tmp;
+ 178     }
+ 179 #endif // _LP64
+ 180     addr =  new LIR_Address(array_opr,
+ 181                             index_opr,
+ 182                             LIR_Address::scale(type),
+ 183                             offset_in_bytes, type);
+ 184   }
+ 185   if (needs_card_mark) {
+ 186     // This store will need a precise card mark, so go ahead and
+ 187     // compute the full adddres instead of computing once for the
+ 188     // store and again for the card mark.
+ 189     LIR_Opr tmp = new_pointer_register();
+ 190     __ leal(LIR_OprFact::address(addr), tmp);
+ 191     return new LIR_Address(tmp, type);
+ 192   } else {
+ 193     return addr;
+ 194   }
+ 195 }
+ 196 
+ 197 
+ 198 LIR_Opr LIRGenerator::load_immediate(int x, BasicType type) {
+ 199   LIR_Opr r = NULL;
+ 200   if (type == T_LONG) {
+ 201     r = LIR_OprFact::longConst(x);
+ 202   } else if (type == T_INT) {
+ 203     r = LIR_OprFact::intConst(x);
+ 204   } else {
+ 205     ShouldNotReachHere();
+ 206   }
+ 207   return r;
+ 208 }
+ 209 
+ 210 void LIRGenerator::increment_counter(address counter, BasicType type, int step) {
+ 211   LIR_Opr pointer = new_pointer_register();
+ 212   __ move(LIR_OprFact::intptrConst(counter), pointer);
+ 213   LIR_Address* addr = new LIR_Address(pointer, type);
+ 214   increment_counter(addr, step);
+ 215 }
+ 216 
+ 217 
+ 218 void LIRGenerator::increment_counter(LIR_Address* addr, int step) {
+ 219   __ add((LIR_Opr)addr, LIR_OprFact::intConst(step), (LIR_Opr)addr);
+ 220 }
+ 221 
+ 222 void LIRGenerator::cmp_mem_int(LIR_Condition condition, LIR_Opr base, int disp, int c, CodeEmitInfo* info) {
+ 223   __ cmp_mem_int(condition, base, disp, c, info);
+ 224 }
+ 225 
+ 226 
+ 227 void LIRGenerator::cmp_reg_mem(LIR_Condition condition, LIR_Opr reg, LIR_Opr base, int disp, BasicType type, CodeEmitInfo* info) {
+ 228   __ cmp_reg_mem(condition, reg, new LIR_Address(base, disp, type), info);
+ 229 }
+ 230 
+ 231 
+ 232 void LIRGenerator::cmp_reg_mem(LIR_Condition condition, LIR_Opr reg, LIR_Opr base, LIR_Opr disp, BasicType type, CodeEmitInfo* info) {
+ 233   __ cmp_reg_mem(condition, reg, new LIR_Address(base, disp, type), info);
+ 234 }
+ 235 
+ 236 
+ 237 bool LIRGenerator::strength_reduce_multiply(LIR_Opr left, int c, LIR_Opr result, LIR_Opr tmp) {
+ 238   if (tmp-&gt;is_valid()) {
+ 239     if (is_power_of_2(c + 1)) {
+ 240       __ move(left, tmp);
+ 241       __ shift_left(left, log2_intptr(c + 1), left);
+ 242       __ sub(left, tmp, result);
+ 243       return true;
+ 244     } else if (is_power_of_2(c - 1)) {
+ 245       __ move(left, tmp);
+ 246       __ shift_left(left, log2_intptr(c - 1), left);
+ 247       __ add(left, tmp, result);
+ 248       return true;
+ 249     }
+ 250   }
+ 251   return false;
+ 252 }
+ 253 
+ 254 
+ 255 void LIRGenerator::store_stack_parameter (LIR_Opr item, ByteSize offset_from_sp) {
+ 256   BasicType type = item-&gt;type();
+ 257   __ store(item, new LIR_Address(FrameMap::rsp_opr, in_bytes(offset_from_sp), type));
+ 258 }
+ 259 
+ 260 //----------------------------------------------------------------------
+ 261 //             visitor functions
+ 262 //----------------------------------------------------------------------
+ 263 
+ 264 
+ 265 void LIRGenerator::do_StoreIndexed(StoreIndexed* x) {
+ 266   assert(x-&gt;is_pinned(),"");
+ 267   bool needs_range_check = x-&gt;compute_needs_range_check();
+ 268   bool use_length = x-&gt;length() != NULL;
+ 269   bool obj_store = x-&gt;elt_type() == T_ARRAY || x-&gt;elt_type() == T_OBJECT;
+ 270   bool needs_store_check = obj_store &amp;&amp; (x-&gt;value()-&gt;as_Constant() == NULL ||
+ 271                                          !get_jobject_constant(x-&gt;value())-&gt;is_null_object() ||
+ 272                                          x-&gt;should_profile());
+ 273 
+ 274   LIRItem array(x-&gt;array(), this);
+ 275   LIRItem index(x-&gt;index(), this);
+ 276   LIRItem value(x-&gt;value(), this);
+ 277   LIRItem length(this);
+ 278 
+ 279   array.load_item();
+ 280   index.load_nonconstant();
+ 281 
+ 282   if (use_length &amp;&amp; needs_range_check) {
+ 283     length.set_instruction(x-&gt;length());
+ 284     length.load_item();
+ 285 
+ 286   }
+ 287   if (needs_store_check || x-&gt;check_boolean()) {
+ 288     value.load_item();
+ 289   } else {
+ 290     value.load_for_store(x-&gt;elt_type());
+ 291   }
+ 292 
+ 293   set_no_result(x);
+ 294 
+ 295   // the CodeEmitInfo must be duplicated for each different
+ 296   // LIR-instruction because spilling can occur anywhere between two
+ 297   // instructions and so the debug information must be different
+ 298   CodeEmitInfo* range_check_info = state_for(x);
+ 299   CodeEmitInfo* null_check_info = NULL;
+ 300   if (x-&gt;needs_null_check()) {
+ 301     null_check_info = new CodeEmitInfo(range_check_info);
+ 302   }
+ 303 
+ 304   // emit array address setup early so it schedules better
+ 305   LIR_Address* array_addr = emit_array_address(array.result(), index.result(), x-&gt;elt_type(), obj_store);
+ 306 
+ 307   if (GenerateRangeChecks &amp;&amp; needs_range_check) {
+ 308     if (use_length) {
+ 309       __ cmp(lir_cond_belowEqual, length.result(), index.result());
+ 310       __ branch(lir_cond_belowEqual, T_INT, new RangeCheckStub(range_check_info, index.result()));
+ 311     } else {
+ 312       array_range_check(array.result(), index.result(), null_check_info, range_check_info);
+ 313       // range_check also does the null check
+ 314       null_check_info = NULL;
+ 315     }
+ 316   }
+ 317 
+ 318   if (GenerateArrayStoreCheck &amp;&amp; needs_store_check) {
+ 319     LIR_Opr tmp1 = new_register(objectType);
+ 320     LIR_Opr tmp2 = new_register(objectType);
+ 321     LIR_Opr tmp3 = new_register(objectType);
+ 322 
+ 323     CodeEmitInfo* store_check_info = new CodeEmitInfo(range_check_info);
+ 324     __ store_check(value.result(), array.result(), tmp1, tmp2, tmp3, store_check_info, x-&gt;profiled_method(), x-&gt;profiled_bci());
+ 325   }
+ 326 
+ 327   if (obj_store) {
+ 328     // Needs GC write barriers.
+ 329     pre_barrier(LIR_OprFact::address(array_addr), LIR_OprFact::illegalOpr /* pre_val */,
+ 330                 true /* do_load */, false /* patch */, NULL);
+ 331     __ move(value.result(), array_addr, null_check_info);
+ 332     // Seems to be a precise
+ 333     post_barrier(LIR_OprFact::address(array_addr), value.result());
+ 334   } else {
+ 335     LIR_Opr result = maybe_mask_boolean(x, array.result(), value.result(), null_check_info);
+ 336     __ move(result, array_addr, null_check_info);
+ 337   }
+ 338 }
+ 339 
+ 340 
+ 341 void LIRGenerator::do_MonitorEnter(MonitorEnter* x) {
+ 342   assert(x-&gt;is_pinned(),"");
+ 343   LIRItem obj(x-&gt;obj(), this);
+ 344   obj.load_item();
+ 345 
+ 346   set_no_result(x);
+ 347 
+ 348   // "lock" stores the address of the monitor stack slot, so this is not an oop
+ 349   LIR_Opr lock = new_register(T_INT);
+ 350   // Need a scratch register for biased locking on x86
+ 351   LIR_Opr scratch = LIR_OprFact::illegalOpr;
+ 352   if (UseBiasedLocking) {
+ 353     scratch = new_register(T_INT);
+ 354   }
+ 355 
+ 356   CodeEmitInfo* info_for_exception = NULL;
+ 357   if (x-&gt;needs_null_check()) {
+ 358     info_for_exception = state_for(x);
+ 359   }
+ 360   // this CodeEmitInfo must not have the xhandlers because here the
+ 361   // object is already locked (xhandlers expect object to be unlocked)
+ 362   CodeEmitInfo* info = state_for(x, x-&gt;state(), true);
+ 363   monitor_enter(obj.result(), lock, syncTempOpr(), scratch,
+ 364                         x-&gt;monitor_no(), info_for_exception, info);
+ 365 }
+ 366 
+ 367 
+ 368 void LIRGenerator::do_MonitorExit(MonitorExit* x) {
+ 369   assert(x-&gt;is_pinned(),"");
+ 370 
+ 371   LIRItem obj(x-&gt;obj(), this);
+ 372   obj.dont_load_item();
+ 373 
+ 374   LIR_Opr lock = new_register(T_INT);
+ 375   LIR_Opr obj_temp = new_register(T_INT);
+ 376   set_no_result(x);
+ 377   monitor_exit(obj_temp, lock, syncTempOpr(), LIR_OprFact::illegalOpr, x-&gt;monitor_no());
+ 378 }
+ 379 
+ 380 
+ 381 // _ineg, _lneg, _fneg, _dneg
+ 382 void LIRGenerator::do_NegateOp(NegateOp* x) {
+ 383   LIRItem value(x-&gt;x(), this);
+ 384   value.set_destroys_register();
+ 385   value.load_item();
+ 386   LIR_Opr reg = rlock(x);
+ 387   __ negate(value.result(), reg);
+ 388 
+ 389   set_result(x, round_item(reg));
+ 390 }
+ 391 
+ 392 
+ 393 // for  _fadd, _fmul, _fsub, _fdiv, _frem
+ 394 //      _dadd, _dmul, _dsub, _ddiv, _drem
+ 395 void LIRGenerator::do_ArithmeticOp_FPU(ArithmeticOp* x) {
+ 396   LIRItem left(x-&gt;x(),  this);
+ 397   LIRItem right(x-&gt;y(), this);
+ 398   LIRItem* left_arg  = &amp;left;
+ 399   LIRItem* right_arg = &amp;right;
+ 400   assert(!left.is_stack() || !right.is_stack(), "can't both be memory operands");
+ 401   bool must_load_both = (x-&gt;op() == Bytecodes::_frem || x-&gt;op() == Bytecodes::_drem);
+ 402   if (left.is_register() || x-&gt;x()-&gt;type()-&gt;is_constant() || must_load_both) {
+ 403     left.load_item();
+ 404   } else {
+ 405     left.dont_load_item();
+ 406   }
+ 407 
+ 408   // do not load right operand if it is a constant.  only 0 and 1 are
+ 409   // loaded because there are special instructions for loading them
+ 410   // without memory access (not needed for SSE2 instructions)
+ 411   bool must_load_right = false;
+ 412   if (right.is_constant()) {
+ 413     LIR_Const* c = right.result()-&gt;as_constant_ptr();
+ 414     assert(c != NULL, "invalid constant");
+ 415     assert(c-&gt;type() == T_FLOAT || c-&gt;type() == T_DOUBLE, "invalid type");
+ 416 
+ 417     if (c-&gt;type() == T_FLOAT) {
+ 418       must_load_right = UseSSE &lt; 1 &amp;&amp; (c-&gt;is_one_float() || c-&gt;is_zero_float());
+ 419     } else {
+ 420       must_load_right = UseSSE &lt; 2 &amp;&amp; (c-&gt;is_one_double() || c-&gt;is_zero_double());
+ 421     }
+ 422   }
+ 423 
+ 424   if (must_load_both) {
+ 425     // frem and drem destroy also right operand, so move it to a new register
+ 426     right.set_destroys_register();
+ 427     right.load_item();
+ 428   } else if (right.is_register() || must_load_right) {
+ 429     right.load_item();
+ 430   } else {
+ 431     right.dont_load_item();
+ 432   }
+ 433   LIR_Opr reg = rlock(x);
+ 434   LIR_Opr tmp = LIR_OprFact::illegalOpr;
+ 435   if (x-&gt;is_strictfp() &amp;&amp; (x-&gt;op() == Bytecodes::_dmul || x-&gt;op() == Bytecodes::_ddiv)) {
+ 436     tmp = new_register(T_DOUBLE);
+ 437   }
+ 438 
+ 439   if ((UseSSE &gt;= 1 &amp;&amp; x-&gt;op() == Bytecodes::_frem) || (UseSSE &gt;= 2 &amp;&amp; x-&gt;op() == Bytecodes::_drem)) {
+ 440     // special handling for frem and drem: no SSE instruction, so must use FPU with temporary fpu stack slots
+ 441     LIR_Opr fpu0, fpu1;
+ 442     if (x-&gt;op() == Bytecodes::_frem) {
+ 443       fpu0 = LIR_OprFact::single_fpu(0);
+ 444       fpu1 = LIR_OprFact::single_fpu(1);
+ 445     } else {
+ 446       fpu0 = LIR_OprFact::double_fpu(0);
+ 447       fpu1 = LIR_OprFact::double_fpu(1);
+ 448     }
+ 449     __ move(right.result(), fpu1); // order of left and right operand is important!
+ 450     __ move(left.result(), fpu0);
+ 451     __ rem (fpu0, fpu1, fpu0);
+ 452     __ move(fpu0, reg);
+ 453 
+ 454   } else {
+ 455     arithmetic_op_fpu(x-&gt;op(), reg, left.result(), right.result(), x-&gt;is_strictfp(), tmp);
+ 456   }
+ 457 
+ 458   set_result(x, round_item(reg));
+ 459 }
+ 460 
+ 461 
+ 462 // for  _ladd, _lmul, _lsub, _ldiv, _lrem
+ 463 void LIRGenerator::do_ArithmeticOp_Long(ArithmeticOp* x) {
+ 464   if (x-&gt;op() == Bytecodes::_ldiv || x-&gt;op() == Bytecodes::_lrem ) {
+ 465     // long division is implemented as a direct call into the runtime
+ 466     LIRItem left(x-&gt;x(), this);
+ 467     LIRItem right(x-&gt;y(), this);
+ 468 
+ 469     // the check for division by zero destroys the right operand
+ 470     right.set_destroys_register();
+ 471 
+ 472     BasicTypeList signature(2);
+ 473     signature.append(T_LONG);
+ 474     signature.append(T_LONG);
+ 475     CallingConvention* cc = frame_map()-&gt;c_calling_convention(&amp;signature);
+ 476 
+ 477     // check for division by zero (destroys registers of right operand!)
+ 478     CodeEmitInfo* info = state_for(x);
+ 479 
+ 480     const LIR_Opr result_reg = result_register_for(x-&gt;type());
+ 481     left.load_item_force(cc-&gt;at(1));
+ 482     right.load_item();
+ 483 
+ 484     __ move(right.result(), cc-&gt;at(0));
+ 485 
+ 486     __ cmp(lir_cond_equal, right.result(), LIR_OprFact::longConst(0));
+ 487     __ branch(lir_cond_equal, T_LONG, new DivByZeroStub(info));
+ 488 
+ 489     address entry = NULL;
+ 490     switch (x-&gt;op()) {
+ 491     case Bytecodes::_lrem:
+ 492       entry = CAST_FROM_FN_PTR(address, SharedRuntime::lrem);
+ 493       break; // check if dividend is 0 is done elsewhere
+ 494     case Bytecodes::_ldiv:
+ 495       entry = CAST_FROM_FN_PTR(address, SharedRuntime::ldiv);
+ 496       break; // check if dividend is 0 is done elsewhere
+ 497     case Bytecodes::_lmul:
+ 498       entry = CAST_FROM_FN_PTR(address, SharedRuntime::lmul);
+ 499       break;
+ 500     default:
+ 501       ShouldNotReachHere();
+ 502     }
+ 503 
+ 504     LIR_Opr result = rlock_result(x);
+ 505     __ call_runtime_leaf(entry, getThreadTemp(), result_reg, cc-&gt;args());
+ 506     __ move(result_reg, result);
+ 507   } else if (x-&gt;op() == Bytecodes::_lmul) {
+ 508     // missing test if instr is commutative and if we should swap
+ 509     LIRItem left(x-&gt;x(), this);
+ 510     LIRItem right(x-&gt;y(), this);
+ 511 
+ 512     // right register is destroyed by the long mul, so it must be
+ 513     // copied to a new register.
+ 514     right.set_destroys_register();
+ 515 
+ 516     left.load_item();
+ 517     right.load_item();
+ 518 
+ 519     LIR_Opr reg = FrameMap::long0_opr;
+ 520     arithmetic_op_long(x-&gt;op(), reg, left.result(), right.result(), NULL);
+ 521     LIR_Opr result = rlock_result(x);
+ 522     __ move(reg, result);
+ 523   } else {
+ 524     // missing test if instr is commutative and if we should swap
+ 525     LIRItem left(x-&gt;x(), this);
+ 526     LIRItem right(x-&gt;y(), this);
+ 527 
+ 528     left.load_item();
+ 529     // don't load constants to save register
+ 530     right.load_nonconstant();
+ 531     rlock_result(x);
+ 532     arithmetic_op_long(x-&gt;op(), x-&gt;operand(), left.result(), right.result(), NULL);
+ 533   }
+ 534 }
+ 535 
+ 536 
+ 537 
+ 538 // for: _iadd, _imul, _isub, _idiv, _irem
+ 539 void LIRGenerator::do_ArithmeticOp_Int(ArithmeticOp* x) {
+ 540   if (x-&gt;op() == Bytecodes::_idiv || x-&gt;op() == Bytecodes::_irem) {
+ 541     // The requirements for division and modulo
+ 542     // input : rax,: dividend                         min_int
+ 543     //         reg: divisor   (may not be rax,/rdx)   -1
+ 544     //
+ 545     // output: rax,: quotient  (= rax, idiv reg)       min_int
+ 546     //         rdx: remainder (= rax, irem reg)       0
+ 547 
+ 548     // rax, and rdx will be destroyed
+ 549 
+ 550     // Note: does this invalidate the spec ???
+ 551     LIRItem right(x-&gt;y(), this);
+ 552     LIRItem left(x-&gt;x() , this);   // visit left second, so that the is_register test is valid
+ 553 
+ 554     // call state_for before load_item_force because state_for may
+ 555     // force the evaluation of other instructions that are needed for
+ 556     // correct debug info.  Otherwise the live range of the fix
+ 557     // register might be too long.
+ 558     CodeEmitInfo* info = state_for(x);
+ 559 
+ 560     left.load_item_force(divInOpr());
+ 561 
+ 562     right.load_item();
+ 563 
+ 564     LIR_Opr result = rlock_result(x);
+ 565     LIR_Opr result_reg;
+ 566     if (x-&gt;op() == Bytecodes::_idiv) {
+ 567       result_reg = divOutOpr();
+ 568     } else {
+ 569       result_reg = remOutOpr();
+ 570     }
+ 571 
+ 572     if (!ImplicitDiv0Checks) {
+ 573       __ cmp(lir_cond_equal, right.result(), LIR_OprFact::intConst(0));
+ 574       __ branch(lir_cond_equal, T_INT, new DivByZeroStub(info));
+ 575     }
+ 576     LIR_Opr tmp = FrameMap::rdx_opr; // idiv and irem use rdx in their implementation
+ 577     if (x-&gt;op() == Bytecodes::_irem) {
+ 578       __ irem(left.result(), right.result(), result_reg, tmp, info);
+ 579     } else if (x-&gt;op() == Bytecodes::_idiv) {
+ 580       __ idiv(left.result(), right.result(), result_reg, tmp, info);
+ 581     } else {
+ 582       ShouldNotReachHere();
+ 583     }
+ 584 
+ 585     __ move(result_reg, result);
+ 586   } else {
+ 587     // missing test if instr is commutative and if we should swap
+ 588     LIRItem left(x-&gt;x(),  this);
+ 589     LIRItem right(x-&gt;y(), this);
+ 590     LIRItem* left_arg = &amp;left;
+ 591     LIRItem* right_arg = &amp;right;
+ 592     if (x-&gt;is_commutative() &amp;&amp; left.is_stack() &amp;&amp; right.is_register()) {
+ 593       // swap them if left is real stack (or cached) and right is real register(not cached)
+ 594       left_arg = &amp;right;
+ 595       right_arg = &amp;left;
+ 596     }
+ 597 
+ 598     left_arg-&gt;load_item();
+ 599 
+ 600     // do not need to load right, as we can handle stack and constants
+ 601     if (x-&gt;op() == Bytecodes::_imul ) {
+ 602       // check if we can use shift instead
+ 603       bool use_constant = false;
+ 604       bool use_tmp = false;
+ 605       if (right_arg-&gt;is_constant()) {
+ 606         int iconst = right_arg-&gt;get_jint_constant();
+ 607         if (iconst &gt; 0) {
+ 608           if (is_power_of_2(iconst)) {
+ 609             use_constant = true;
+ 610           } else if (is_power_of_2(iconst - 1) || is_power_of_2(iconst + 1)) {
+ 611             use_constant = true;
+ 612             use_tmp = true;
+ 613           }
+ 614         }
+ 615       }
+ 616       if (use_constant) {
+ 617         right_arg-&gt;dont_load_item();
+ 618       } else {
+ 619         right_arg-&gt;load_item();
+ 620       }
+ 621       LIR_Opr tmp = LIR_OprFact::illegalOpr;
+ 622       if (use_tmp) {
+ 623         tmp = new_register(T_INT);
+ 624       }
+ 625       rlock_result(x);
+ 626 
+ 627       arithmetic_op_int(x-&gt;op(), x-&gt;operand(), left_arg-&gt;result(), right_arg-&gt;result(), tmp);
+ 628     } else {
+ 629       right_arg-&gt;dont_load_item();
+ 630       rlock_result(x);
+ 631       LIR_Opr tmp = LIR_OprFact::illegalOpr;
+ 632       arithmetic_op_int(x-&gt;op(), x-&gt;operand(), left_arg-&gt;result(), right_arg-&gt;result(), tmp);
+ 633     }
+ 634   }
+ 635 }
+ 636 
+ 637 
+ 638 void LIRGenerator::do_ArithmeticOp(ArithmeticOp* x) {
+ 639   // when an operand with use count 1 is the left operand, then it is
+ 640   // likely that no move for 2-operand-LIR-form is necessary
+ 641   if (x-&gt;is_commutative() &amp;&amp; x-&gt;y()-&gt;as_Constant() == NULL &amp;&amp; x-&gt;x()-&gt;use_count() &gt; x-&gt;y()-&gt;use_count()) {
+ 642     x-&gt;swap_operands();
+ 643   }
+ 644 
+ 645   ValueTag tag = x-&gt;type()-&gt;tag();
+ 646   assert(x-&gt;x()-&gt;type()-&gt;tag() == tag &amp;&amp; x-&gt;y()-&gt;type()-&gt;tag() == tag, "wrong parameters");
+ 647   switch (tag) {
+ 648     case floatTag:
+ 649     case doubleTag:  do_ArithmeticOp_FPU(x);  return;
+ 650     case longTag:    do_ArithmeticOp_Long(x); return;
+ 651     case intTag:     do_ArithmeticOp_Int(x);  return;
+ 652   }
+ 653   ShouldNotReachHere();
+ 654 }
+ 655 
+ 656 
+ 657 // _ishl, _lshl, _ishr, _lshr, _iushr, _lushr
+ 658 void LIRGenerator::do_ShiftOp(ShiftOp* x) {
+ 659   // count must always be in rcx
+ 660   LIRItem value(x-&gt;x(), this);
+ 661   LIRItem count(x-&gt;y(), this);
+ 662 
+ 663   ValueTag elemType = x-&gt;type()-&gt;tag();
+ 664   bool must_load_count = !count.is_constant() || elemType == longTag;
+ 665   if (must_load_count) {
+ 666     // count for long must be in register
+ 667     count.load_item_force(shiftCountOpr());
+ 668   } else {
+ 669     count.dont_load_item();
+ 670   }
+ 671   value.load_item();
+ 672   LIR_Opr reg = rlock_result(x);
+ 673 
+ 674   shift_op(x-&gt;op(), reg, value.result(), count.result(), LIR_OprFact::illegalOpr);
+ 675 }
+ 676 
+ 677 
+ 678 // _iand, _land, _ior, _lor, _ixor, _lxor
+ 679 void LIRGenerator::do_LogicOp(LogicOp* x) {
+ 680   // when an operand with use count 1 is the left operand, then it is
+ 681   // likely that no move for 2-operand-LIR-form is necessary
+ 682   if (x-&gt;is_commutative() &amp;&amp; x-&gt;y()-&gt;as_Constant() == NULL &amp;&amp; x-&gt;x()-&gt;use_count() &gt; x-&gt;y()-&gt;use_count()) {
+ 683     x-&gt;swap_operands();
+ 684   }
+ 685 
+ 686   LIRItem left(x-&gt;x(), this);
+ 687   LIRItem right(x-&gt;y(), this);
+ 688 
+ 689   left.load_item();
+ 690   right.load_nonconstant();
+ 691   LIR_Opr reg = rlock_result(x);
+ 692 
+ 693   logic_op(x-&gt;op(), reg, left.result(), right.result());
+ 694 }
+ 695 
+ 696 
+ 697 
+ 698 // _lcmp, _fcmpl, _fcmpg, _dcmpl, _dcmpg
+ 699 void LIRGenerator::do_CompareOp(CompareOp* x) {
+ 700   LIRItem left(x-&gt;x(), this);
+ 701   LIRItem right(x-&gt;y(), this);
+ 702   ValueTag tag = x-&gt;x()-&gt;type()-&gt;tag();
+ 703   if (tag == longTag) {
+ 704     left.set_destroys_register();
+ 705   }
+ 706   left.load_item();
+ 707   right.load_item();
+ 708   LIR_Opr reg = rlock_result(x);
+ 709 
+ 710   if (x-&gt;x()-&gt;type()-&gt;is_float_kind()) {
+ 711     Bytecodes::Code code = x-&gt;op();
+ 712     __ fcmp2int(left.result(), right.result(), reg, (code == Bytecodes::_fcmpl || code == Bytecodes::_dcmpl));
+ 713   } else if (x-&gt;x()-&gt;type()-&gt;tag() == longTag) {
+ 714     __ lcmp2int(left.result(), right.result(), reg);
+ 715   } else {
+ 716     Unimplemented();
+ 717   }
+ 718 }
+ 719 
+ 720 
+ 721 void LIRGenerator::do_CompareAndSwap(Intrinsic* x, ValueType* type) {
+ 722   assert(x-&gt;number_of_arguments() == 4, "wrong type");
+ 723   LIRItem obj   (x-&gt;argument_at(0), this);  // object
+ 724   LIRItem offset(x-&gt;argument_at(1), this);  // offset of field
+ 725   LIRItem cmp   (x-&gt;argument_at(2), this);  // value to compare with field
+ 726   LIRItem val   (x-&gt;argument_at(3), this);  // replace field with val if matches cmp
+ 727 
+ 728   assert(obj.type()-&gt;tag() == objectTag, "invalid type");
+ 729 
+ 730   // In 64bit the type can be long, sparc doesn't have this assert
+ 731   // assert(offset.type()-&gt;tag() == intTag, "invalid type");
+ 732 
+ 733   assert(cmp.type()-&gt;tag() == type-&gt;tag(), "invalid type");
+ 734   assert(val.type()-&gt;tag() == type-&gt;tag(), "invalid type");
+ 735 
+ 736   // get address of field
+ 737   obj.load_item();
+ 738   offset.load_nonconstant();
+ 739 
+ 740   LIR_Opr addr = new_pointer_register();
+ 741   LIR_Address* a;
+ 742   if(offset.result()-&gt;is_constant()) {
+ 743 #ifdef _LP64
+ 744     jlong c = offset.result()-&gt;as_jlong();
+ 745     if ((jlong)((jint)c) == c) {
+ 746       a = new LIR_Address(obj.result(),
+ 747                           (jint)c,
+ 748                           as_BasicType(type));
+ 749     } else {
+ 750       LIR_Opr tmp = new_register(T_LONG);
+ 751       __ move(offset.result(), tmp);
+ 752       a = new LIR_Address(obj.result(),
+ 753                           tmp,
+ 754                           as_BasicType(type));
+ 755     }
+ 756 #else
+ 757     a = new LIR_Address(obj.result(),
+ 758                         offset.result()-&gt;as_jint(),
+ 759                         as_BasicType(type));
+ 760 #endif
+ 761   } else {
+ 762     a = new LIR_Address(obj.result(),
+ 763                         offset.result(),
+ 764                         0,
+ 765                         as_BasicType(type));
+ 766   }
+ 767   __ leal(LIR_OprFact::address(a), addr);
+ 768 
+ 769   if (type == objectType) {  // Write-barrier needed for Object fields.
+ 770     // Do the pre-write barrier, if any.
+ 771     pre_barrier(addr, LIR_OprFact::illegalOpr /* pre_val */,
+ 772                 true /* do_load */, false /* patch */, NULL);
+ 773   }
+ 774 
+ 775   if (type == objectType) {
+ 776     cmp.load_item_force(FrameMap::rax_oop_opr);
+ 777     val.load_item();
+ 778   } else if (type == intType) {
+ 779     cmp.load_item_force(FrameMap::rax_opr);
+ 780     val.load_item();
+ 781   } else if (type == longType) {
+ 782     cmp.load_item_force(FrameMap::long0_opr);
+ 783     val.load_item_force(FrameMap::long1_opr);
+ 784   } else {
+ 785     ShouldNotReachHere();
+ 786   }
+ 787 
+ 788   LIR_Opr ill = LIR_OprFact::illegalOpr;  // for convenience
+ 789   if (type == objectType)
+ 790     __ cas_obj(addr, cmp.result(), val.result(), ill, ill);
+ 791   else if (type == intType)
+ 792     __ cas_int(addr, cmp.result(), val.result(), ill, ill);
+ 793   else if (type == longType)
+ 794     __ cas_long(addr, cmp.result(), val.result(), ill, ill);
+ 795   else {
+ 796     ShouldNotReachHere();
+ 797   }
+ 798 
+ 799   // generate conditional move of boolean result
+ 800   LIR_Opr result = rlock_result(x);
+ 801   __ cmove(lir_cond_equal, LIR_OprFact::intConst(1), LIR_OprFact::intConst(0),
+ 802            result, as_BasicType(type));
+ 803   if (type == objectType) {   // Write-barrier needed for Object fields.
+ 804     // Seems to be precise
+ 805     post_barrier(addr, val.result());
+ 806   }
+ 807 }
+ 808 
+ 809 void LIRGenerator::do_FmaIntrinsic(Intrinsic* x) {
+ 810   assert(x-&gt;number_of_arguments() == 3, "wrong type");
+ 811   assert(UseFMA, "Needs FMA instructions support.");
+ 812   LIRItem value(x-&gt;argument_at(0), this);
+ 813   LIRItem value1(x-&gt;argument_at(1), this);
+ 814   LIRItem value2(x-&gt;argument_at(2), this);
+ 815 
+ 816   value2.set_destroys_register();
+ 817 
+ 818   value.load_item();
+ 819   value1.load_item();
+ 820   value2.load_item();
+ 821 
+ 822   LIR_Opr calc_input = value.result();
+ 823   LIR_Opr calc_input1 = value1.result();
+ 824   LIR_Opr calc_input2 = value2.result();
+ 825   LIR_Opr calc_result = rlock_result(x);
+ 826 
+ 827   switch (x-&gt;id()) {
+ 828   case vmIntrinsics::_fmaD:   __ fmad(calc_input, calc_input1, calc_input2, calc_result); break;
+ 829   case vmIntrinsics::_fmaF:   __ fmaf(calc_input, calc_input1, calc_input2, calc_result); break;
+ 830   default:                    ShouldNotReachHere();
+ 831   }
+ 832 
+ 833 }
+ 834 
+ 835 
+ 836 void LIRGenerator::do_MathIntrinsic(Intrinsic* x) {
+ 837   assert(x-&gt;number_of_arguments() == 1 || (x-&gt;number_of_arguments() == 2 &amp;&amp; x-&gt;id() == vmIntrinsics::_dpow), "wrong type");
+ 838 
+ 839   if (x-&gt;id() == vmIntrinsics::_dexp || x-&gt;id() == vmIntrinsics::_dlog ||
+ 840       x-&gt;id() == vmIntrinsics::_dpow || x-&gt;id() == vmIntrinsics::_dcos ||
+ 841       x-&gt;id() == vmIntrinsics::_dsin || x-&gt;id() == vmIntrinsics::_dtan ||
+ 842       x-&gt;id() == vmIntrinsics::_dlog10) {
+ 843     do_LibmIntrinsic(x);
+ 844     return;
+ 845   }
+ 846 
+ 847   LIRItem value(x-&gt;argument_at(0), this);
+ 848 
+ 849   bool use_fpu = false;
+ 850   if (UseSSE &lt; 2) {
+ 851     value.set_destroys_register();
+ 852   }
+ 853   value.load_item();
+ 854 
+ 855   LIR_Opr calc_input = value.result();
+ 856   LIR_Opr calc_result = rlock_result(x);
+ 857 
+ 858   switch(x-&gt;id()) {
+ 859     case vmIntrinsics::_dabs:   __ abs  (calc_input, calc_result, LIR_OprFact::illegalOpr); break;
+ 860     case vmIntrinsics::_dsqrt:  __ sqrt (calc_input, calc_result, LIR_OprFact::illegalOpr); break;
+ 861     default:                    ShouldNotReachHere();
+ 862   }
+ 863 
+ 864   if (use_fpu) {
+ 865     __ move(calc_result, x-&gt;operand());
+ 866   }
+ 867 }
+ 868 
+ 869 void LIRGenerator::do_LibmIntrinsic(Intrinsic* x) {
+ 870   LIRItem value(x-&gt;argument_at(0), this);
+ 871   value.set_destroys_register();
+ 872 
+ 873   LIR_Opr calc_result = rlock_result(x);
+ 874   LIR_Opr result_reg = result_register_for(x-&gt;type());
+ 875 
+ 876   CallingConvention* cc = NULL;
+ 877 
+ 878   if (x-&gt;id() == vmIntrinsics::_dpow) {
+ 879     LIRItem value1(x-&gt;argument_at(1), this);
+ 880 
+ 881     value1.set_destroys_register();
+ 882 
+ 883     BasicTypeList signature(2);
+ 884     signature.append(T_DOUBLE);
+ 885     signature.append(T_DOUBLE);
+ 886     cc = frame_map()-&gt;c_calling_convention(&amp;signature);
+ 887     value.load_item_force(cc-&gt;at(0));
+ 888     value1.load_item_force(cc-&gt;at(1));
+ 889   } else {
+ 890     BasicTypeList signature(1);
+ 891     signature.append(T_DOUBLE);
+ 892     cc = frame_map()-&gt;c_calling_convention(&amp;signature);
+ 893     value.load_item_force(cc-&gt;at(0));
+ 894   }
+ 895 
+ 896 #ifndef _LP64
+ 897   LIR_Opr tmp = FrameMap::fpu0_double_opr;
+ 898   result_reg = tmp;
+ 899   switch(x-&gt;id()) {
+ 900     case vmIntrinsics::_dexp:
+ 901       if (StubRoutines::dexp() != NULL) {
+ 902         __ call_runtime_leaf(StubRoutines::dexp(), getThreadTemp(), result_reg, cc-&gt;args());
+ 903       } else {
+ 904         __ call_runtime_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::dexp), getThreadTemp(), result_reg, cc-&gt;args());
+ 905       }
+ 906       break;
+ 907     case vmIntrinsics::_dlog:
+ 908       if (StubRoutines::dlog() != NULL) {
+ 909         __ call_runtime_leaf(StubRoutines::dlog(), getThreadTemp(), result_reg, cc-&gt;args());
+ 910       } else {
+ 911         __ call_runtime_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::dlog), getThreadTemp(), result_reg, cc-&gt;args());
+ 912       }
+ 913       break;
+ 914     case vmIntrinsics::_dlog10:
+ 915       if (StubRoutines::dlog10() != NULL) {
+ 916        __ call_runtime_leaf(StubRoutines::dlog10(), getThreadTemp(), result_reg, cc-&gt;args());
+ 917       } else {
+ 918         __ call_runtime_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::dlog10), getThreadTemp(), result_reg, cc-&gt;args());
+ 919       }
+ 920       break;
+ 921     case vmIntrinsics::_dpow:
+ 922       if (StubRoutines::dpow() != NULL) {
+ 923         __ call_runtime_leaf(StubRoutines::dpow(), getThreadTemp(), result_reg, cc-&gt;args());
+ 924       } else {
+ 925         __ call_runtime_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::dpow), getThreadTemp(), result_reg, cc-&gt;args());
+ 926       }
+ 927       break;
+ 928     case vmIntrinsics::_dsin:
+ 929       if (VM_Version::supports_sse2() &amp;&amp; StubRoutines::dsin() != NULL) {
+ 930         __ call_runtime_leaf(StubRoutines::dsin(), getThreadTemp(), result_reg, cc-&gt;args());
+ 931       } else {
+ 932         __ call_runtime_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::dsin), getThreadTemp(), result_reg, cc-&gt;args());
+ 933       }
+ 934       break;
+ 935     case vmIntrinsics::_dcos:
+ 936       if (VM_Version::supports_sse2() &amp;&amp; StubRoutines::dcos() != NULL) {
+ 937         __ call_runtime_leaf(StubRoutines::dcos(), getThreadTemp(), result_reg, cc-&gt;args());
+ 938       } else {
+ 939         __ call_runtime_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::dcos), getThreadTemp(), result_reg, cc-&gt;args());
+ 940       }
+ 941       break;
+ 942     case vmIntrinsics::_dtan:
+ 943       if (StubRoutines::dtan() != NULL) {
+ 944         __ call_runtime_leaf(StubRoutines::dtan(), getThreadTemp(), result_reg, cc-&gt;args());
+ 945       } else {
+ 946         __ call_runtime_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::dtan), getThreadTemp(), result_reg, cc-&gt;args());
+ 947       }
+ 948       break;
+ 949     default:  ShouldNotReachHere();
+ 950   }
+ 951 #else
+ 952   switch (x-&gt;id()) {
+ 953     case vmIntrinsics::_dexp:
+ 954       if (StubRoutines::dexp() != NULL) {
+ 955         __ call_runtime_leaf(StubRoutines::dexp(), getThreadTemp(), result_reg, cc-&gt;args());
+ 956       } else {
+ 957         __ call_runtime_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::dexp), getThreadTemp(), result_reg, cc-&gt;args());
+ 958       }
+ 959       break;
+ 960     case vmIntrinsics::_dlog:
+ 961       if (StubRoutines::dlog() != NULL) {
+ 962       __ call_runtime_leaf(StubRoutines::dlog(), getThreadTemp(), result_reg, cc-&gt;args());
+ 963       } else {
+ 964         __ call_runtime_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::dlog), getThreadTemp(), result_reg, cc-&gt;args());
+ 965       }
+ 966       break;
+ 967     case vmIntrinsics::_dlog10:
+ 968       if (StubRoutines::dlog10() != NULL) {
+ 969       __ call_runtime_leaf(StubRoutines::dlog10(), getThreadTemp(), result_reg, cc-&gt;args());
+ 970       } else {
+ 971         __ call_runtime_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::dlog10), getThreadTemp(), result_reg, cc-&gt;args());
+ 972       }
+ 973       break;
+ 974     case vmIntrinsics::_dpow:
+ 975        if (StubRoutines::dpow() != NULL) {
+ 976       __ call_runtime_leaf(StubRoutines::dpow(), getThreadTemp(), result_reg, cc-&gt;args());
+ 977       } else {
+ 978         __ call_runtime_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::dpow), getThreadTemp(), result_reg, cc-&gt;args());
+ 979       }
+ 980       break;
+ 981     case vmIntrinsics::_dsin:
+ 982       if (StubRoutines::dsin() != NULL) {
+ 983         __ call_runtime_leaf(StubRoutines::dsin(), getThreadTemp(), result_reg, cc-&gt;args());
+ 984       } else {
+ 985         __ call_runtime_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::dsin), getThreadTemp(), result_reg, cc-&gt;args());
+ 986       }
+ 987       break;
+ 988     case vmIntrinsics::_dcos:
+ 989       if (StubRoutines::dcos() != NULL) {
+ 990         __ call_runtime_leaf(StubRoutines::dcos(), getThreadTemp(), result_reg, cc-&gt;args());
+ 991       } else {
+ 992         __ call_runtime_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::dcos), getThreadTemp(), result_reg, cc-&gt;args());
+ 993       }
+ 994       break;
+ 995     case vmIntrinsics::_dtan:
+ 996        if (StubRoutines::dtan() != NULL) {
+ 997       __ call_runtime_leaf(StubRoutines::dtan(), getThreadTemp(), result_reg, cc-&gt;args());
+ 998       } else {
+ 999         __ call_runtime_leaf(CAST_FROM_FN_PTR(address, SharedRuntime::dtan), getThreadTemp(), result_reg, cc-&gt;args());
+1000       }
+1001       break;
+1002     default:  ShouldNotReachHere();
+1003   }
+1004 #endif // _LP64
+1005   __ move(result_reg, calc_result);
+1006 }
+1007 
+1008 void LIRGenerator::do_ArrayCopy(Intrinsic* x) {
+1009   assert(x-&gt;number_of_arguments() == 5, "wrong type");
+1010 
+1011   // Make all state_for calls early since they can emit code
+1012   CodeEmitInfo* info = state_for(x, x-&gt;state());
+1013 
+1014   LIRItem src(x-&gt;argument_at(0), this);
+1015   LIRItem src_pos(x-&gt;argument_at(1), this);
+1016   LIRItem dst(x-&gt;argument_at(2), this);
+1017   LIRItem dst_pos(x-&gt;argument_at(3), this);
+1018   LIRItem length(x-&gt;argument_at(4), this);
+1019 
+1020   // operands for arraycopy must use fixed registers, otherwise
+1021   // LinearScan will fail allocation (because arraycopy always needs a
+1022   // call)
+1023 
+1024 #ifndef _LP64
+1025   src.load_item_force     (FrameMap::rcx_oop_opr);
+1026   src_pos.load_item_force (FrameMap::rdx_opr);
+1027   dst.load_item_force     (FrameMap::rax_oop_opr);
+1028   dst_pos.load_item_force (FrameMap::rbx_opr);
+1029   length.load_item_force  (FrameMap::rdi_opr);
+1030   LIR_Opr tmp =           (FrameMap::rsi_opr);
+1031 #else
+1032 
+1033   // The java calling convention will give us enough registers
+1034   // so that on the stub side the args will be perfect already.
+1035   // On the other slow/special case side we call C and the arg
+1036   // positions are not similar enough to pick one as the best.
+1037   // Also because the java calling convention is a "shifted" version
+1038   // of the C convention we can process the java args trivially into C
+1039   // args without worry of overwriting during the xfer
+1040 
+1041   src.load_item_force     (FrameMap::as_oop_opr(j_rarg0));
+1042   src_pos.load_item_force (FrameMap::as_opr(j_rarg1));
+1043   dst.load_item_force     (FrameMap::as_oop_opr(j_rarg2));
+1044   dst_pos.load_item_force (FrameMap::as_opr(j_rarg3));
+1045   length.load_item_force  (FrameMap::as_opr(j_rarg4));
+1046 
+1047   LIR_Opr tmp =           FrameMap::as_opr(j_rarg5);
+1048 #endif // LP64
+1049 
+1050   set_no_result(x);
+1051 
+1052   int flags;
+1053   ciArrayKlass* expected_type;
+1054   arraycopy_helper(x, &amp;flags, &amp;expected_type);
+1055 
+1056   __ arraycopy(src.result(), src_pos.result(), dst.result(), dst_pos.result(), length.result(), tmp, expected_type, flags, info); // does add_safepoint
+1057 }
+1058 
+1059 void LIRGenerator::do_update_CRC32(Intrinsic* x) {
+1060   assert(UseCRC32Intrinsics, "need AVX and LCMUL instructions support");
+1061   // Make all state_for calls early since they can emit code
+1062   LIR_Opr result = rlock_result(x);
+1063   int flags = 0;
+1064   switch (x-&gt;id()) {
+1065     case vmIntrinsics::_updateCRC32: {
+1066       LIRItem crc(x-&gt;argument_at(0), this);
+1067       LIRItem val(x-&gt;argument_at(1), this);
+1068       // val is destroyed by update_crc32
+1069       val.set_destroys_register();
+1070       crc.load_item();
+1071       val.load_item();
+1072       __ update_crc32(crc.result(), val.result(), result);
+1073       break;
+1074     }
+1075     case vmIntrinsics::_updateBytesCRC32:
+1076     case vmIntrinsics::_updateByteBufferCRC32: {
+1077       bool is_updateBytes = (x-&gt;id() == vmIntrinsics::_updateBytesCRC32);
+1078 
+1079       LIRItem crc(x-&gt;argument_at(0), this);
+1080       LIRItem buf(x-&gt;argument_at(1), this);
+1081       LIRItem off(x-&gt;argument_at(2), this);
+1082       LIRItem len(x-&gt;argument_at(3), this);
+1083       buf.load_item();
+1084       off.load_nonconstant();
+1085 
+1086       LIR_Opr index = off.result();
+1087       int offset = is_updateBytes ? arrayOopDesc::base_offset_in_bytes(T_BYTE) : 0;
+1088       if(off.result()-&gt;is_constant()) {
+1089         index = LIR_OprFact::illegalOpr;
+1090        offset += off.result()-&gt;as_jint();
+1091       }
+1092       LIR_Opr base_op = buf.result();
+1093 
+1094 #ifndef _LP64
+1095       if (!is_updateBytes) { // long b raw address
+1096          base_op = new_register(T_INT);
+1097          __ convert(Bytecodes::_l2i, buf.result(), base_op);
+1098       }
+1099 #else
+1100       if (index-&gt;is_valid()) {
+1101         LIR_Opr tmp = new_register(T_LONG);
+1102         __ convert(Bytecodes::_i2l, index, tmp);
+1103         index = tmp;
+1104       }
+1105 #endif
+1106 
+1107       LIR_Address* a = new LIR_Address(base_op,
+1108                                        index,
+1109                                        offset,
+1110                                        T_BYTE);
+1111       BasicTypeList signature(3);
+1112       signature.append(T_INT);
+1113       signature.append(T_ADDRESS);
+1114       signature.append(T_INT);
+1115       CallingConvention* cc = frame_map()-&gt;c_calling_convention(&amp;signature);
+1116       const LIR_Opr result_reg = result_register_for(x-&gt;type());
+1117 
+1118       LIR_Opr addr = new_pointer_register();
+1119       __ leal(LIR_OprFact::address(a), addr);
+1120 
+1121       crc.load_item_force(cc-&gt;at(0));
+1122       __ move(addr, cc-&gt;at(1));
+1123       len.load_item_force(cc-&gt;at(2));
+1124 
+1125       __ call_runtime_leaf(StubRoutines::updateBytesCRC32(), getThreadTemp(), result_reg, cc-&gt;args());
+1126       __ move(result_reg, result);
+1127 
+1128       break;
+1129     }
+1130     default: {
+1131       ShouldNotReachHere();
+1132     }
+1133   }
+1134 }
+1135 
+1136 void LIRGenerator::do_update_CRC32C(Intrinsic* x) {
+1137   Unimplemented();
+1138 }
+1139 
+1140 void LIRGenerator::do_vectorizedMismatch(Intrinsic* x) {
+1141   assert(UseVectorizedMismatchIntrinsic, "need AVX instruction support");
+1142 
+1143   // Make all state_for calls early since they can emit code
+1144   LIR_Opr result = rlock_result(x);
+1145 
+1146   LIRItem a(x-&gt;argument_at(0), this); // Object
+1147   LIRItem aOffset(x-&gt;argument_at(1), this); // long
+1148   LIRItem b(x-&gt;argument_at(2), this); // Object
+1149   LIRItem bOffset(x-&gt;argument_at(3), this); // long
+1150   LIRItem length(x-&gt;argument_at(4), this); // int
+1151   LIRItem log2ArrayIndexScale(x-&gt;argument_at(5), this); // int
+1152 
+1153   a.load_item();
+1154   aOffset.load_nonconstant();
+1155   b.load_item();
+1156   bOffset.load_nonconstant();
+1157 
+1158   long constant_aOffset = 0;
+1159   LIR_Opr result_aOffset = aOffset.result();
+1160   if (result_aOffset-&gt;is_constant()) {
+1161     constant_aOffset = result_aOffset-&gt;as_jlong();
+1162     result_aOffset = LIR_OprFact::illegalOpr;
+1163   }
+1164   LIR_Opr result_a = a.result();
+1165 
+1166   long constant_bOffset = 0;
+1167   LIR_Opr result_bOffset = bOffset.result();
+1168   if (result_bOffset-&gt;is_constant()) {
+1169     constant_bOffset = result_bOffset-&gt;as_jlong();
+1170     result_bOffset = LIR_OprFact::illegalOpr;
+1171   }
+1172   LIR_Opr result_b = b.result();
+1173 
+1174 #ifndef _LP64
+1175   result_a = new_register(T_INT);
+1176   __ convert(Bytecodes::_l2i, a.result(), result_a);
+1177   result_b = new_register(T_INT);
+1178   __ convert(Bytecodes::_l2i, b.result(), result_b);
+1179 #endif
+1180 
+1181 
+1182   LIR_Address* addr_a = new LIR_Address(result_a,
+1183                                         result_aOffset,
+1184                                         constant_aOffset,
+1185                                         T_BYTE);
+1186 
+1187   LIR_Address* addr_b = new LIR_Address(result_b,
+1188                                         result_bOffset,
+1189                                         constant_bOffset,
+1190                                         T_BYTE);
+1191 
+1192   BasicTypeList signature(4);
+1193   signature.append(T_ADDRESS);
+1194   signature.append(T_ADDRESS);
+1195   signature.append(T_INT);
+1196   signature.append(T_INT);
+1197   CallingConvention* cc = frame_map()-&gt;c_calling_convention(&amp;signature);
+1198   const LIR_Opr result_reg = result_register_for(x-&gt;type());
+1199 
+1200   LIR_Opr ptr_addr_a = new_pointer_register();
+1201   __ leal(LIR_OprFact::address(addr_a), ptr_addr_a);
+1202 
+1203   LIR_Opr ptr_addr_b = new_pointer_register();
+1204   __ leal(LIR_OprFact::address(addr_b), ptr_addr_b);
+1205 
+1206   __ move(ptr_addr_a, cc-&gt;at(0));
+1207   __ move(ptr_addr_b, cc-&gt;at(1));
+1208   length.load_item_force(cc-&gt;at(2));
+1209   log2ArrayIndexScale.load_item_force(cc-&gt;at(3));
+1210 
+1211   __ call_runtime_leaf(StubRoutines::vectorizedMismatch(), getThreadTemp(), result_reg, cc-&gt;args());
+1212   __ move(result_reg, result);
+1213 }
+1214 
+1215 // _i2l, _i2f, _i2d, _l2i, _l2f, _l2d, _f2i, _f2l, _f2d, _d2i, _d2l, _d2f
+1216 // _i2b, _i2c, _i2s
+1217 LIR_Opr fixed_register_for(BasicType type) {
+1218   switch (type) {
+1219     case T_FLOAT:  return FrameMap::fpu0_float_opr;
+1220     case T_DOUBLE: return FrameMap::fpu0_double_opr;
+1221     case T_INT:    return FrameMap::rax_opr;
+1222     case T_LONG:   return FrameMap::long0_opr;
+1223     default:       ShouldNotReachHere(); return LIR_OprFact::illegalOpr;
+1224   }
+1225 }
+1226 
+1227 void LIRGenerator::do_Convert(Convert* x) {
+1228   // flags that vary for the different operations and different SSE-settings
+1229   bool fixed_input = false, fixed_result = false, round_result = false, needs_stub = false;
+1230 
+1231   switch (x-&gt;op()) {
+1232     case Bytecodes::_i2l: // fall through
+1233     case Bytecodes::_l2i: // fall through
+1234     case Bytecodes::_i2b: // fall through
+1235     case Bytecodes::_i2c: // fall through
+1236     case Bytecodes::_i2s: fixed_input = false;       fixed_result = false;       round_result = false;      needs_stub = false; break;
+1237 
+1238     case Bytecodes::_f2d: fixed_input = UseSSE == 1; fixed_result = false;       round_result = false;      needs_stub = false; break;
+1239     case Bytecodes::_d2f: fixed_input = false;       fixed_result = UseSSE == 1; round_result = UseSSE &lt; 1; needs_stub = false; break;
+1240     case Bytecodes::_i2f: fixed_input = false;       fixed_result = false;       round_result = UseSSE &lt; 1; needs_stub = false; break;
+1241     case Bytecodes::_i2d: fixed_input = false;       fixed_result = false;       round_result = false;      needs_stub = false; break;
+1242     case Bytecodes::_f2i: fixed_input = false;       fixed_result = false;       round_result = false;      needs_stub = true;  break;
+1243     case Bytecodes::_d2i: fixed_input = false;       fixed_result = false;       round_result = false;      needs_stub = true;  break;
+1244     case Bytecodes::_l2f: fixed_input = false;       fixed_result = UseSSE &gt;= 1; round_result = UseSSE &lt; 1; needs_stub = false; break;
+1245     case Bytecodes::_l2d: fixed_input = false;       fixed_result = UseSSE &gt;= 2; round_result = UseSSE &lt; 2; needs_stub = false; break;
+1246     case Bytecodes::_f2l: fixed_input = true;        fixed_result = true;        round_result = false;      needs_stub = false; break;
+1247     case Bytecodes::_d2l: fixed_input = true;        fixed_result = true;        round_result = false;      needs_stub = false; break;
+1248     default: ShouldNotReachHere();
+1249   }
+1250 
+1251   LIRItem value(x-&gt;value(), this);
+1252   value.load_item();
+1253   LIR_Opr input = value.result();
+1254   LIR_Opr result = rlock(x);
+1255 
+1256   // arguments of lir_convert
+1257   LIR_Opr conv_input = input;
+1258   LIR_Opr conv_result = result;
+1259   ConversionStub* stub = NULL;
+1260 
+1261   if (fixed_input) {
+1262     conv_input = fixed_register_for(input-&gt;type());
+1263     __ move(input, conv_input);
+1264   }
+1265 
+1266   assert(fixed_result == false || round_result == false, "cannot set both");
+1267   if (fixed_result) {
+1268     conv_result = fixed_register_for(result-&gt;type());
+1269   } else if (round_result) {
+1270     result = new_register(result-&gt;type());
+1271     set_vreg_flag(result, must_start_in_memory);
+1272   }
+1273 
+1274   if (needs_stub) {
+1275     stub = new ConversionStub(x-&gt;op(), conv_input, conv_result);
+1276   }
+1277 
+1278   __ convert(x-&gt;op(), conv_input, conv_result, stub);
+1279 
+1280   if (result != conv_result) {
+1281     __ move(conv_result, result);
+1282   }
+1283 
+1284   assert(result-&gt;is_virtual(), "result must be virtual register");
+1285   set_result(x, result);
+1286 }
+1287 
+1288 
+1289 void LIRGenerator::do_NewInstance(NewInstance* x) {
+1290   print_if_not_loaded(x);
+1291 
+1292   CodeEmitInfo* info = state_for(x, x-&gt;state());
+1293   LIR_Opr reg = result_register_for(x-&gt;type());
+1294   new_instance(reg, x-&gt;klass(), x-&gt;is_unresolved(),
+1295                        FrameMap::rcx_oop_opr,
+1296                        FrameMap::rdi_oop_opr,
+1297                        FrameMap::rsi_oop_opr,
+1298                        LIR_OprFact::illegalOpr,
+1299                        FrameMap::rdx_metadata_opr, info);
+1300   LIR_Opr result = rlock_result(x);
+1301   __ move(reg, result);
+1302 }
+1303 
+1304 
+1305 void LIRGenerator::do_NewTypeArray(NewTypeArray* x) {
+1306   CodeEmitInfo* info = state_for(x, x-&gt;state());
+1307 
+1308   LIRItem length(x-&gt;length(), this);
+1309   length.load_item_force(FrameMap::rbx_opr);
+1310 
+1311   LIR_Opr reg = result_register_for(x-&gt;type());
+1312   LIR_Opr tmp1 = FrameMap::rcx_oop_opr;
+1313   LIR_Opr tmp2 = FrameMap::rsi_oop_opr;
+1314   LIR_Opr tmp3 = FrameMap::rdi_oop_opr;
+1315   LIR_Opr tmp4 = reg;
+1316   LIR_Opr klass_reg = FrameMap::rdx_metadata_opr;
+1317   LIR_Opr len = length.result();
+1318   BasicType elem_type = x-&gt;elt_type();
+1319 
+1320   __ metadata2reg(ciTypeArrayKlass::make(elem_type)-&gt;constant_encoding(), klass_reg);
+1321 
+1322   CodeStub* slow_path = new NewTypeArrayStub(klass_reg, len, reg, info);
+1323   __ allocate_array(reg, len, tmp1, tmp2, tmp3, tmp4, elem_type, klass_reg, slow_path);
+1324 
+1325   LIR_Opr result = rlock_result(x);
+1326   __ move(reg, result);
+1327 }
+1328 
+1329 
+1330 void LIRGenerator::do_NewObjectArray(NewObjectArray* x) {
+1331   LIRItem length(x-&gt;length(), this);
+1332   // in case of patching (i.e., object class is not yet loaded), we need to reexecute the instruction
+1333   // and therefore provide the state before the parameters have been consumed
+1334   CodeEmitInfo* patching_info = NULL;
+1335   if (!x-&gt;klass()-&gt;is_loaded() || PatchALot) {
+1336     patching_info =  state_for(x, x-&gt;state_before());
+1337   }
+1338 
+1339   CodeEmitInfo* info = state_for(x, x-&gt;state());
+1340 
+1341   const LIR_Opr reg = result_register_for(x-&gt;type());
+1342   LIR_Opr tmp1 = FrameMap::rcx_oop_opr;
+1343   LIR_Opr tmp2 = FrameMap::rsi_oop_opr;
+1344   LIR_Opr tmp3 = FrameMap::rdi_oop_opr;
+1345   LIR_Opr tmp4 = reg;
+1346   LIR_Opr klass_reg = FrameMap::rdx_metadata_opr;
+1347 
+1348   length.load_item_force(FrameMap::rbx_opr);
+1349   LIR_Opr len = length.result();
+1350 
+1351   CodeStub* slow_path = new NewObjectArrayStub(klass_reg, len, reg, info);
+1352   ciKlass* obj = (ciKlass*) ciObjArrayKlass::make(x-&gt;klass());
+1353   if (obj == ciEnv::unloaded_ciobjarrayklass()) {
+1354     BAILOUT("encountered unloaded_ciobjarrayklass due to out of memory error");
+1355   }
+1356   klass2reg_with_patching(klass_reg, obj, patching_info);
+1357   __ allocate_array(reg, len, tmp1, tmp2, tmp3, tmp4, T_OBJECT, klass_reg, slow_path);
+1358 
+1359   LIR_Opr result = rlock_result(x);
+1360   __ move(reg, result);
+1361 }
+1362 
+1363 
+1364 void LIRGenerator::do_NewMultiArray(NewMultiArray* x) {
+1365   Values* dims = x-&gt;dims();
+1366   int i = dims-&gt;length();
+1367   LIRItemList* items = new LIRItemList(i, i, NULL);
+1368   while (i-- &gt; 0) {
+1369     LIRItem* size = new LIRItem(dims-&gt;at(i), this);
+1370     items-&gt;at_put(i, size);
+1371   }
+1372 
+1373   // Evaluate state_for early since it may emit code.
+1374   CodeEmitInfo* patching_info = NULL;
+1375   if (!x-&gt;klass()-&gt;is_loaded() || PatchALot) {
+1376     patching_info = state_for(x, x-&gt;state_before());
+1377 
+1378     // Cannot re-use same xhandlers for multiple CodeEmitInfos, so
+1379     // clone all handlers (NOTE: Usually this is handled transparently
+1380     // by the CodeEmitInfo cloning logic in CodeStub constructors but
+1381     // is done explicitly here because a stub isn't being used).
+1382     x-&gt;set_exception_handlers(new XHandlers(x-&gt;exception_handlers()));
+1383   }
+1384   CodeEmitInfo* info = state_for(x, x-&gt;state());
+1385 
+1386   i = dims-&gt;length();
+1387   while (i-- &gt; 0) {
+1388     LIRItem* size = items-&gt;at(i);
+1389     size-&gt;load_nonconstant();
+1390 
+1391     store_stack_parameter(size-&gt;result(), in_ByteSize(i*4));
+1392   }
+1393 
+1394   LIR_Opr klass_reg = FrameMap::rax_metadata_opr;
+1395   klass2reg_with_patching(klass_reg, x-&gt;klass(), patching_info);
+1396 
+1397   LIR_Opr rank = FrameMap::rbx_opr;
+1398   __ move(LIR_OprFact::intConst(x-&gt;rank()), rank);
+1399   LIR_Opr varargs = FrameMap::rcx_opr;
+1400   __ move(FrameMap::rsp_opr, varargs);
+1401   LIR_OprList* args = new LIR_OprList(3);
+1402   args-&gt;append(klass_reg);
+1403   args-&gt;append(rank);
+1404   args-&gt;append(varargs);
+1405   LIR_Opr reg = result_register_for(x-&gt;type());
+1406   __ call_runtime(Runtime1::entry_for(Runtime1::new_multi_array_id),
+1407                   LIR_OprFact::illegalOpr,
+1408                   reg, args, info);
+1409 
+1410   LIR_Opr result = rlock_result(x);
+1411   __ move(reg, result);
+1412 }
+1413 
+1414 
+1415 void LIRGenerator::do_BlockBegin(BlockBegin* x) {
+1416   // nothing to do for now
+1417 }
+1418 
+1419 
+1420 void LIRGenerator::do_CheckCast(CheckCast* x) {
+1421   LIRItem obj(x-&gt;obj(), this);
+1422 
+1423   CodeEmitInfo* patching_info = NULL;
+1424   if (!x-&gt;klass()-&gt;is_loaded() || (PatchALot &amp;&amp; !x-&gt;is_incompatible_class_change_check())) {
+1425     // must do this before locking the destination register as an oop register,
+1426     // and before the obj is loaded (the latter is for deoptimization)
+1427     patching_info = state_for(x, x-&gt;state_before());
+1428   }
+1429   obj.load_item();
+1430 
+1431   // info for exceptions
+1432   CodeEmitInfo* info_for_exception = state_for(x);
+1433 
+1434   CodeStub* stub;
+1435   if (x-&gt;is_incompatible_class_change_check()) {
+1436     assert(patching_info == NULL, "can't patch this");
+1437     stub = new SimpleExceptionStub(Runtime1::throw_incompatible_class_change_error_id, LIR_OprFact::illegalOpr, info_for_exception);
+1438   } else {
+1439     stub = new SimpleExceptionStub(Runtime1::throw_class_cast_exception_id, obj.result(), info_for_exception);
+1440   }
+1441   LIR_Opr reg = rlock_result(x);
+1442   LIR_Opr tmp3 = LIR_OprFact::illegalOpr;
+1443   if (!x-&gt;klass()-&gt;is_loaded() || UseCompressedClassPointers) {
+1444     tmp3 = new_register(objectType);
+1445   }
+1446   __ checkcast(reg, obj.result(), x-&gt;klass(),
+1447                new_register(objectType), new_register(objectType), tmp3,
+1448                x-&gt;direct_compare(), info_for_exception, patching_info, stub,
+1449                x-&gt;profiled_method(), x-&gt;profiled_bci());
+1450 }
+1451 
+1452 
+1453 void LIRGenerator::do_InstanceOf(InstanceOf* x) {
+1454   LIRItem obj(x-&gt;obj(), this);
+1455 
+1456   // result and test object may not be in same register
+1457   LIR_Opr reg = rlock_result(x);
+1458   CodeEmitInfo* patching_info = NULL;
+1459   if ((!x-&gt;klass()-&gt;is_loaded() || PatchALot)) {
+1460     // must do this before locking the destination register as an oop register
+1461     patching_info = state_for(x, x-&gt;state_before());
+1462   }
+1463   obj.load_item();
+1464   LIR_Opr tmp3 = LIR_OprFact::illegalOpr;
+1465   if (!x-&gt;klass()-&gt;is_loaded() || UseCompressedClassPointers) {
+1466     tmp3 = new_register(objectType);
+1467   }
+1468   __ instanceof(reg, obj.result(), x-&gt;klass(),
+1469                 new_register(objectType), new_register(objectType), tmp3,
+1470                 x-&gt;direct_compare(), patching_info, x-&gt;profiled_method(), x-&gt;profiled_bci());
+1471 }
+1472 
+1473 
+1474 void LIRGenerator::do_If(If* x) {
+1475   assert(x-&gt;number_of_sux() == 2, "inconsistency");
+1476   ValueTag tag = x-&gt;x()-&gt;type()-&gt;tag();
+1477   bool is_safepoint = x-&gt;is_safepoint();
+1478 
+1479   If::Condition cond = x-&gt;cond();
+1480 
+1481   LIRItem xitem(x-&gt;x(), this);
+1482   LIRItem yitem(x-&gt;y(), this);
+1483   LIRItem* xin = &amp;xitem;
+1484   LIRItem* yin = &amp;yitem;
+1485 
+1486   if (tag == longTag) {
+1487     // for longs, only conditions "eql", "neq", "lss", "geq" are valid;
+1488     // mirror for other conditions
+1489     if (cond == If::gtr || cond == If::leq) {
+1490       cond = Instruction::mirror(cond);
+1491       xin = &amp;yitem;
+1492       yin = &amp;xitem;
+1493     }
+1494     xin-&gt;set_destroys_register();
+1495   }
+1496   xin-&gt;load_item();
+1497   if (tag == longTag &amp;&amp; yin-&gt;is_constant() &amp;&amp; yin-&gt;get_jlong_constant() == 0 &amp;&amp; (cond == If::eql || cond == If::neq)) {
+1498     // inline long zero
+1499     yin-&gt;dont_load_item();
+1500   } else if (tag == longTag || tag == floatTag || tag == doubleTag) {
+1501     // longs cannot handle constants at right side
+1502     yin-&gt;load_item();
+1503   } else {
+1504     yin-&gt;dont_load_item();
+1505   }
+1506 
+1507   // add safepoint before generating condition code so it can be recomputed
+1508   if (x-&gt;is_safepoint()) {
+1509     // increment backedge counter if needed
+1510     increment_backedge_counter(state_for(x, x-&gt;state_before()), x-&gt;profiled_bci());
+1511     __ safepoint(LIR_OprFact::illegalOpr, state_for(x, x-&gt;state_before()));
+1512   }
+1513   set_no_result(x);
+1514 
+1515   LIR_Opr left = xin-&gt;result();
+1516   LIR_Opr right = yin-&gt;result();
+1517   __ cmp(lir_cond(cond), left, right);
+1518   // Generate branch profiling. Profiling code doesn't kill flags.
+1519   profile_branch(x, cond);
+1520   move_to_phi(x-&gt;state());
+1521   if (x-&gt;x()-&gt;type()-&gt;is_float_kind()) {
+1522     __ branch(lir_cond(cond), right-&gt;type(), x-&gt;tsux(), x-&gt;usux());
+1523   } else {
+1524     __ branch(lir_cond(cond), right-&gt;type(), x-&gt;tsux());
+1525   }
+1526   assert(x-&gt;default_sux() == x-&gt;fsux(), "wrong destination above");
+1527   __ jump(x-&gt;default_sux());
+1528 }
+1529 
+1530 
+1531 LIR_Opr LIRGenerator::getThreadPointer() {
+1532 #ifdef _LP64
+1533   return FrameMap::as_pointer_opr(r15_thread);
+1534 #else
+1535   LIR_Opr result = new_register(T_INT);
+1536   __ get_thread(result);
+1537   return result;
+1538 #endif //
+1539 }
+1540 
+1541 void LIRGenerator::trace_block_entry(BlockBegin* block) {
+1542   store_stack_parameter(LIR_OprFact::intConst(block-&gt;block_id()), in_ByteSize(0));
+1543   LIR_OprList* args = new LIR_OprList();
+1544   address func = CAST_FROM_FN_PTR(address, Runtime1::trace_block_entry);
+1545   __ call_runtime_leaf(func, LIR_OprFact::illegalOpr, LIR_OprFact::illegalOpr, args);
+1546 }
+1547 
+1548 
+1549 void LIRGenerator::volatile_field_store(LIR_Opr value, LIR_Address* address,
+1550                                         CodeEmitInfo* info) {
+1551   if (address-&gt;type() == T_LONG) {
+1552     address = new LIR_Address(address-&gt;base(),
+1553                               address-&gt;index(), address-&gt;scale(),
+1554                               address-&gt;disp(), T_DOUBLE);
+1555     // Transfer the value atomically by using FP moves.  This means
+1556     // the value has to be moved between CPU and FPU registers.  It
+1557     // always has to be moved through spill slot since there's no
+1558     // quick way to pack the value into an SSE register.
+1559     LIR_Opr temp_double = new_register(T_DOUBLE);
+1560     LIR_Opr spill = new_register(T_LONG);
+1561     set_vreg_flag(spill, must_start_in_memory);
+1562     __ move(value, spill);
+1563     __ volatile_move(spill, temp_double, T_LONG);
+1564     __ volatile_move(temp_double, LIR_OprFact::address(address), T_LONG, info);
+1565   } else {
+1566     __ store(value, address, info);
+1567   }
+1568 }
+1569 
+1570 
+1571 
+1572 void LIRGenerator::volatile_field_load(LIR_Address* address, LIR_Opr result,
+1573                                        CodeEmitInfo* info) {
+1574   if (address-&gt;type() == T_LONG) {
+1575     address = new LIR_Address(address-&gt;base(),
+1576                               address-&gt;index(), address-&gt;scale(),
+1577                               address-&gt;disp(), T_DOUBLE);
+1578     // Transfer the value atomically by using FP moves.  This means
+1579     // the value has to be moved between CPU and FPU registers.  In
+1580     // SSE0 and SSE1 mode it has to be moved through spill slot but in
+1581     // SSE2+ mode it can be moved directly.
+1582     LIR_Opr temp_double = new_register(T_DOUBLE);
+1583     __ volatile_move(LIR_OprFact::address(address), temp_double, T_LONG, info);
+1584     __ volatile_move(temp_double, result, T_LONG);
+1585     if (UseSSE &lt; 2) {
+1586       // no spill slot needed in SSE2 mode because xmm-&gt;cpu register move is possible
+1587       set_vreg_flag(result, must_start_in_memory);
+1588     }
+1589   } else {
+1590     __ load(address, result, info);
+1591   }
+1592 }
+1593 
+1594 void LIRGenerator::get_Object_unsafe(LIR_Opr dst, LIR_Opr src, LIR_Opr offset,
+1595                                      BasicType type, bool is_volatile) {
+1596   if (is_volatile &amp;&amp; type == T_LONG) {
+1597     LIR_Address* addr = new LIR_Address(src, offset, T_DOUBLE);
+1598     LIR_Opr tmp = new_register(T_DOUBLE);
+1599     __ load(addr, tmp);
+1600     LIR_Opr spill = new_register(T_LONG);
+1601     set_vreg_flag(spill, must_start_in_memory);
+1602     __ move(tmp, spill);
+1603     __ move(spill, dst);
+1604   } else {
+1605     LIR_Address* addr = new LIR_Address(src, offset, type);
+1606     __ load(addr, dst);
+1607   }
+1608 }
+1609 
+1610 
+1611 void LIRGenerator::put_Object_unsafe(LIR_Opr src, LIR_Opr offset, LIR_Opr data,
+1612                                      BasicType type, bool is_volatile) {
+1613   if (is_volatile &amp;&amp; type == T_LONG) {
+1614     LIR_Address* addr = new LIR_Address(src, offset, T_DOUBLE);
+1615     LIR_Opr tmp = new_register(T_DOUBLE);
+1616     LIR_Opr spill = new_register(T_DOUBLE);
+1617     set_vreg_flag(spill, must_start_in_memory);
+1618     __ move(data, spill);
+1619     __ move(spill, tmp);
+1620     __ move(tmp, addr);
+1621   } else {
+1622     LIR_Address* addr = new LIR_Address(src, offset, type);
+1623     bool is_obj = (type == T_ARRAY || type == T_OBJECT);
+1624     if (is_obj) {
+1625       // Do the pre-write barrier, if any.
+1626       pre_barrier(LIR_OprFact::address(addr), LIR_OprFact::illegalOpr /* pre_val */,
+1627                   true /* do_load */, false /* patch */, NULL);
+1628       __ move(data, addr);
+1629       assert(src-&gt;is_register(), "must be register");
+1630       // Seems to be a precise address
+1631       post_barrier(LIR_OprFact::address(addr), data);
+1632     } else {
+1633       __ move(data, addr);
+1634     }
+1635   }
+1636 }
+1637 
+1638 void LIRGenerator::do_UnsafeGetAndSetObject(UnsafeGetAndSetObject* x) {
+1639   BasicType type = x-&gt;basic_type();
+1640   LIRItem src(x-&gt;object(), this);
+1641   LIRItem off(x-&gt;offset(), this);
+1642   LIRItem value(x-&gt;value(), this);
+1643 
+1644   src.load_item();
+1645   value.load_item();
+1646   off.load_nonconstant();
+1647 
+1648   LIR_Opr dst = rlock_result(x, type);
+1649   LIR_Opr data = value.result();
+1650   bool is_obj = (type == T_ARRAY || type == T_OBJECT);
+1651   LIR_Opr offset = off.result();
+1652 
+1653   assert (type == T_INT || (!x-&gt;is_add() &amp;&amp; is_obj) LP64_ONLY( || type == T_LONG ), "unexpected type");
+1654   LIR_Address* addr;
+1655   if (offset-&gt;is_constant()) {
+1656 #ifdef _LP64
+1657     jlong c = offset-&gt;as_jlong();
+1658     if ((jlong)((jint)c) == c) {
+1659       addr = new LIR_Address(src.result(), (jint)c, type);
+1660     } else {
+1661       LIR_Opr tmp = new_register(T_LONG);
+1662       __ move(offset, tmp);
+1663       addr = new LIR_Address(src.result(), tmp, type);
+1664     }
+1665 #else
+1666     addr = new LIR_Address(src.result(), offset-&gt;as_jint(), type);
+1667 #endif
+1668   } else {
+1669     addr = new LIR_Address(src.result(), offset, type);
+1670   }
+1671 
+1672   // Because we want a 2-arg form of xchg and xadd
+1673   __ move(data, dst);
+1674 
+1675   if (x-&gt;is_add()) {
+1676     __ xadd(LIR_OprFact::address(addr), dst, dst, LIR_OprFact::illegalOpr);
+1677   } else {
+1678     if (is_obj) {
+1679       // Do the pre-write barrier, if any.
+1680       pre_barrier(LIR_OprFact::address(addr), LIR_OprFact::illegalOpr /* pre_val */,
+1681                   true /* do_load */, false /* patch */, NULL);
+1682     }
+1683     __ xchg(LIR_OprFact::address(addr), dst, dst, LIR_OprFact::illegalOpr);
+1684     if (is_obj) {
+1685       // Seems to be a precise address
+1686       post_barrier(LIR_OprFact::address(addr), data);
+1687     }
+1688   }
+1689 }
+</pre></body></html>

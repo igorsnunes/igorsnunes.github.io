@@ -1,0 +1,569 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>Old src/cpu/ppc/vm/c1_MacroAssembler_ppc.cpp</title>
+<body id="SUNWwebrev">
+<pre>
+   1 /*
+   2  * Copyright (c) 1999, 2015, Oracle and/or its affiliates. All rights reserved.
+   3  * Copyright (c) 2012, 2015 SAP SE. All rights reserved.
+   4  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+   5  *
+   6  * This code is free software; you can redistribute it and/or modify it
+   7  * under the terms of the GNU General Public License version 2 only, as
+   8  * published by the Free Software Foundation.
+   9  *
+  10  * This code is distributed in the hope that it will be useful, but WITHOUT
+  11  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+  12  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+  13  * version 2 for more details (a copy is included in the LICENSE file that
+  14  * accompanied this code).
+  15  *
+  16  * You should have received a copy of the GNU General Public License version
+  17  * 2 along with this work; if not, write to the Free Software Foundation,
+  18  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+  19  *
+  20  * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+  21  * or visit www.oracle.com if you need additional information or have any
+  22  * questions.
+  23  *
+  24  */
+  25 
+  26 #include "precompiled.hpp"
+  27 #include "c1/c1_MacroAssembler.hpp"
+  28 #include "c1/c1_Runtime1.hpp"
+  29 #include "classfile/systemDictionary.hpp"
+  30 #include "gc/shared/collectedHeap.hpp"
+  31 #include "interpreter/interpreter.hpp"
+  32 #include "oops/arrayOop.hpp"
+  33 #include "oops/markOop.hpp"
+  34 #include "runtime/basicLock.hpp"
+  35 #include "runtime/biasedLocking.hpp"
+  36 #include "runtime/os.hpp"
+  37 #include "runtime/stubRoutines.hpp"
+  38 #include "runtime/sharedRuntime.hpp"
+  39 
+  40 
+  41 void C1_MacroAssembler::inline_cache_check(Register receiver, Register iCache) {
+  42   const Register temp_reg = R12_scratch2;
+  43   verify_oop(receiver);
+  44   load_klass(temp_reg, receiver);
+  45   if (TrapBasedICMissChecks) {
+  46     trap_ic_miss_check(temp_reg, iCache);
+  47   } else {
+  48     Label L;
+  49     cmpd(CCR0, temp_reg, iCache);
+  50     beq(CCR0, L);
+  51     //load_const_optimized(temp_reg, SharedRuntime::get_ic_miss_stub(), R0);
+  52     calculate_address_from_global_toc(temp_reg, SharedRuntime::get_ic_miss_stub(), true, true, false);
+  53     mtctr(temp_reg);
+  54     bctr();
+  55     align(32, 12);
+  56     bind(L);
+  57   }
+  58 }
+  59 
+  60 
+  61 void C1_MacroAssembler::explicit_null_check(Register base) {
+  62   Unimplemented();
+  63 }
+  64 
+  65 
+  66 void C1_MacroAssembler::build_frame(int frame_size_in_bytes, int bang_size_in_bytes) {
+  67   assert(bang_size_in_bytes &gt;= frame_size_in_bytes, "stack bang size incorrect");
+  68   // Make sure there is enough stack space for this method's activation.
+  69   generate_stack_overflow_check(bang_size_in_bytes);
+  70 
+  71   // Create the frame.
+  72   const Register return_pc  = R0;
+  73 
+  74   mflr(return_pc);
+  75   // Get callers sp.
+  76   std(return_pc, _abi(lr), R1_SP);           // SP-&gt;lr = return_pc
+  77   push_frame(frame_size_in_bytes, R0);       // SP -= frame_size_in_bytes
+  78 }
+  79 
+  80 
+  81 void C1_MacroAssembler::unverified_entry(Register receiver, Register ic_klass) {
+  82   Unimplemented(); // Currently unused.
+  83   //if (C1Breakpoint) illtrap();
+  84   //inline_cache_check(receiver, ic_klass);
+  85 }
+  86 
+  87 
+  88 void C1_MacroAssembler::verified_entry() {
+  89   if (C1Breakpoint) illtrap();
+  90   // build frame
+  91 }
+  92 
+  93 
+  94 void C1_MacroAssembler::lock_object(Register Rmark, Register Roop, Register Rbox, Register Rscratch, Label&amp; slow_case) {
+  95   assert_different_registers(Rmark, Roop, Rbox, Rscratch);
+  96 
+  97   Label done, cas_failed, slow_int;
+  98 
+  99   // The following move must be the first instruction of emitted since debug
+ 100   // information may be generated for it.
+ 101   // Load object header.
+ 102   ld(Rmark, oopDesc::mark_offset_in_bytes(), Roop);
+ 103 
+ 104   verify_oop(Roop);
+ 105 
+ 106   // Save object being locked into the BasicObjectLock...
+ 107   std(Roop, BasicObjectLock::obj_offset_in_bytes(), Rbox);
+ 108 
+ 109   if (UseBiasedLocking) {
+ 110     biased_locking_enter(CCR0, Roop, Rmark, Rscratch, R0, done, &amp;slow_int);
+ 111   }
+ 112 
+ 113   // ... and mark it unlocked.
+ 114   ori(Rmark, Rmark, markOopDesc::unlocked_value);
+ 115 
+ 116   // Save unlocked object header into the displaced header location on the stack.
+ 117   std(Rmark, BasicLock::displaced_header_offset_in_bytes(), Rbox);
+ 118 
+ 119   // Compare object markOop with Rmark and if equal exchange Rscratch with object markOop.
+ 120   assert(oopDesc::mark_offset_in_bytes() == 0, "cas must take a zero displacement");
+ 121   cmpxchgd(/*flag=*/CCR0,
+ 122            /*current_value=*/Rscratch,
+ 123            /*compare_value=*/Rmark,
+ 124            /*exchange_value=*/Rbox,
+ 125            /*where=*/Roop/*+0==mark_offset_in_bytes*/,
+ 126            MacroAssembler::MemBarRel | MacroAssembler::MemBarAcq,
+ 127            MacroAssembler::cmpxchgx_hint_acquire_lock(),
+ 128            noreg,
+ 129            &amp;cas_failed,
+ 130            /*check without membar and ldarx first*/true);
+ 131   // If compare/exchange succeeded we found an unlocked object and we now have locked it
+ 132   // hence we are done.
+ 133   b(done);
+ 134 
+ 135   bind(slow_int);
+ 136   b(slow_case); // far
+ 137 
+ 138   bind(cas_failed);
+ 139   // We did not find an unlocked object so see if this is a recursive case.
+ 140   sub(Rscratch, Rscratch, R1_SP);
+ 141   load_const_optimized(R0, (~(os::vm_page_size()-1) | markOopDesc::lock_mask_in_place));
+ 142   and_(R0/*==0?*/, Rscratch, R0);
+ 143   std(R0/*==0, perhaps*/, BasicLock::displaced_header_offset_in_bytes(), Rbox);
+ 144   bne(CCR0, slow_int);
+ 145 
+ 146   bind(done);
+ 147 }
+ 148 
+ 149 
+ 150 void C1_MacroAssembler::unlock_object(Register Rmark, Register Roop, Register Rbox, Label&amp; slow_case) {
+ 151   assert_different_registers(Rmark, Roop, Rbox);
+ 152 
+ 153   Label slow_int, done;
+ 154 
+ 155   Address mark_addr(Roop, oopDesc::mark_offset_in_bytes());
+ 156   assert(mark_addr.disp() == 0, "cas must take a zero displacement");
+ 157 
+ 158   if (UseBiasedLocking) {
+ 159     // Load the object out of the BasicObjectLock.
+ 160     ld(Roop, BasicObjectLock::obj_offset_in_bytes(), Rbox);
+ 161     verify_oop(Roop);
+ 162     biased_locking_exit(CCR0, Roop, R0, done);
+ 163   }
+ 164   // Test first it it is a fast recursive unlock.
+ 165   ld(Rmark, BasicLock::displaced_header_offset_in_bytes(), Rbox);
+ 166   cmpdi(CCR0, Rmark, 0);
+ 167   beq(CCR0, done);
+ 168   if (!UseBiasedLocking) {
+ 169     // Load object.
+ 170     ld(Roop, BasicObjectLock::obj_offset_in_bytes(), Rbox);
+ 171     verify_oop(Roop);
+ 172   }
+ 173 
+ 174   // Check if it is still a light weight lock, this is is true if we see
+ 175   // the stack address of the basicLock in the markOop of the object.
+ 176   cmpxchgd(/*flag=*/CCR0,
+ 177            /*current_value=*/R0,
+ 178            /*compare_value=*/Rbox,
+ 179            /*exchange_value=*/Rmark,
+ 180            /*where=*/Roop,
+ 181            MacroAssembler::MemBarRel,
+ 182            MacroAssembler::cmpxchgx_hint_release_lock(),
+ 183            noreg,
+ 184            &amp;slow_int);
+ 185   b(done);
+ 186   bind(slow_int);
+ 187   b(slow_case); // far
+ 188 
+ 189   // Done
+ 190   bind(done);
+ 191 }
+ 192 
+ 193 
+ 194 void C1_MacroAssembler::try_allocate(
+ 195   Register obj,                        // result: pointer to object after successful allocation
+ 196   Register var_size_in_bytes,          // object size in bytes if unknown at compile time; invalid otherwise
+ 197   int      con_size_in_bytes,          // object size in bytes if   known at compile time
+ 198   Register t1,                         // temp register, must be global register for incr_allocated_bytes
+ 199   Register t2,                         // temp register
+ 200   Label&amp;   slow_case                   // continuation point if fast allocation fails
+ 201 ) {
+ 202   if (UseTLAB) {
+ 203     tlab_allocate(obj, var_size_in_bytes, con_size_in_bytes, t1, slow_case);
+ 204   } else {
+ 205     eden_allocate(obj, var_size_in_bytes, con_size_in_bytes, t1, t2, slow_case);
+ 206     RegisterOrConstant size_in_bytes = var_size_in_bytes-&gt;is_valid()
+ 207                                        ? RegisterOrConstant(var_size_in_bytes)
+ 208                                        : RegisterOrConstant(con_size_in_bytes);
+ 209     incr_allocated_bytes(size_in_bytes, t1, t2);
+ 210   }
+ 211 }
+ 212 
+ 213 
+ 214 void C1_MacroAssembler::initialize_header(Register obj, Register klass, Register len, Register t1, Register t2) {
+ 215   assert_different_registers(obj, klass, len, t1, t2);
+ 216   if (UseBiasedLocking &amp;&amp; !len-&gt;is_valid()) {
+ 217     ld(t1, in_bytes(Klass::prototype_header_offset()), klass);
+ 218   } else {
+ 219     load_const_optimized(t1, (intx)markOopDesc::prototype());
+ 220   }
+ 221   std(t1, oopDesc::mark_offset_in_bytes(), obj);
+ 222   store_klass(obj, klass);
+ 223   if (len-&gt;is_valid()) {
+ 224     stw(len, arrayOopDesc::length_offset_in_bytes(), obj);
+ 225   } else if (UseCompressedClassPointers) {
+ 226     // Otherwise length is in the class gap.
+ 227     store_klass_gap(obj);
+ 228   }
+ 229 }
+ 230 
+ 231 
+ 232 void C1_MacroAssembler::initialize_body(Register base, Register index) {
+ 233   assert_different_registers(base, index);
+ 234   srdi(index, index, LogBytesPerWord);
+ 235   clear_memory_doubleword(base, index);
+ 236 }
+ 237 
+ 238 void C1_MacroAssembler::initialize_body(Register obj, Register tmp1, Register tmp2,
+ 239                                         int obj_size_in_bytes, int hdr_size_in_bytes) {
+ 240   const int index = (obj_size_in_bytes - hdr_size_in_bytes) / HeapWordSize;
+ 241 
+ 242   const int cl_size         = VM_Version::L1_data_cache_line_size(),
+ 243             cl_dwords       = cl_size&gt;&gt;3,
+ 244             cl_dw_addr_bits = exact_log2(cl_dwords);
+ 245 
+ 246   const Register tmp = R0,
+ 247                  base_ptr = tmp1,
+ 248                  cnt_dwords = tmp2;
+ 249 
+ 250   if (index &lt;= 6) {
+ 251     // Use explicit NULL stores.
+ 252     if (index &gt; 0) { li(tmp, 0); }
+ 253     for (int i = 0; i &lt; index; ++i) { std(tmp, hdr_size_in_bytes + i * HeapWordSize, obj); }
+ 254 
+ 255   } else if (index &lt; (2&lt;&lt;cl_dw_addr_bits)-1) {
+ 256     // simple loop
+ 257     Label loop;
+ 258 
+ 259     li(cnt_dwords, index);
+ 260     addi(base_ptr, obj, hdr_size_in_bytes); // Compute address of first element.
+ 261     li(tmp, 0);
+ 262     mtctr(cnt_dwords);                      // Load counter.
+ 263   bind(loop);
+ 264     std(tmp, 0, base_ptr);                  // Clear 8byte aligned block.
+ 265     addi(base_ptr, base_ptr, 8);
+ 266     bdnz(loop);
+ 267 
+ 268   } else {
+ 269     // like clear_memory_doubleword
+ 270     Label startloop, fast, fastloop, restloop, done;
+ 271 
+ 272     addi(base_ptr, obj, hdr_size_in_bytes);           // Compute address of first element.
+ 273     load_const_optimized(cnt_dwords, index);
+ 274     rldicl_(tmp, base_ptr, 64-3, 64-cl_dw_addr_bits); // Extract dword offset within first cache line.
+ 275     beq(CCR0, fast);                                  // Already 128byte aligned.
+ 276 
+ 277     subfic(tmp, tmp, cl_dwords);
+ 278     mtctr(tmp);                        // Set ctr to hit 128byte boundary (0&lt;ctr&lt;cl_dwords).
+ 279     subf(cnt_dwords, tmp, cnt_dwords); // rest.
+ 280     li(tmp, 0);
+ 281 
+ 282   bind(startloop);                     // Clear at the beginning to reach 128byte boundary.
+ 283     std(tmp, 0, base_ptr);             // Clear 8byte aligned block.
+ 284     addi(base_ptr, base_ptr, 8);
+ 285     bdnz(startloop);
+ 286 
+ 287   bind(fast);                                  // Clear 128byte blocks.
+ 288     srdi(tmp, cnt_dwords, cl_dw_addr_bits);    // Loop count for 128byte loop (&gt;0).
+ 289     andi(cnt_dwords, cnt_dwords, cl_dwords-1); // Rest in dwords.
+ 290     mtctr(tmp);                                // Load counter.
+ 291 
+ 292   bind(fastloop);
+ 293     dcbz(base_ptr);                    // Clear 128byte aligned block.
+ 294     addi(base_ptr, base_ptr, cl_size);
+ 295     bdnz(fastloop);
+ 296 
+ 297     cmpdi(CCR0, cnt_dwords, 0);        // size 0?
+ 298     beq(CCR0, done);                   // rest == 0
+ 299     li(tmp, 0);
+ 300     mtctr(cnt_dwords);                 // Load counter.
+ 301 
+ 302   bind(restloop);                      // Clear rest.
+ 303     std(tmp, 0, base_ptr);             // Clear 8byte aligned block.
+ 304     addi(base_ptr, base_ptr, 8);
+ 305     bdnz(restloop);
+ 306 
+ 307   bind(done);
+ 308   }
+ 309 }
+ 310 
+ 311 void C1_MacroAssembler::allocate_object(
+ 312   Register obj,                        // result: pointer to object after successful allocation
+ 313   Register t1,                         // temp register
+ 314   Register t2,                         // temp register
+ 315   Register t3,                         // temp register
+ 316   int      hdr_size,                   // object header size in words
+ 317   int      obj_size,                   // object size in words
+ 318   Register klass,                      // object klass
+ 319   Label&amp;   slow_case                   // continuation point if fast allocation fails
+ 320 ) {
+ 321   assert_different_registers(obj, t1, t2, t3, klass);
+ 322 
+ 323   // allocate space &amp; initialize header
+ 324   if (!is_simm16(obj_size * wordSize)) {
+ 325     // Would need to use extra register to load
+ 326     // object size =&gt; go the slow case for now.
+ 327     b(slow_case);
+ 328     return;
+ 329   }
+ 330   try_allocate(obj, noreg, obj_size * wordSize, t2, t3, slow_case);
+ 331 
+ 332   initialize_object(obj, klass, noreg, obj_size * HeapWordSize, t1, t2);
+ 333 }
+ 334 
+ 335 void C1_MacroAssembler::initialize_object(
+ 336   Register obj,                        // result: pointer to object after successful allocation
+ 337   Register klass,                      // object klass
+ 338   Register var_size_in_bytes,          // object size in bytes if unknown at compile time; invalid otherwise
+ 339   int      con_size_in_bytes,          // object size in bytes if   known at compile time
+ 340   Register t1,                         // temp register
+ 341   Register t2                          // temp register
+ 342   ) {
+ 343   const int hdr_size_in_bytes = instanceOopDesc::header_size() * HeapWordSize;
+ 344 
+ 345   initialize_header(obj, klass, noreg, t1, t2);
+ 346 
+ 347 #ifdef ASSERT
+ 348   {
+ 349     lwz(t1, in_bytes(Klass::layout_helper_offset()), klass);
+ 350     if (var_size_in_bytes != noreg) {
+ 351       cmpw(CCR0, t1, var_size_in_bytes);
+ 352     } else {
+ 353       cmpwi(CCR0, t1, con_size_in_bytes);
+ 354     }
+ 355     asm_assert_eq("bad size in initialize_object", 0x753);
+ 356   }
+ 357 #endif
+ 358 
+ 359   // Initialize body.
+ 360   if (var_size_in_bytes != noreg) {
+ 361     // Use a loop.
+ 362     addi(t1, obj, hdr_size_in_bytes);                // Compute address of first element.
+ 363     addi(t2, var_size_in_bytes, -hdr_size_in_bytes); // Compute size of body.
+ 364     initialize_body(t1, t2);
+ 365   } else if (con_size_in_bytes &gt; hdr_size_in_bytes) {
+ 366     // Use a loop.
+ 367     initialize_body(obj, t1, t2, con_size_in_bytes, hdr_size_in_bytes);
+ 368   }
+ 369 
+ 370   if (CURRENT_ENV-&gt;dtrace_alloc_probes()) {
+ 371     Unimplemented();
+ 372 //    assert(obj == O0, "must be");
+ 373 //    call(CAST_FROM_FN_PTR(address, Runtime1::entry_for(Runtime1::dtrace_object_alloc_id)),
+ 374 //         relocInfo::runtime_call_type);
+ 375   }
+ 376 
+ 377   verify_oop(obj);
+ 378 }
+ 379 
+ 380 
+ 381 void C1_MacroAssembler::allocate_array(
+ 382   Register obj,                        // result: pointer to array after successful allocation
+ 383   Register len,                        // array length
+ 384   Register t1,                         // temp register
+ 385   Register t2,                         // temp register
+ 386   Register t3,                         // temp register
+ 387   int      hdr_size,                   // object header size in words
+ 388   int      elt_size,                   // element size in bytes
+ 389   Register klass,                      // object klass
+ 390   Label&amp;   slow_case                   // continuation point if fast allocation fails
+ 391 ) {
+ 392   assert_different_registers(obj, len, t1, t2, t3, klass);
+ 393 
+ 394   // Determine alignment mask.
+ 395   assert(!(BytesPerWord &amp; 1), "must be a multiple of 2 for masking code to work");
+ 396   int log2_elt_size = exact_log2(elt_size);
+ 397 
+ 398   // Check for negative or excessive length.
+ 399   size_t max_length = max_array_allocation_length &gt;&gt; log2_elt_size;
+ 400   if (UseTLAB) {
+ 401     size_t max_tlab = align_size_up(ThreadLocalAllocBuffer::max_size() &gt;&gt; log2_elt_size, 64*K);
+ 402     if (max_tlab &lt; max_length) { max_length = max_tlab; }
+ 403   }
+ 404   load_const_optimized(t1, max_length);
+ 405   cmpld(CCR0, len, t1);
+ 406   bc_far_optimized(Assembler::bcondCRbiIs1, bi0(CCR0, Assembler::greater), slow_case);
+ 407 
+ 408   // compute array size
+ 409   // note: If 0 &lt;= len &lt;= max_length, len*elt_size + header + alignment is
+ 410   //       smaller or equal to the largest integer; also, since top is always
+ 411   //       aligned, we can do the alignment here instead of at the end address
+ 412   //       computation.
+ 413   const Register arr_size = t1;
+ 414   Register arr_len_in_bytes = len;
+ 415   if (elt_size != 1) {
+ 416     sldi(t1, len, log2_elt_size);
+ 417     arr_len_in_bytes = t1;
+ 418   }
+ 419   addi(arr_size, arr_len_in_bytes, hdr_size * wordSize + MinObjAlignmentInBytesMask); // Add space for header &amp; alignment.
+ 420   clrrdi(arr_size, arr_size, LogMinObjAlignmentInBytes);                              // Align array size.
+ 421 
+ 422   // Allocate space &amp; initialize header.
+ 423   if (UseTLAB) {
+ 424     tlab_allocate(obj, arr_size, 0, t2, slow_case);
+ 425   } else {
+ 426     eden_allocate(obj, arr_size, 0, t2, t3, slow_case);
+ 427   }
+ 428   initialize_header(obj, klass, len, t2, t3);
+ 429 
+ 430   // Initialize body.
+ 431   const Register base  = t2;
+ 432   const Register index = t3;
+ 433   addi(base, obj, hdr_size * wordSize);               // compute address of first element
+ 434   addi(index, arr_size, -(hdr_size * wordSize));      // compute index = number of bytes to clear
+ 435   initialize_body(base, index);
+ 436 
+ 437   if (CURRENT_ENV-&gt;dtrace_alloc_probes()) {
+ 438     Unimplemented();
+ 439     //assert(obj == O0, "must be");
+ 440     //call(CAST_FROM_FN_PTR(address, Runtime1::entry_for(Runtime1::dtrace_object_alloc_id)),
+ 441     //     relocInfo::runtime_call_type);
+ 442   }
+ 443 
+ 444   verify_oop(obj);
+ 445 }
+ 446 
+ 447 
+ 448 #ifndef PRODUCT
+ 449 
+ 450 void C1_MacroAssembler::verify_stack_oop(int stack_offset) {
+ 451   verify_oop_addr((RegisterOrConstant)(stack_offset + STACK_BIAS), R1_SP, "broken oop in stack slot");
+ 452 }
+ 453 
+ 454 void C1_MacroAssembler::verify_not_null_oop(Register r) {
+ 455   Label not_null;
+ 456   cmpdi(CCR0, r, 0);
+ 457   bne(CCR0, not_null);
+ 458   stop("non-null oop required");
+ 459   bind(not_null);
+ 460   if (!VerifyOops) return;
+ 461   verify_oop(r);
+ 462 }
+ 463 
+ 464 #endif // PRODUCT
+ 465 
+ 466 void C1_MacroAssembler::null_check(Register r, Label* Lnull) {
+ 467   if (TrapBasedNullChecks) { // SIGTRAP based
+ 468     trap_null_check(r);
+ 469   } else { // explicit
+ 470     //const address exception_entry = Runtime1::entry_for(Runtime1::throw_null_pointer_exception_id);
+ 471     assert(Lnull != NULL, "must have Label for explicit check");
+ 472     cmpdi(CCR0, r, 0);
+ 473     bc_far_optimized(Assembler::bcondCRbiIs1, bi0(CCR0, Assembler::equal), *Lnull);
+ 474   }
+ 475 }
+ 476 
+ 477 address C1_MacroAssembler::call_c_with_frame_resize(address dest, int frame_resize) {
+ 478   if (frame_resize) { resize_frame(-frame_resize, R0); }
+ 479 #if defined(ABI_ELFv2)
+ 480   address return_pc = call_c(dest, relocInfo::runtime_call_type);
+ 481 #else
+ 482   address return_pc = call_c(CAST_FROM_FN_PTR(FunctionDescriptor*, dest), relocInfo::runtime_call_type);
+ 483 #endif
+ 484   if (frame_resize) { resize_frame(frame_resize, R0); }
+ 485   return return_pc;
+ 486 }
+</pre></body></html>

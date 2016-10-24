@@ -1,0 +1,144 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>hotspot Udiff make/gensrc/GensrcJvmti.gmk</title>
+
+<style type="text/css" media="screen">
+span.new {
+    color: blue;
+    font-weight: normal;
+}
+</style>
+
+</head>
+<body id="SUNWwebrev">
+<center><a href='../../.hgtags.udiff.html' target='_top'>&lt prev</a> <a href='../../index.html' target='_top'>index</a> <a href='../../make/test/JtregNative.gmk.udiff.html' target='_top'>next &gt</a></center>
+<h2>make/gensrc/GensrcJvmti.gmk</h2>
+        <a class="print" href="javascript:print()">Print this page</a>
+<pre></pre>
+        <pre>
+</pre><hr /><pre>
+<span class="newmarker">@@ -65,11 +65,12 @@</span>
+ SetupXslTransform = $(NamedParamsMacroTemplate)
+ define SetupXslTransformBody
+   $$($1_OUTPUT_DIR)/$1: $$($1_XML_FILE) $$($1_XSL_FILE) $$($1_DEPS) $$(BUILD_JVMTI_TOOLS)
+         $$(call LogInfo, Generating $$(@F))
+         $$(call MakeDir, $$(@D))
+<span class="removed">-        $$(call ExecuteWithLog, $$@, $$(TOOL_JVMTI_GEN) -IN $$($1_XML_FILE) -XSL $$($1_XSL_FILE) -OUT $$@ $$($1_ARGS))</span>
+<span class="new">+        $$(call ExecuteWithLog, $$@, $$(TOOL_JVMTI_GEN) -IN $$($1_XML_FILE) \</span>
+<span class="new">+            -XSL $$($1_XSL_FILE) -OUT $$@ $$($1_ARGS))</span>
+         # jvmtiGen does not return error code properly on fail.
+         # NOTE: We should really fix jvmtiGen.java instead.
+         test -f $$@
+ 
+   TARGETS += $$($1_OUTPUT_DIR)/$1
+</pre><hr /><pre>
+<span class="newmarker">@@ -132,12 +133,12 @@</span>
+ # Create trace files in gensrc/tracefiles
+ 
+ TRACE_OUTPUTDIR := $(JVM_VARIANT_OUTPUTDIR)/gensrc/tracefiles
+ TRACE_SRCDIR := $(HOTSPOT_TOPDIR)/src/share/vm/trace
+ 
+<span class="removed">-# Append directories to search (might have been set by custom extensions)</span>
+<span class="removed">-TRACE_SEARCH_DIRS += $(TRACE_SRCDIR)</span>
+<span class="new">+# Append list of XSL files to search (might have been set by custom extensions)</span>
+<span class="new">+TRACE_XSL_FILES += $(wildcard $(TRACE_SRCDIR)/*.xsl)</span>
+ 
+ TRACE_XML ?= $(TRACE_SRCDIR)/trace.xml
+ 
+ # Changing these will trigger a rebuild of generated trace files.
+ TRACE_DEPS += \
+</pre><hr /><pre>
+<span class="newmarker">@@ -153,11 +154,11 @@</span>
+ #
+ # $1 is generated source file name in $(TRACE_OUTPUTDIR)
+ define SetupTraceGeneration
+   $$(eval $$(call SetupXslTransform, $1, \
+       XML_FILE := $$(TRACE_XML), \
+<span class="removed">-      XSL_FILE := $$(firstword $$(wildcard $$(addsuffix /$$(basename $1).xsl, $$(TRACE_SEARCH_DIRS)))), \</span>
+<span class="new">+      XSL_FILE := $$(firstword $$(filter %/$$(basename $1).xsl, $$(TRACE_XSL_FILES))), \</span>
+       OUTPUT_DIR := $$(TRACE_OUTPUTDIR), \
+       DEPS := $$(TRACE_DEPS), \
+   ))
+ endef
+ 
+</pre>
+<center><a href='../../.hgtags.udiff.html' target='_top'>&lt prev</a> <a href='../../index.html' target='_top'>index</a> <a href='../../make/test/JtregNative.gmk.udiff.html' target='_top'>next &gt</a></center>
+</body></html>
+

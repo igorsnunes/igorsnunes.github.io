@@ -1,0 +1,301 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>hotspot Sdiff make/gensrc </title>
+</head><body id="SUNWwebrev">
+<center><a href='../../.hgtags.sdiff.html' target='_top'>&lt prev</a> <a href='../../index.html' target='_top'>index</a> <a href='../../make/test/JtregNative.gmk.sdiff.html' target='_top'>next &gt</a></center>
+<h2>make/gensrc/GensrcJvmti.gmk</h2>
+<a class="print" href="javascript:print()">Print this page</a>
+<pre></pre>
+
+<table><tr valign="top">
+<td><pre>
+
+</pre><hr></hr><pre>
+  50 TOOL_JVMTI_ENV_FILL := $(JAVA_SMALL) -cp $(JVMTI_TOOLS_OUTPUTDIR) jvmtiEnvFill
+  51 
+  52 ################################################################################
+  53 # Setup make rules for an xml transform for jvmti/trace file generation.
+  54 #
+  55 # Parameter 1 is the name of the rule. This name is used as variable prefix,
+  56 # and the targets generated are listed in a variable by that name. This name is
+  57 # also used as the name of the output file.
+  58 #
+  59 # Remaining parameters are named arguments. These include:
+  60 #   XML_FILE -- The input source file to use
+  61 #   XSL_FILE -- The xsl file to use
+  62 #   OUTPUT_DIR -- The directory to put the generated file in
+  63 #   ARGS -- Additional arguments to the jvmtiGen tool
+  64 #   DEPS -- Additional dependencies
+  65 SetupXslTransform = $(NamedParamsMacroTemplate)
+  66 define SetupXslTransformBody
+  67   $$($1_OUTPUT_DIR)/$1: $$($1_XML_FILE) $$($1_XSL_FILE) $$($1_DEPS) $$(BUILD_JVMTI_TOOLS)
+  68         $$(call LogInfo, Generating $$(@F))
+  69         $$(call MakeDir, $$(@D))
+<span class="changed">  70         $$(call ExecuteWithLog, $$@, $$(TOOL_JVMTI_GEN) -IN $$($1_XML_FILE) -XSL $$($1_XSL_FILE) -OUT $$@ $$($1_ARGS))</span>
+
+  71         # jvmtiGen does not return error code properly on fail.
+  72         # NOTE: We should really fix jvmtiGen.java instead.
+  73         test -f $$@
+  74 
+  75   TARGETS += $$($1_OUTPUT_DIR)/$1
+  76 endef
+  77 
+  78 ################################################################################
+  79 # Create JVMTI files in gensrc/jvmtifiles
+  80 
+  81 JVMTI_SRCDIR := $(HOTSPOT_TOPDIR)/src/share/vm/prims
+  82 JVMTI_OUTPUTDIR := $(JVM_VARIANT_OUTPUTDIR)/gensrc/jvmtifiles
+  83 
+  84 # Setup rule for generating a jvmti file
+  85 #
+  86 # $1 is generated source file name in $(JVMTI_OUTPUTDIR)
+  87 # $2 is XSL file to use in $(JVMTI_SRCDIR)
+  88 # $3 is optional extra arguments to jvmtiGen
+  89 define SetupJvmtiGeneration
+  90   $$(eval $$(call SetupXslTransform, $1, \
+
+</pre><hr></hr><pre>
+ 117 # We need $(JVMTI_OUTPUTDIR)/jvmtiEnvStub.cpp (generated above) as input
+ 118 $(JVMTI_OUTPUTDIR)/jvmtiEnvRecommended.cpp: $(JVMTI_SRCDIR)/jvmtiEnv.cpp \
+ 119     $(JVMTI_OUTPUTDIR)/jvmtiEnvStub.cpp $(BUILD_JVMTI_TOOLS)
+ 120         $(call LogInfo, Generating $(@F))
+ 121         $(call MakeDir, $(@D))
+ 122         $(call ExecuteWithLog, $@, $(TOOL_JVMTI_ENV_FILL) $(JVMTI_SRCDIR)/jvmtiEnv.cpp \
+ 123             $(JVMTI_OUTPUTDIR)/jvmtiEnvStub.cpp \
+ 124             $(JVMTI_OUTPUTDIR)/jvmtiEnvRecommended.cpp)
+ 125         # jvmtiEnvFill does not necessarily return an error code on failure.
+ 126         # NOTE: We should really fix jvmtiEnvFill.java instead.
+ 127         test -f $@
+ 128 
+ 129 TARGETS += $(JVMTI_OUTPUTDIR)/jvmtiEnvRecommended.cpp
+ 130 
+ 131 ################################################################################
+ 132 # Create trace files in gensrc/tracefiles
+ 133 
+ 134 TRACE_OUTPUTDIR := $(JVM_VARIANT_OUTPUTDIR)/gensrc/tracefiles
+ 135 TRACE_SRCDIR := $(HOTSPOT_TOPDIR)/src/share/vm/trace
+ 136 
+<span class="changed"> 137 # Append directories to search (might have been set by custom extensions)</span>
+<span class="changed"> 138 TRACE_SEARCH_DIRS += $(TRACE_SRCDIR)</span>
+ 139 
+ 140 TRACE_XML ?= $(TRACE_SRCDIR)/trace.xml
+ 141 
+ 142 # Changing these will trigger a rebuild of generated trace files.
+ 143 TRACE_DEPS += \
+ 144     $(TRACE_XML) \
+ 145     $(TRACE_SRCDIR)/tracetypes.xml \
+ 146     $(TRACE_SRCDIR)/tracerelationdecls.xml \
+ 147     $(TRACE_SRCDIR)/traceevents.xml \
+ 148     $(TRACE_SRCDIR)/trace.dtd \
+ 149     $(TRACE_SRCDIR)/xinclude.mod \
+ 150     #
+ 151 
+ 152 # Setup rule for generating a trace file
+ 153 #
+ 154 # $1 is generated source file name in $(TRACE_OUTPUTDIR)
+ 155 define SetupTraceGeneration
+ 156   $$(eval $$(call SetupXslTransform, $1, \
+ 157       XML_FILE := $$(TRACE_XML), \
+<span class="changed"> 158       XSL_FILE := $$(firstword $$(wildcard $$(addsuffix /$$(basename $1).xsl, $$(TRACE_SEARCH_DIRS)))), \</span>
+ 159       OUTPUT_DIR := $$(TRACE_OUTPUTDIR), \
+ 160       DEPS := $$(TRACE_DEPS), \
+ 161   ))
+ 162 endef
+ 163 
+ 164 # Append files to generated (might have been set by custom extensions)
+ 165 TRACE_GENSRC_FILES += \
+ 166     traceEventClasses.hpp \
+ 167     traceEventIds.hpp \
+ 168     traceTypes.hpp \
+ 169     #
+ 170 
+ 171 # Call SetupTraceGeneration for all trace gensrc files
+ 172 $(foreach tracefile, $(TRACE_GENSRC_FILES), \
+ 173   $(eval $(call SetupTraceGeneration, $(tracefile))) \
+ 174 )
+</pre></td><td><pre>
+
+</pre><hr></hr><pre>
+  50 TOOL_JVMTI_ENV_FILL := $(JAVA_SMALL) -cp $(JVMTI_TOOLS_OUTPUTDIR) jvmtiEnvFill
+  51 
+  52 ################################################################################
+  53 # Setup make rules for an xml transform for jvmti/trace file generation.
+  54 #
+  55 # Parameter 1 is the name of the rule. This name is used as variable prefix,
+  56 # and the targets generated are listed in a variable by that name. This name is
+  57 # also used as the name of the output file.
+  58 #
+  59 # Remaining parameters are named arguments. These include:
+  60 #   XML_FILE -- The input source file to use
+  61 #   XSL_FILE -- The xsl file to use
+  62 #   OUTPUT_DIR -- The directory to put the generated file in
+  63 #   ARGS -- Additional arguments to the jvmtiGen tool
+  64 #   DEPS -- Additional dependencies
+  65 SetupXslTransform = $(NamedParamsMacroTemplate)
+  66 define SetupXslTransformBody
+  67   $$($1_OUTPUT_DIR)/$1: $$($1_XML_FILE) $$($1_XSL_FILE) $$($1_DEPS) $$(BUILD_JVMTI_TOOLS)
+  68         $$(call LogInfo, Generating $$(@F))
+  69         $$(call MakeDir, $$(@D))
+<span class="changed">  70         $$(call ExecuteWithLog, $$@, $$(TOOL_JVMTI_GEN) -IN $$($1_XML_FILE) \</span>
+<span class="changed">  71             -XSL $$($1_XSL_FILE) -OUT $$@ $$($1_ARGS))</span>
+  72         # jvmtiGen does not return error code properly on fail.
+  73         # NOTE: We should really fix jvmtiGen.java instead.
+  74         test -f $$@
+  75 
+  76   TARGETS += $$($1_OUTPUT_DIR)/$1
+  77 endef
+  78 
+  79 ################################################################################
+  80 # Create JVMTI files in gensrc/jvmtifiles
+  81 
+  82 JVMTI_SRCDIR := $(HOTSPOT_TOPDIR)/src/share/vm/prims
+  83 JVMTI_OUTPUTDIR := $(JVM_VARIANT_OUTPUTDIR)/gensrc/jvmtifiles
+  84 
+  85 # Setup rule for generating a jvmti file
+  86 #
+  87 # $1 is generated source file name in $(JVMTI_OUTPUTDIR)
+  88 # $2 is XSL file to use in $(JVMTI_SRCDIR)
+  89 # $3 is optional extra arguments to jvmtiGen
+  90 define SetupJvmtiGeneration
+  91   $$(eval $$(call SetupXslTransform, $1, \
+
+</pre><hr></hr><pre>
+ 118 # We need $(JVMTI_OUTPUTDIR)/jvmtiEnvStub.cpp (generated above) as input
+ 119 $(JVMTI_OUTPUTDIR)/jvmtiEnvRecommended.cpp: $(JVMTI_SRCDIR)/jvmtiEnv.cpp \
+ 120     $(JVMTI_OUTPUTDIR)/jvmtiEnvStub.cpp $(BUILD_JVMTI_TOOLS)
+ 121         $(call LogInfo, Generating $(@F))
+ 122         $(call MakeDir, $(@D))
+ 123         $(call ExecuteWithLog, $@, $(TOOL_JVMTI_ENV_FILL) $(JVMTI_SRCDIR)/jvmtiEnv.cpp \
+ 124             $(JVMTI_OUTPUTDIR)/jvmtiEnvStub.cpp \
+ 125             $(JVMTI_OUTPUTDIR)/jvmtiEnvRecommended.cpp)
+ 126         # jvmtiEnvFill does not necessarily return an error code on failure.
+ 127         # NOTE: We should really fix jvmtiEnvFill.java instead.
+ 128         test -f $@
+ 129 
+ 130 TARGETS += $(JVMTI_OUTPUTDIR)/jvmtiEnvRecommended.cpp
+ 131 
+ 132 ################################################################################
+ 133 # Create trace files in gensrc/tracefiles
+ 134 
+ 135 TRACE_OUTPUTDIR := $(JVM_VARIANT_OUTPUTDIR)/gensrc/tracefiles
+ 136 TRACE_SRCDIR := $(HOTSPOT_TOPDIR)/src/share/vm/trace
+ 137 
+<span class="changed"> 138 # Append list of XSL files to search (might have been set by custom extensions)</span>
+<span class="changed"> 139 TRACE_XSL_FILES += $(wildcard $(TRACE_SRCDIR)/*.xsl)</span>
+ 140 
+ 141 TRACE_XML ?= $(TRACE_SRCDIR)/trace.xml
+ 142 
+ 143 # Changing these will trigger a rebuild of generated trace files.
+ 144 TRACE_DEPS += \
+ 145     $(TRACE_XML) \
+ 146     $(TRACE_SRCDIR)/tracetypes.xml \
+ 147     $(TRACE_SRCDIR)/tracerelationdecls.xml \
+ 148     $(TRACE_SRCDIR)/traceevents.xml \
+ 149     $(TRACE_SRCDIR)/trace.dtd \
+ 150     $(TRACE_SRCDIR)/xinclude.mod \
+ 151     #
+ 152 
+ 153 # Setup rule for generating a trace file
+ 154 #
+ 155 # $1 is generated source file name in $(TRACE_OUTPUTDIR)
+ 156 define SetupTraceGeneration
+ 157   $$(eval $$(call SetupXslTransform, $1, \
+ 158       XML_FILE := $$(TRACE_XML), \
+<span class="changed"> 159       XSL_FILE := $$(firstword $$(filter %/$$(basename $1).xsl, $$(TRACE_XSL_FILES))), \</span>
+ 160       OUTPUT_DIR := $$(TRACE_OUTPUTDIR), \
+ 161       DEPS := $$(TRACE_DEPS), \
+ 162   ))
+ 163 endef
+ 164 
+ 165 # Append files to generated (might have been set by custom extensions)
+ 166 TRACE_GENSRC_FILES += \
+ 167     traceEventClasses.hpp \
+ 168     traceEventIds.hpp \
+ 169     traceTypes.hpp \
+ 170     #
+ 171 
+ 172 # Call SetupTraceGeneration for all trace gensrc files
+ 173 $(foreach tracefile, $(TRACE_GENSRC_FILES), \
+ 174   $(eval $(call SetupTraceGeneration, $(tracefile))) \
+ 175 )
+</pre></td>
+</tr></table>
+<center><a href='../../.hgtags.sdiff.html' target='_top'>&lt prev</a> <a href='../../index.html' target='_top'>index</a> <a href='../../make/test/JtregNative.gmk.sdiff.html' target='_top'>next &gt</a></center>
+</body></html>

@@ -1,0 +1,291 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>hotspot Sdiff src/cpu/sparc/vm </title>
+</head><body id="SUNWwebrev">
+<center><a href='../../../../src/cpu/ppc/vm/templateTable_ppc_64.cpp.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/cpu/sparc/vm/c1_Runtime1_sparc.cpp.sdiff.html' target='_top'>next &gt</a></center>
+<h2>src/cpu/sparc/vm/c1_LIRGenerator_sparc.cpp</h2>
+<a class="print" href="javascript:print()">Print this page</a>
+<pre></pre>
+
+<table><tr valign="top">
+<td><pre>
+
+</pre><hr></hr><pre>
+ 130 }
+ 131 
+ 132 
+ 133 bool LIRGenerator:: can_inline_as_constant(LIR_Const* c) const {
+ 134   if (c-&gt;type() == T_INT) {
+ 135     return Assembler::is_simm13(c-&gt;as_jint());
+ 136   }
+ 137   return false;
+ 138 }
+ 139 
+ 140 
+ 141 LIR_Opr LIRGenerator::safepoint_poll_register() {
+ 142   return new_register(T_INT);
+ 143 }
+ 144 
+ 145 
+ 146 
+ 147 LIR_Address* LIRGenerator::generate_address(LIR_Opr base, LIR_Opr index,
+ 148                                             int shift, int disp, BasicType type) {
+ 149   assert(base-&gt;is_register(), "must be");
+
+ 150 
+ 151   // accumulate fixed displacements
+ 152   if (index-&gt;is_constant()) {
+<span class="changed"> 153     disp += index-&gt;as_constant_ptr()-&gt;as_jint() &lt;&lt; shift;</span>
+ 154     index = LIR_OprFact::illegalOpr;
+ 155   }
+ 156 
+ 157   if (index-&gt;is_register()) {
+ 158     // apply the shift and accumulate the displacement
+ 159     if (shift &gt; 0) {
+ 160       LIR_Opr tmp = new_pointer_register();
+ 161       __ shift_left(index, shift, tmp);
+ 162       index = tmp;
+ 163     }
+<span class="changed"> 164     if (disp != 0) {</span>
+ 165       LIR_Opr tmp = new_pointer_register();
+<span class="changed"> 166       if (Assembler::is_simm13(disp)) {</span>
+<span class="changed"> 167         __ add(tmp, LIR_OprFact::intptrConst(disp), tmp);</span>
+ 168         index = tmp;
+ 169       } else {
+<span class="changed"> 170         __ move(LIR_OprFact::intptrConst(disp), tmp);</span>
+ 171         __ add(tmp, index, tmp);
+ 172         index = tmp;
+ 173       }
+<span class="changed"> 174       disp = 0;</span>
+ 175     }
+<span class="changed"> 176   } else if (disp != 0 &amp;&amp; !Assembler::is_simm13(disp)) {</span>
+ 177     // index is illegal so replace it with the displacement loaded into a register
+ 178     index = new_pointer_register();
+<span class="changed"> 179     __ move(LIR_OprFact::intptrConst(disp), index);</span>
+<span class="changed"> 180     disp = 0;</span>
+ 181   }
+ 182 
+ 183   // at this point we either have base + index or base + displacement
+<span class="changed"> 184   if (disp == 0) {</span>
+ 185     return new LIR_Address(base, index, type);
+ 186   } else {
+<span class="changed"> 187     assert(Assembler::is_simm13(disp), "must be");</span>
+<span class="changed"> 188     return new LIR_Address(base, disp, type);</span>
+ 189   }
+ 190 }
+ 191 
+ 192 
+ 193 LIR_Address* LIRGenerator::emit_array_address(LIR_Opr array_opr, LIR_Opr index_opr,
+ 194                                               BasicType type, bool needs_card_mark) {
+ 195   int elem_size = type2aelembytes(type);
+ 196   int shift = exact_log2(elem_size);
+ 197 
+ 198   LIR_Opr base_opr;
+<span class="changed"> 199   int offset = arrayOopDesc::base_offset_in_bytes(type);</span>
+ 200 
+ 201   if (index_opr-&gt;is_constant()) {
+<span class="changed"> 202     int i = index_opr-&gt;as_constant_ptr()-&gt;as_jint();</span>
+<span class="changed"> 203     int array_offset = i * elem_size;</span>
+ 204     if (Assembler::is_simm13(array_offset + offset)) {
+ 205       base_opr = array_opr;
+ 206       offset = array_offset + offset;
+ 207     } else {
+ 208       base_opr = new_pointer_register();
+ 209       if (Assembler::is_simm13(array_offset)) {
+ 210         __ add(array_opr, LIR_OprFact::intptrConst(array_offset), base_opr);
+ 211       } else {
+ 212         __ move(LIR_OprFact::intptrConst(array_offset), base_opr);
+ 213         __ add(base_opr, array_opr, base_opr);
+ 214       }
+ 215     }
+ 216   } else {
+ 217 #ifdef _LP64
+ 218     if (index_opr-&gt;type() == T_INT) {
+ 219       LIR_Opr tmp = new_register(T_LONG);
+ 220       __ convert(Bytecodes::_i2l, index_opr, tmp);
+ 221       index_opr = tmp;
+ 222     }
+ 223 #endif
+
+</pre><hr></hr>
+</pre></td><td><pre>
+
+</pre><hr></hr><pre>
+ 130 }
+ 131 
+ 132 
+ 133 bool LIRGenerator:: can_inline_as_constant(LIR_Const* c) const {
+ 134   if (c-&gt;type() == T_INT) {
+ 135     return Assembler::is_simm13(c-&gt;as_jint());
+ 136   }
+ 137   return false;
+ 138 }
+ 139 
+ 140 
+ 141 LIR_Opr LIRGenerator::safepoint_poll_register() {
+ 142   return new_register(T_INT);
+ 143 }
+ 144 
+ 145 
+ 146 
+ 147 LIR_Address* LIRGenerator::generate_address(LIR_Opr base, LIR_Opr index,
+ 148                                             int shift, int disp, BasicType type) {
+ 149   assert(base-&gt;is_register(), "must be");
+<span class="new"> 150   intx large_disp = disp;</span>
+ 151 
+ 152   // accumulate fixed displacements
+ 153   if (index-&gt;is_constant()) {
+<span class="changed"> 154     large_disp += (intx)(index-&gt;as_constant_ptr()-&gt;as_jint()) &lt;&lt; shift;</span>
+ 155     index = LIR_OprFact::illegalOpr;
+ 156   }
+ 157 
+ 158   if (index-&gt;is_register()) {
+ 159     // apply the shift and accumulate the displacement
+ 160     if (shift &gt; 0) {
+ 161       LIR_Opr tmp = new_pointer_register();
+ 162       __ shift_left(index, shift, tmp);
+ 163       index = tmp;
+ 164     }
+<span class="changed"> 165     if (large_disp != 0) {</span>
+ 166       LIR_Opr tmp = new_pointer_register();
+<span class="changed"> 167       if (Assembler::is_simm13(large_disp)) {</span>
+<span class="changed"> 168         __ add(tmp, LIR_OprFact::intptrConst(large_disp), tmp);</span>
+ 169         index = tmp;
+ 170       } else {
+<span class="changed"> 171         __ move(LIR_OprFact::intptrConst(large_disp), tmp);</span>
+ 172         __ add(tmp, index, tmp);
+ 173         index = tmp;
+ 174       }
+<span class="changed"> 175       large_disp = 0;</span>
+ 176     }
+<span class="changed"> 177   } else if (large_disp != 0 &amp;&amp; !Assembler::is_simm13(large_disp)) {</span>
+ 178     // index is illegal so replace it with the displacement loaded into a register
+ 179     index = new_pointer_register();
+<span class="changed"> 180     __ move(LIR_OprFact::intptrConst(large_disp), index);</span>
+<span class="changed"> 181     large_disp = 0;</span>
+ 182   }
+ 183 
+ 184   // at this point we either have base + index or base + displacement
+<span class="changed"> 185   if (large_disp == 0) {</span>
+ 186     return new LIR_Address(base, index, type);
+ 187   } else {
+<span class="changed"> 188     assert(Assembler::is_simm13(large_disp), "must be");</span>
+<span class="changed"> 189     return new LIR_Address(base, large_disp, type);</span>
+ 190   }
+ 191 }
+ 192 
+ 193 
+ 194 LIR_Address* LIRGenerator::emit_array_address(LIR_Opr array_opr, LIR_Opr index_opr,
+ 195                                               BasicType type, bool needs_card_mark) {
+ 196   int elem_size = type2aelembytes(type);
+ 197   int shift = exact_log2(elem_size);
+ 198 
+ 199   LIR_Opr base_opr;
+<span class="changed"> 200   intx offset = arrayOopDesc::base_offset_in_bytes(type);</span>
+ 201 
+ 202   if (index_opr-&gt;is_constant()) {
+<span class="changed"> 203     intx i = index_opr-&gt;as_constant_ptr()-&gt;as_jint();</span>
+<span class="changed"> 204     intx array_offset = i * elem_size;</span>
+ 205     if (Assembler::is_simm13(array_offset + offset)) {
+ 206       base_opr = array_opr;
+ 207       offset = array_offset + offset;
+ 208     } else {
+ 209       base_opr = new_pointer_register();
+ 210       if (Assembler::is_simm13(array_offset)) {
+ 211         __ add(array_opr, LIR_OprFact::intptrConst(array_offset), base_opr);
+ 212       } else {
+ 213         __ move(LIR_OprFact::intptrConst(array_offset), base_opr);
+ 214         __ add(base_opr, array_opr, base_opr);
+ 215       }
+ 216     }
+ 217   } else {
+ 218 #ifdef _LP64
+ 219     if (index_opr-&gt;type() == T_INT) {
+ 220       LIR_Opr tmp = new_register(T_LONG);
+ 221       __ convert(Bytecodes::_i2l, index_opr, tmp);
+ 222       index_opr = tmp;
+ 223     }
+ 224 #endif
+
+</pre><hr></hr>
+</pre></td>
+</tr></table>
+<center><a href='../../../../src/cpu/ppc/vm/templateTable_ppc_64.cpp.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/cpu/sparc/vm/c1_Runtime1_sparc.cpp.sdiff.html' target='_top'>next &gt</a></center>
+</body></html>

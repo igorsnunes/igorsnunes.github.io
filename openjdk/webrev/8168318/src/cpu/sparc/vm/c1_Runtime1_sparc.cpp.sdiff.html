@@ -1,0 +1,321 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>hotspot Sdiff src/cpu/sparc/vm </title>
+</head><body id="SUNWwebrev">
+<center><a href='../../../../src/cpu/sparc/vm/c1_LIRGenerator_sparc.cpp.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/cpu/sparc/vm/jvmciCodeInstaller_sparc.cpp.sdiff.html' target='_top'>next &gt</a></center>
+<h2>src/cpu/sparc/vm/c1_Runtime1_sparc.cpp</h2>
+<a class="print" href="javascript:print()">Print this page</a>
+<pre></pre>
+
+<table><tr valign="top">
+<td><pre>
+
+</pre><hr></hr><pre>
+ 864           in_bytes(JavaThread::satb_mark_queue_offset() +
+ 865                    SATBMarkQueue::byte_offset_of_buf());
+ 866 
+ 867         __ bind(restart);
+ 868         // Load the index into the SATB buffer. SATBMarkQueue::_index is a
+ 869         // size_t so ld_ptr is appropriate
+ 870         __ ld_ptr(G2_thread, satb_q_index_byte_offset, tmp);
+ 871 
+ 872         // index == 0?
+ 873         __ cmp_and_brx_short(tmp, G0, Assembler::equal, Assembler::pn, refill);
+ 874 
+ 875         __ ld_ptr(G2_thread, satb_q_buf_byte_offset, tmp2);
+ 876         __ sub(tmp, oopSize, tmp);
+ 877 
+ 878         __ st_ptr(pre_val, tmp2, tmp);  // [_buf + index] := &lt;address_of_card&gt;
+ 879         // Use return-from-leaf
+ 880         __ retl();
+ 881         __ delayed()-&gt;st_ptr(tmp, G2_thread, satb_q_index_byte_offset);
+ 882 
+ 883         __ bind(refill);
+<span class="removed"> 884         __ save_frame(0);</span>
+ 885 
+<span class="changed"> 886         __ mov(pre_val, L0);</span>
+<span class="changed"> 887         __ mov(tmp,     L1);</span>
+<span class="changed"> 888         __ mov(tmp2,    L2);</span>
+ 889 
+ 890         __ call_VM_leaf(L7_thread_cache,
+ 891                         CAST_FROM_FN_PTR(address,
+ 892                                          SATBMarkQueueSet::handle_zero_index_for_thread),
+ 893                                          G2_thread);
+ 894 
+<span class="changed"> 895         __ mov(L0, pre_val);</span>
+<span class="changed"> 896         __ mov(L1, tmp);</span>
+<span class="changed"> 897         __ mov(L2, tmp2);</span>
+ 898 
+ 899         __ br(Assembler::always, /*annul*/false, Assembler::pt, restart);
+ 900         __ delayed()-&gt;restore();
+ 901       }
+ 902       break;
+ 903 
+ 904     case g1_post_barrier_slow_id:
+ 905       {
+ 906         BarrierSet* bs = Universe::heap()-&gt;barrier_set();
+ 907         if (bs-&gt;kind() != BarrierSet::G1SATBCTLogging) {
+ 908           __ save_frame(0);
+ 909           __ set((int)id, O1);
+ 910           __ call_RT(noreg, noreg, CAST_FROM_FN_PTR(address, unimplemented_entry), I0);
+ 911           __ should_not_reach_here();
+ 912           break;
+ 913         }
+ 914 
+ 915         __ set_info("g1_post_barrier_slow_id", dont_gc_arguments);
+ 916 
+ 917         Register addr = G4;
+
+</pre><hr></hr><pre>
+ 969                    DirtyCardQueue::byte_offset_of_buf());
+ 970 
+ 971         __ bind(restart);
+ 972 
+ 973         // Get the index into the update buffer. DirtyCardQueue::_index is
+ 974         // a size_t so ld_ptr is appropriate here.
+ 975         __ ld_ptr(G2_thread, dirty_card_q_index_byte_offset, tmp3);
+ 976 
+ 977         // index == 0?
+ 978         __ cmp_and_brx_short(tmp3, G0, Assembler::equal,  Assembler::pn, refill);
+ 979 
+ 980         __ ld_ptr(G2_thread, dirty_card_q_buf_byte_offset, tmp4);
+ 981         __ sub(tmp3, oopSize, tmp3);
+ 982 
+ 983         __ st_ptr(tmp2, tmp4, tmp3);  // [_buf + index] := &lt;address_of_card&gt;
+ 984         // Use return-from-leaf
+ 985         __ retl();
+ 986         __ delayed()-&gt;st_ptr(tmp3, G2_thread, dirty_card_q_index_byte_offset);
+ 987 
+ 988         __ bind(refill);
+<span class="removed"> 989         __ save_frame(0);</span>
+ 990 
+<span class="changed"> 991         __ mov(tmp2, L0);</span>
+<span class="changed"> 992         __ mov(tmp3, L1);</span>
+<span class="changed"> 993         __ mov(tmp4, L2);</span>
+ 994 
+ 995         __ call_VM_leaf(L7_thread_cache,
+ 996                         CAST_FROM_FN_PTR(address,
+ 997                                          DirtyCardQueueSet::handle_zero_index_for_thread),
+ 998                                          G2_thread);
+ 999 
+<span class="changed">1000         __ mov(L0, tmp2);</span>
+<span class="changed">1001         __ mov(L1, tmp3);</span>
+<span class="changed">1002         __ mov(L2, tmp4);</span>
+1003 
+1004         __ br(Assembler::always, /*annul*/false, Assembler::pt, restart);
+1005         __ delayed()-&gt;restore();
+1006       }
+1007       break;
+1008 #endif // INCLUDE_ALL_GCS
+1009 
+1010     case predicate_failed_trap_id:
+1011       {
+1012         __ set_info("predicate_failed_trap", dont_gc_arguments);
+1013         OopMap* oop_map = save_live_registers(sasm);
+1014 
+1015         int call_offset = __ call_RT(noreg, noreg, CAST_FROM_FN_PTR(address, predicate_failed_trap));
+1016 
+1017         oop_maps = new OopMapSet();
+1018         oop_maps-&gt;add_gc_map(call_offset, oop_map);
+1019 
+1020         DeoptimizationBlob* deopt_blob = SharedRuntime::deopt_blob();
+1021         assert(deopt_blob != NULL, "deoptimization blob must have been created");
+1022         restore_live_registers(sasm);
+
+</pre><hr></hr>
+</pre></td><td><pre>
+
+</pre><hr></hr><pre>
+ 864           in_bytes(JavaThread::satb_mark_queue_offset() +
+ 865                    SATBMarkQueue::byte_offset_of_buf());
+ 866 
+ 867         __ bind(restart);
+ 868         // Load the index into the SATB buffer. SATBMarkQueue::_index is a
+ 869         // size_t so ld_ptr is appropriate
+ 870         __ ld_ptr(G2_thread, satb_q_index_byte_offset, tmp);
+ 871 
+ 872         // index == 0?
+ 873         __ cmp_and_brx_short(tmp, G0, Assembler::equal, Assembler::pn, refill);
+ 874 
+ 875         __ ld_ptr(G2_thread, satb_q_buf_byte_offset, tmp2);
+ 876         __ sub(tmp, oopSize, tmp);
+ 877 
+ 878         __ st_ptr(pre_val, tmp2, tmp);  // [_buf + index] := &lt;address_of_card&gt;
+ 879         // Use return-from-leaf
+ 880         __ retl();
+ 881         __ delayed()-&gt;st_ptr(tmp, G2_thread, satb_q_index_byte_offset);
+ 882 
+ 883         __ bind(refill);
+
+ 884 
+<span class="changed"> 885         save_live_registers(sasm);</span>
+
+
+ 886 
+ 887         __ call_VM_leaf(L7_thread_cache,
+ 888                         CAST_FROM_FN_PTR(address,
+ 889                                          SATBMarkQueueSet::handle_zero_index_for_thread),
+ 890                                          G2_thread);
+ 891 
+<span class="changed"> 892         restore_live_registers(sasm);</span>
+
+
+ 893 
+ 894         __ br(Assembler::always, /*annul*/false, Assembler::pt, restart);
+ 895         __ delayed()-&gt;restore();
+ 896       }
+ 897       break;
+ 898 
+ 899     case g1_post_barrier_slow_id:
+ 900       {
+ 901         BarrierSet* bs = Universe::heap()-&gt;barrier_set();
+ 902         if (bs-&gt;kind() != BarrierSet::G1SATBCTLogging) {
+ 903           __ save_frame(0);
+ 904           __ set((int)id, O1);
+ 905           __ call_RT(noreg, noreg, CAST_FROM_FN_PTR(address, unimplemented_entry), I0);
+ 906           __ should_not_reach_here();
+ 907           break;
+ 908         }
+ 909 
+ 910         __ set_info("g1_post_barrier_slow_id", dont_gc_arguments);
+ 911 
+ 912         Register addr = G4;
+
+</pre><hr></hr><pre>
+ 964                    DirtyCardQueue::byte_offset_of_buf());
+ 965 
+ 966         __ bind(restart);
+ 967 
+ 968         // Get the index into the update buffer. DirtyCardQueue::_index is
+ 969         // a size_t so ld_ptr is appropriate here.
+ 970         __ ld_ptr(G2_thread, dirty_card_q_index_byte_offset, tmp3);
+ 971 
+ 972         // index == 0?
+ 973         __ cmp_and_brx_short(tmp3, G0, Assembler::equal,  Assembler::pn, refill);
+ 974 
+ 975         __ ld_ptr(G2_thread, dirty_card_q_buf_byte_offset, tmp4);
+ 976         __ sub(tmp3, oopSize, tmp3);
+ 977 
+ 978         __ st_ptr(tmp2, tmp4, tmp3);  // [_buf + index] := &lt;address_of_card&gt;
+ 979         // Use return-from-leaf
+ 980         __ retl();
+ 981         __ delayed()-&gt;st_ptr(tmp3, G2_thread, dirty_card_q_index_byte_offset);
+ 982 
+ 983         __ bind(refill);
+
+ 984 
+<span class="changed"> 985         save_live_registers(sasm);</span>
+
+
+ 986 
+ 987         __ call_VM_leaf(L7_thread_cache,
+ 988                         CAST_FROM_FN_PTR(address,
+ 989                                          DirtyCardQueueSet::handle_zero_index_for_thread),
+ 990                                          G2_thread);
+ 991 
+<span class="changed"> 992         restore_live_registers(sasm);</span>
+
+
+ 993 
+ 994         __ br(Assembler::always, /*annul*/false, Assembler::pt, restart);
+ 995         __ delayed()-&gt;restore();
+ 996       }
+ 997       break;
+ 998 #endif // INCLUDE_ALL_GCS
+ 999 
+1000     case predicate_failed_trap_id:
+1001       {
+1002         __ set_info("predicate_failed_trap", dont_gc_arguments);
+1003         OopMap* oop_map = save_live_registers(sasm);
+1004 
+1005         int call_offset = __ call_RT(noreg, noreg, CAST_FROM_FN_PTR(address, predicate_failed_trap));
+1006 
+1007         oop_maps = new OopMapSet();
+1008         oop_maps-&gt;add_gc_map(call_offset, oop_map);
+1009 
+1010         DeoptimizationBlob* deopt_blob = SharedRuntime::deopt_blob();
+1011         assert(deopt_blob != NULL, "deoptimization blob must have been created");
+1012         restore_live_registers(sasm);
+
+</pre><hr></hr>
+</pre></td>
+</tr></table>
+<center><a href='../../../../src/cpu/sparc/vm/c1_LIRGenerator_sparc.cpp.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/cpu/sparc/vm/jvmciCodeInstaller_sparc.cpp.sdiff.html' target='_top'>next &gt</a></center>
+</body></html>

@@ -1,0 +1,233 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>hotspot Sdiff make/test </title>
+</head><body id="SUNWwebrev">
+<center><a href='../../make/gensrc/GensrcJvmti.gmk.sdiff.html' target='_top'>&lt prev</a> <a href='../../index.html' target='_top'>index</a> <a href='../../src/cpu/aarch64/vm/c1_LIRGenerator_aarch64.cpp.sdiff.html' target='_top'>next &gt</a></center>
+<h2>make/test/JtregNative.gmk</h2>
+<a class="print" href="javascript:print()">Print this page</a>
+<pre></pre>
+
+<table><tr valign="top">
+<td><pre>
+
+</pre><hr></hr><pre>
+  38 ################################################################################
+  39 # Targets for building the native tests themselves.
+  40 ################################################################################
+  41 
+  42 # Add more directories here when needed.
+  43 BUILD_HOTSPOT_JTREG_NATIVE_SRC := \
+  44     $(HOTSPOT_TOPDIR)/test/native_sanity \
+  45     $(HOTSPOT_TOPDIR)/test/runtime/jni/8025979 \
+  46     $(HOTSPOT_TOPDIR)/test/runtime/jni/8033445 \
+  47     $(HOTSPOT_TOPDIR)/test/runtime/jni/checked \
+  48     $(HOTSPOT_TOPDIR)/test/runtime/jni/ToStringInInterfaceTest \
+  49     $(HOTSPOT_TOPDIR)/test/runtime/modules/getModuleJNI \
+  50     $(HOTSPOT_TOPDIR)/test/runtime/SameObject \
+  51     $(HOTSPOT_TOPDIR)/test/runtime/BoolReturn \
+  52     $(HOTSPOT_TOPDIR)/test/compiler/floatingpoint/ \
+  53     $(HOTSPOT_TOPDIR)/test/compiler/calls \
+  54     $(HOTSPOT_TOPDIR)/test/serviceability/jvmti/GetNamedModule \
+  55     $(HOTSPOT_TOPDIR)/test/testlibrary/jvmti \
+  56     $(HOTSPOT_TOPDIR)/test/compiler/jvmci/jdk.vm.ci.code.test \
+  57     $(HOTSPOT_TOPDIR)/test/serviceability/jvmti/GetModulesInfo \
+
+
+
+  58     #
+  59 
+  60 # Add conditional directories here when needed.
+  61 ifeq ($(OPENJDK_TARGET_OS)-$(OPENJDK_TARGET_CPU_ARCH), solaris-sparc)
+  62 BUILD_HOTSPOT_JTREG_NATIVE_SRC += \
+  63     $(HOTSPOT_TOPDIR)/test/runtime/libadimalloc.solaris.sparc \
+  64     $(HOTSPOT_TOPDIR)/test/runtime/ThreadSignalMask
+  65 endif
+  66 
+  67 ifeq ($(OPENJDK_TARGET_OS), linux)
+  68 BUILD_HOTSPOT_JTREG_NATIVE_SRC += \
+  69     $(HOTSPOT_TOPDIR)/test/runtime/execstack \
+  70     $(HOTSPOT_TOPDIR)/test/runtime/jsig \
+  71     $(HOTSPOT_TOPDIR)/test/runtime/StackGuardPages
+  72 endif
+  73 
+  74 ifeq ($(TOOLCHAIN_TYPE), solstudio)
+  75     BUILD_HOTSPOT_JTREG_LIBRARIES_LIBS_liboverflow := -lc
+  76     BUILD_HOTSPOT_JTREG_LIBRARIES_LIBS_libSimpleClassFileLoadHook := -lc
+  77     BUILD_HOTSPOT_JTREG_LIBRARIES_LIBS_libGetNamedModuleTest := -lc
+
+
+
+  78 endif
+  79 
+  80 ifeq ($(OPENJDK_TARGET_OS), linux)
+  81     BUILD_HOTSPOT_JTREG_LIBRARIES_LDFLAGS_libtest-rw := -z noexecstack
+  82     BUILD_HOTSPOT_JTREG_LIBRARIES_LDFLAGS_libtest-rwx := -z execstack
+  83     BUILD_HOTSPOT_JTREG_EXECUTABLES_LIBS_exeinvoke := -ljvm -lpthread
+  84     BUILD_TEST_invoke_exeinvoke.c_OPTIMIZATION := NONE
+  85 endif
+  86 
+  87 BUILD_HOTSPOT_JTREG_OUTPUT_DIR := $(BUILD_OUTPUT)/support/test/hotspot/jtreg/native
+  88 
+  89 BUILD_HOTSPOT_JTREG_IMAGE_DIR := $(TEST_IMAGE_DIR)/hotspot/jtreg
+  90 
+  91 $(eval $(call SetupTestFilesCompilation, BUILD_HOTSPOT_JTREG_LIBRARIES, \
+  92     TYPE := LIBRARY, \
+  93     SOURCE_DIRS := $(BUILD_HOTSPOT_JTREG_NATIVE_SRC), \
+  94     OUTPUT_DIR := $(BUILD_HOTSPOT_JTREG_OUTPUT_DIR), \
+  95 ))
+  96 
+  97 $(eval $(call SetupTestFilesCompilation, BUILD_HOTSPOT_JTREG_EXECUTABLES, \
+
+</pre><hr></hr>
+</pre></td><td><pre>
+
+</pre><hr></hr><pre>
+  38 ################################################################################
+  39 # Targets for building the native tests themselves.
+  40 ################################################################################
+  41 
+  42 # Add more directories here when needed.
+  43 BUILD_HOTSPOT_JTREG_NATIVE_SRC := \
+  44     $(HOTSPOT_TOPDIR)/test/native_sanity \
+  45     $(HOTSPOT_TOPDIR)/test/runtime/jni/8025979 \
+  46     $(HOTSPOT_TOPDIR)/test/runtime/jni/8033445 \
+  47     $(HOTSPOT_TOPDIR)/test/runtime/jni/checked \
+  48     $(HOTSPOT_TOPDIR)/test/runtime/jni/ToStringInInterfaceTest \
+  49     $(HOTSPOT_TOPDIR)/test/runtime/modules/getModuleJNI \
+  50     $(HOTSPOT_TOPDIR)/test/runtime/SameObject \
+  51     $(HOTSPOT_TOPDIR)/test/runtime/BoolReturn \
+  52     $(HOTSPOT_TOPDIR)/test/compiler/floatingpoint/ \
+  53     $(HOTSPOT_TOPDIR)/test/compiler/calls \
+  54     $(HOTSPOT_TOPDIR)/test/serviceability/jvmti/GetNamedModule \
+  55     $(HOTSPOT_TOPDIR)/test/testlibrary/jvmti \
+  56     $(HOTSPOT_TOPDIR)/test/compiler/jvmci/jdk.vm.ci.code.test \
+  57     $(HOTSPOT_TOPDIR)/test/serviceability/jvmti/GetModulesInfo \
+<span class="new">  58     $(HOTSPOT_TOPDIR)/test/serviceability/jvmti/ModuleAwareAgents/ClassFileLoadHook \</span>
+<span class="new">  59     $(HOTSPOT_TOPDIR)/test/serviceability/jvmti/ModuleAwareAgents/ClassLoadPrepare \</span>
+<span class="new">  60     $(HOTSPOT_TOPDIR)/test/serviceability/jvmti/ModuleAwareAgents/ThreadStart \</span>
+  61     #
+  62 
+  63 # Add conditional directories here when needed.
+  64 ifeq ($(OPENJDK_TARGET_OS)-$(OPENJDK_TARGET_CPU_ARCH), solaris-sparc)
+  65 BUILD_HOTSPOT_JTREG_NATIVE_SRC += \
+  66     $(HOTSPOT_TOPDIR)/test/runtime/libadimalloc.solaris.sparc \
+  67     $(HOTSPOT_TOPDIR)/test/runtime/ThreadSignalMask
+  68 endif
+  69 
+  70 ifeq ($(OPENJDK_TARGET_OS), linux)
+  71 BUILD_HOTSPOT_JTREG_NATIVE_SRC += \
+  72     $(HOTSPOT_TOPDIR)/test/runtime/execstack \
+  73     $(HOTSPOT_TOPDIR)/test/runtime/jsig \
+  74     $(HOTSPOT_TOPDIR)/test/runtime/StackGuardPages
+  75 endif
+  76 
+  77 ifeq ($(TOOLCHAIN_TYPE), solstudio)
+  78     BUILD_HOTSPOT_JTREG_LIBRARIES_LIBS_liboverflow := -lc
+  79     BUILD_HOTSPOT_JTREG_LIBRARIES_LIBS_libSimpleClassFileLoadHook := -lc
+  80     BUILD_HOTSPOT_JTREG_LIBRARIES_LIBS_libGetNamedModuleTest := -lc
+<span class="new">  81     BUILD_HOTSPOT_JTREG_LIBRARIES_LIBS_libMAAClassFileLoadHook := -lc</span>
+<span class="new">  82     BUILD_HOTSPOT_JTREG_LIBRARIES_LIBS_libMAAClassLoadPrepare := -lc</span>
+<span class="new">  83     BUILD_HOTSPOT_JTREG_LIBRARIES_LIBS_libMAAThreadStart := -lc</span>
+  84 endif
+  85 
+  86 ifeq ($(OPENJDK_TARGET_OS), linux)
+  87     BUILD_HOTSPOT_JTREG_LIBRARIES_LDFLAGS_libtest-rw := -z noexecstack
+  88     BUILD_HOTSPOT_JTREG_LIBRARIES_LDFLAGS_libtest-rwx := -z execstack
+  89     BUILD_HOTSPOT_JTREG_EXECUTABLES_LIBS_exeinvoke := -ljvm -lpthread
+  90     BUILD_TEST_invoke_exeinvoke.c_OPTIMIZATION := NONE
+  91 endif
+  92 
+  93 BUILD_HOTSPOT_JTREG_OUTPUT_DIR := $(BUILD_OUTPUT)/support/test/hotspot/jtreg/native
+  94 
+  95 BUILD_HOTSPOT_JTREG_IMAGE_DIR := $(TEST_IMAGE_DIR)/hotspot/jtreg
+  96 
+  97 $(eval $(call SetupTestFilesCompilation, BUILD_HOTSPOT_JTREG_LIBRARIES, \
+  98     TYPE := LIBRARY, \
+  99     SOURCE_DIRS := $(BUILD_HOTSPOT_JTREG_NATIVE_SRC), \
+ 100     OUTPUT_DIR := $(BUILD_HOTSPOT_JTREG_OUTPUT_DIR), \
+ 101 ))
+ 102 
+ 103 $(eval $(call SetupTestFilesCompilation, BUILD_HOTSPOT_JTREG_EXECUTABLES, \
+
+</pre><hr></hr>
+</pre></td>
+</tr></table>
+<center><a href='../../make/gensrc/GensrcJvmti.gmk.sdiff.html' target='_top'>&lt prev</a> <a href='../../index.html' target='_top'>index</a> <a href='../../src/cpu/aarch64/vm/c1_LIRGenerator_aarch64.cpp.sdiff.html' target='_top'>next &gt</a></center>
+</body></html>

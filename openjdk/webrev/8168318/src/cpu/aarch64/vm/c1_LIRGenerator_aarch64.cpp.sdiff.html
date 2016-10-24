@@ -1,0 +1,289 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>hotspot Sdiff src/cpu/aarch64/vm </title>
+</head><body id="SUNWwebrev">
+<center><a href='../../../../make/test/JtregNative.gmk.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/cpu/aarch64/vm/interp_masm_aarch64.cpp.sdiff.html' target='_top'>next &gt</a></center>
+<h2>src/cpu/aarch64/vm/c1_LIRGenerator_aarch64.cpp</h2>
+<a class="print" href="javascript:print()">Print this page</a>
+<pre></pre>
+
+<table><tr valign="top">
+<td><pre>
+
+</pre><hr></hr><pre>
+ 123     return v-&gt;type()-&gt;as_LongConstant()-&gt;value() == 0L;
+ 124   } else if (v-&gt;type()-&gt;as_ObjectConstant() != NULL) {
+ 125     return v-&gt;type()-&gt;as_ObjectConstant()-&gt;value()-&gt;is_null_object();
+ 126   } else {
+ 127     return false;
+ 128   }
+ 129 }
+ 130 
+ 131 
+ 132 bool LIRGenerator::can_inline_as_constant(LIR_Const* c) const { return false; }
+ 133 
+ 134 
+ 135 LIR_Opr LIRGenerator::safepoint_poll_register() {
+ 136   return LIR_OprFact::illegalOpr;
+ 137 }
+ 138 
+ 139 
+ 140 LIR_Address* LIRGenerator::generate_address(LIR_Opr base, LIR_Opr index,
+ 141                                             int shift, int disp, BasicType type) {
+ 142   assert(base-&gt;is_register(), "must be");
+
+ 143 
+ 144   // accumulate fixed displacements
+ 145   if (index-&gt;is_constant()) {
+<span class="changed"> 146     disp += index-&gt;as_constant_ptr()-&gt;as_jint() &lt;&lt; shift;</span>
+ 147     index = LIR_OprFact::illegalOpr;
+ 148   }
+ 149 
+ 150   if (index-&gt;is_register()) {
+ 151     // apply the shift and accumulate the displacement
+ 152     if (shift &gt; 0) {
+ 153       LIR_Opr tmp = new_pointer_register();
+ 154       __ shift_left(index, shift, tmp);
+ 155       index = tmp;
+ 156     }
+<span class="changed"> 157     if (disp != 0) {</span>
+ 158       LIR_Opr tmp = new_pointer_register();
+<span class="changed"> 159       if (Assembler::operand_valid_for_add_sub_immediate(disp)) {</span>
+<span class="changed"> 160         __ add(tmp, tmp, LIR_OprFact::intptrConst(disp));</span>
+ 161         index = tmp;
+ 162       } else {
+<span class="changed"> 163         __ move(tmp, LIR_OprFact::intptrConst(disp));</span>
+ 164         __ add(tmp, index, tmp);
+ 165         index = tmp;
+ 166       }
+<span class="changed"> 167       disp = 0;</span>
+ 168     }
+<span class="changed"> 169   } else if (disp != 0 &amp;&amp; !Address::offset_ok_for_immed(disp, shift)) {</span>
+ 170     // index is illegal so replace it with the displacement loaded into a register
+ 171     index = new_pointer_register();
+<span class="changed"> 172     __ move(LIR_OprFact::intptrConst(disp), index);</span>
+<span class="changed"> 173     disp = 0;</span>
+ 174   }
+ 175 
+ 176   // at this point we either have base + index or base + displacement
+<span class="changed"> 177   if (disp == 0) {</span>
+ 178     return new LIR_Address(base, index, type);
+ 179   } else {
+<span class="changed"> 180     assert(Address::offset_ok_for_immed(disp, 0), "must be");</span>
+<span class="changed"> 181     return new LIR_Address(base, disp, type);</span>
+ 182   }
+ 183 }
+ 184 
+ 185 
+ 186 LIR_Address* LIRGenerator::emit_array_address(LIR_Opr array_opr, LIR_Opr index_opr,
+ 187                                               BasicType type, bool needs_card_mark) {
+ 188   int offset_in_bytes = arrayOopDesc::base_offset_in_bytes(type);
+ 189   int elem_size = type2aelembytes(type);
+ 190   int shift = exact_log2(elem_size);
+ 191 
+ 192   LIR_Address* addr;
+ 193   if (index_opr-&gt;is_constant()) {
+ 194     addr = new LIR_Address(array_opr,
+<span class="changed"> 195                            offset_in_bytes + index_opr-&gt;as_jint() * elem_size, type);</span>
+ 196   } else {
+ 197     if (offset_in_bytes) {
+ 198       LIR_Opr tmp = new_pointer_register();
+ 199       __ add(array_opr, LIR_OprFact::intConst(offset_in_bytes), tmp);
+ 200       array_opr = tmp;
+ 201       offset_in_bytes = 0;
+ 202     }
+ 203     addr =  new LIR_Address(array_opr,
+ 204                             index_opr,
+ 205                             LIR_Address::scale(type),
+ 206                             offset_in_bytes, type);
+ 207   }
+ 208   if (needs_card_mark) {
+ 209     // This store will need a precise card mark, so go ahead and
+ 210     // compute the full adddres instead of computing once for the
+ 211     // store and again for the card mark.
+ 212     LIR_Opr tmp = new_pointer_register();
+ 213     __ leal(LIR_OprFact::address(addr), tmp);
+ 214     return new LIR_Address(tmp, type);
+ 215   } else {
+
+</pre><hr></hr>
+</pre></td><td><pre>
+
+</pre><hr></hr><pre>
+ 123     return v-&gt;type()-&gt;as_LongConstant()-&gt;value() == 0L;
+ 124   } else if (v-&gt;type()-&gt;as_ObjectConstant() != NULL) {
+ 125     return v-&gt;type()-&gt;as_ObjectConstant()-&gt;value()-&gt;is_null_object();
+ 126   } else {
+ 127     return false;
+ 128   }
+ 129 }
+ 130 
+ 131 
+ 132 bool LIRGenerator::can_inline_as_constant(LIR_Const* c) const { return false; }
+ 133 
+ 134 
+ 135 LIR_Opr LIRGenerator::safepoint_poll_register() {
+ 136   return LIR_OprFact::illegalOpr;
+ 137 }
+ 138 
+ 139 
+ 140 LIR_Address* LIRGenerator::generate_address(LIR_Opr base, LIR_Opr index,
+ 141                                             int shift, int disp, BasicType type) {
+ 142   assert(base-&gt;is_register(), "must be");
+<span class="new"> 143   intx large_disp = disp;</span>
+ 144 
+ 145   // accumulate fixed displacements
+ 146   if (index-&gt;is_constant()) {
+<span class="changed"> 147     large_disp += (intx)(index-&gt;as_constant_ptr()-&gt;as_jint()) &lt;&lt; shift;</span>
+ 148     index = LIR_OprFact::illegalOpr;
+ 149   }
+ 150 
+ 151   if (index-&gt;is_register()) {
+ 152     // apply the shift and accumulate the displacement
+ 153     if (shift &gt; 0) {
+ 154       LIR_Opr tmp = new_pointer_register();
+ 155       __ shift_left(index, shift, tmp);
+ 156       index = tmp;
+ 157     }
+<span class="changed"> 158     if (large_disp != 0) {</span>
+ 159       LIR_Opr tmp = new_pointer_register();
+<span class="changed"> 160       if (Assembler::operand_valid_for_add_sub_immediate(large_disp)) {</span>
+<span class="changed"> 161         __ add(tmp, tmp, LIR_OprFact::intptrConst(large_disp));</span>
+ 162         index = tmp;
+ 163       } else {
+<span class="changed"> 164         __ move(tmp, LIR_OprFact::intptrConst(large_disp));</span>
+ 165         __ add(tmp, index, tmp);
+ 166         index = tmp;
+ 167       }
+<span class="changed"> 168       large_disp = 0;</span>
+ 169     }
+<span class="changed"> 170   } else if (large_disp != 0 &amp;&amp; !Address::offset_ok_for_immed(large_disp, shift)) {</span>
+ 171     // index is illegal so replace it with the displacement loaded into a register
+ 172     index = new_pointer_register();
+<span class="changed"> 173     __ move(LIR_OprFact::intptrConst(large_disp), index);</span>
+<span class="changed"> 174     large_disp = 0;</span>
+ 175   }
+ 176 
+ 177   // at this point we either have base + index or base + displacement
+<span class="changed"> 178   if (large_disp == 0) {</span>
+ 179     return new LIR_Address(base, index, type);
+ 180   } else {
+<span class="changed"> 181     assert(Address::offset_ok_for_immed(large_disp, 0), "must be");</span>
+<span class="changed"> 182     return new LIR_Address(base, large_disp, type);</span>
+ 183   }
+ 184 }
+ 185 
+ 186 
+ 187 LIR_Address* LIRGenerator::emit_array_address(LIR_Opr array_opr, LIR_Opr index_opr,
+ 188                                               BasicType type, bool needs_card_mark) {
+ 189   int offset_in_bytes = arrayOopDesc::base_offset_in_bytes(type);
+ 190   int elem_size = type2aelembytes(type);
+ 191   int shift = exact_log2(elem_size);
+ 192 
+ 193   LIR_Address* addr;
+ 194   if (index_opr-&gt;is_constant()) {
+ 195     addr = new LIR_Address(array_opr,
+<span class="changed"> 196                            offset_in_bytes + (intx)(index_opr-&gt;as_jint()) * elem_size, type);</span>
+ 197   } else {
+ 198     if (offset_in_bytes) {
+ 199       LIR_Opr tmp = new_pointer_register();
+ 200       __ add(array_opr, LIR_OprFact::intConst(offset_in_bytes), tmp);
+ 201       array_opr = tmp;
+ 202       offset_in_bytes = 0;
+ 203     }
+ 204     addr =  new LIR_Address(array_opr,
+ 205                             index_opr,
+ 206                             LIR_Address::scale(type),
+ 207                             offset_in_bytes, type);
+ 208   }
+ 209   if (needs_card_mark) {
+ 210     // This store will need a precise card mark, so go ahead and
+ 211     // compute the full adddres instead of computing once for the
+ 212     // store and again for the card mark.
+ 213     LIR_Opr tmp = new_pointer_register();
+ 214     __ leal(LIR_OprFact::address(addr), tmp);
+ 215     return new LIR_Address(tmp, type);
+ 216   } else {
+
+</pre><hr></hr>
+</pre></td>
+</tr></table>
+<center><a href='../../../../make/test/JtregNative.gmk.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/cpu/aarch64/vm/interp_masm_aarch64.cpp.sdiff.html' target='_top'>next &gt</a></center>
+</body></html>

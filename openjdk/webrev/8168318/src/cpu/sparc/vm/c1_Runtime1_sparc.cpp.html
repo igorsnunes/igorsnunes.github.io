@@ -1,0 +1,1220 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>New src/cpu/sparc/vm/c1_Runtime1_sparc.cpp</title>
+<body id="SUNWwebrev">
+<pre>
+   1 /*
+   2  * Copyright (c) 1999, 2015, Oracle and/or its affiliates. All rights reserved.
+   3  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+   4  *
+   5  * This code is free software; you can redistribute it and/or modify it
+   6  * under the terms of the GNU General Public License version 2 only, as
+   7  * published by the Free Software Foundation.
+   8  *
+   9  * This code is distributed in the hope that it will be useful, but WITHOUT
+  10  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+  11  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+  12  * version 2 for more details (a copy is included in the LICENSE file that
+  13  * accompanied this code).
+  14  *
+  15  * You should have received a copy of the GNU General Public License version
+  16  * 2 along with this work; if not, write to the Free Software Foundation,
+  17  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+  18  *
+  19  * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+  20  * or visit www.oracle.com if you need additional information or have any
+  21  * questions.
+  22  *
+  23  */
+  24 
+  25 #include "precompiled.hpp"
+  26 #include "c1/c1_Defs.hpp"
+  27 #include "c1/c1_MacroAssembler.hpp"
+  28 #include "c1/c1_Runtime1.hpp"
+  29 #include "interpreter/interpreter.hpp"
+  30 #include "nativeInst_sparc.hpp"
+  31 #include "oops/compiledICHolder.hpp"
+  32 #include "oops/oop.inline.hpp"
+  33 #include "prims/jvmtiExport.hpp"
+  34 #include "runtime/sharedRuntime.hpp"
+  35 #include "runtime/signature.hpp"
+  36 #include "runtime/vframeArray.hpp"
+  37 #include "utilities/macros.hpp"
+  38 #include "vmreg_sparc.inline.hpp"
+  39 #if INCLUDE_ALL_GCS
+  40 #include "gc/g1/g1SATBCardTableModRefBS.hpp"
+  41 #endif
+  42 
+  43 // Implementation of StubAssembler
+  44 
+  45 int StubAssembler::call_RT(Register oop_result1, Register metadata_result, address entry_point, int number_of_arguments) {
+  46   // for sparc changing the number of arguments doesn't change
+  47   // anything about the frame size so we'll always lie and claim that
+  48   // we are only passing 1 argument.
+  49   set_num_rt_args(1);
+  50 
+  51   assert_not_delayed();
+  52   // bang stack before going to runtime
+  53   set(-os::vm_page_size() + STACK_BIAS, G3_scratch);
+  54   st(G0, SP, G3_scratch);
+  55 
+  56   // debugging support
+  57   assert(number_of_arguments &gt;= 0   , "cannot have negative number of arguments");
+  58 
+  59   set_last_Java_frame(SP, noreg);
+  60   if (VerifyThread)  mov(G2_thread, O0); // about to be smashed; pass early
+  61   save_thread(L7_thread_cache);
+  62   // do the call
+  63   call(entry_point, relocInfo::runtime_call_type);
+  64   if (!VerifyThread) {
+  65     delayed()-&gt;mov(G2_thread, O0);  // pass thread as first argument
+  66   } else {
+  67     delayed()-&gt;nop();             // (thread already passed)
+  68   }
+  69   int call_offset = offset();  // offset of return address
+  70   restore_thread(L7_thread_cache);
+  71   reset_last_Java_frame();
+  72 
+  73   // check for pending exceptions
+  74   { Label L;
+  75     Address exception_addr(G2_thread, Thread::pending_exception_offset());
+  76     ld_ptr(exception_addr, Gtemp);
+  77     br_null_short(Gtemp, pt, L);
+  78     Address vm_result_addr(G2_thread, JavaThread::vm_result_offset());
+  79     st_ptr(G0, vm_result_addr);
+  80     Address vm_result_addr_2(G2_thread, JavaThread::vm_result_2_offset());
+  81     st_ptr(G0, vm_result_addr_2);
+  82 
+  83     if (frame_size() == no_frame_size) {
+  84       // we use O7 linkage so that forward_exception_entry has the issuing PC
+  85       call(StubRoutines::forward_exception_entry(), relocInfo::runtime_call_type);
+  86       delayed()-&gt;restore();
+  87     } else if (_stub_id == Runtime1::forward_exception_id) {
+  88       should_not_reach_here();
+  89     } else {
+  90       AddressLiteral exc(Runtime1::entry_for(Runtime1::forward_exception_id));
+  91       jump_to(exc, G4);
+  92       delayed()-&gt;nop();
+  93     }
+  94     bind(L);
+  95   }
+  96 
+  97   // get oop result if there is one and reset the value in the thread
+  98   if (oop_result1-&gt;is_valid()) {                    // get oop result if there is one and reset it in the thread
+  99     get_vm_result  (oop_result1);
+ 100   } else {
+ 101     // be a little paranoid and clear the result
+ 102     Address vm_result_addr(G2_thread, JavaThread::vm_result_offset());
+ 103     st_ptr(G0, vm_result_addr);
+ 104   }
+ 105 
+ 106   // get second result if there is one and reset the value in the thread
+ 107   if (metadata_result-&gt;is_valid()) {
+ 108     get_vm_result_2  (metadata_result);
+ 109   } else {
+ 110     // be a little paranoid and clear the result
+ 111     Address vm_result_addr_2(G2_thread, JavaThread::vm_result_2_offset());
+ 112     st_ptr(G0, vm_result_addr_2);
+ 113   }
+ 114 
+ 115   return call_offset;
+ 116 }
+ 117 
+ 118 
+ 119 int StubAssembler::call_RT(Register oop_result1, Register metadata_result, address entry, Register arg1) {
+ 120   // O0 is reserved for the thread
+ 121   mov(arg1, O1);
+ 122   return call_RT(oop_result1, metadata_result, entry, 1);
+ 123 }
+ 124 
+ 125 
+ 126 int StubAssembler::call_RT(Register oop_result1, Register metadata_result, address entry, Register arg1, Register arg2) {
+ 127   // O0 is reserved for the thread
+ 128   mov(arg1, O1);
+ 129   mov(arg2, O2); assert(arg2 != O1, "smashed argument");
+ 130   return call_RT(oop_result1, metadata_result, entry, 2);
+ 131 }
+ 132 
+ 133 
+ 134 int StubAssembler::call_RT(Register oop_result1, Register metadata_result, address entry, Register arg1, Register arg2, Register arg3) {
+ 135   // O0 is reserved for the thread
+ 136   mov(arg1, O1);
+ 137   mov(arg2, O2); assert(arg2 != O1,               "smashed argument");
+ 138   mov(arg3, O3); assert(arg3 != O1 &amp;&amp; arg3 != O2, "smashed argument");
+ 139   return call_RT(oop_result1, metadata_result, entry, 3);
+ 140 }
+ 141 
+ 142 
+ 143 // Implementation of Runtime1
+ 144 
+ 145 #define __ sasm-&gt;
+ 146 
+ 147 static int cpu_reg_save_offsets[FrameMap::nof_cpu_regs];
+ 148 static int fpu_reg_save_offsets[FrameMap::nof_fpu_regs];
+ 149 static int reg_save_size_in_words;
+ 150 static int frame_size_in_bytes = -1;
+ 151 
+ 152 static OopMap* generate_oop_map(StubAssembler* sasm, bool save_fpu_registers) {
+ 153   assert(frame_size_in_bytes == __ total_frame_size_in_bytes(reg_save_size_in_words),
+ 154          "mismatch in calculation");
+ 155   sasm-&gt;set_frame_size(frame_size_in_bytes / BytesPerWord);
+ 156   int frame_size_in_slots = frame_size_in_bytes / sizeof(jint);
+ 157   OopMap* oop_map = new OopMap(frame_size_in_slots, 0);
+ 158 
+ 159   int i;
+ 160   for (i = 0; i &lt; FrameMap::nof_cpu_regs; i++) {
+ 161     Register r = as_Register(i);
+ 162     if (r == G1 || r == G3 || r == G4 || r == G5) {
+ 163       int sp_offset = cpu_reg_save_offsets[i];
+ 164       oop_map-&gt;set_callee_saved(VMRegImpl::stack2reg(sp_offset),
+ 165                                 r-&gt;as_VMReg());
+ 166     }
+ 167   }
+ 168 
+ 169   if (save_fpu_registers) {
+ 170     for (i = 0; i &lt; FrameMap::nof_fpu_regs; i++) {
+ 171       FloatRegister r = as_FloatRegister(i);
+ 172       int sp_offset = fpu_reg_save_offsets[i];
+ 173       oop_map-&gt;set_callee_saved(VMRegImpl::stack2reg(sp_offset),
+ 174                                 r-&gt;as_VMReg());
+ 175     }
+ 176   }
+ 177   return oop_map;
+ 178 }
+ 179 
+ 180 static OopMap* save_live_registers(StubAssembler* sasm, bool save_fpu_registers = true) {
+ 181   assert(frame_size_in_bytes == __ total_frame_size_in_bytes(reg_save_size_in_words),
+ 182          "mismatch in calculation");
+ 183   __ save_frame_c1(frame_size_in_bytes);
+ 184 
+ 185   // Record volatile registers as callee-save values in an OopMap so their save locations will be
+ 186   // propagated to the caller frame's RegisterMap during StackFrameStream construction (needed for
+ 187   // deoptimization; see compiledVFrame::create_stack_value).  The caller's I, L and O registers
+ 188   // are saved in register windows - I's and L's in the caller's frame and O's in the stub frame
+ 189   // (as the stub's I's) when the runtime routine called by the stub creates its frame.
+ 190   // OopMap frame sizes are in c2 stack slot sizes (sizeof(jint))
+ 191 
+ 192   int i;
+ 193   for (i = 0; i &lt; FrameMap::nof_cpu_regs; i++) {
+ 194     Register r = as_Register(i);
+ 195     if (r == G1 || r == G3 || r == G4 || r == G5) {
+ 196       int sp_offset = cpu_reg_save_offsets[i];
+ 197       __ st_ptr(r, SP, (sp_offset * BytesPerWord) + STACK_BIAS);
+ 198     }
+ 199   }
+ 200 
+ 201   if (save_fpu_registers) {
+ 202     for (i = 0; i &lt; FrameMap::nof_fpu_regs; i++) {
+ 203       FloatRegister r = as_FloatRegister(i);
+ 204       int sp_offset = fpu_reg_save_offsets[i];
+ 205       __ stf(FloatRegisterImpl::S, r, SP, (sp_offset * BytesPerWord) + STACK_BIAS);
+ 206     }
+ 207   }
+ 208 
+ 209   return generate_oop_map(sasm, save_fpu_registers);
+ 210 }
+ 211 
+ 212 static void restore_live_registers(StubAssembler* sasm, bool restore_fpu_registers = true) {
+ 213   for (int i = 0; i &lt; FrameMap::nof_cpu_regs; i++) {
+ 214     Register r = as_Register(i);
+ 215     if (r == G1 || r == G3 || r == G4 || r == G5) {
+ 216       __ ld_ptr(SP, (cpu_reg_save_offsets[i] * BytesPerWord) + STACK_BIAS, r);
+ 217     }
+ 218   }
+ 219 
+ 220   if (restore_fpu_registers) {
+ 221     for (int i = 0; i &lt; FrameMap::nof_fpu_regs; i++) {
+ 222       FloatRegister r = as_FloatRegister(i);
+ 223       __ ldf(FloatRegisterImpl::S, SP, (fpu_reg_save_offsets[i] * BytesPerWord) + STACK_BIAS, r);
+ 224     }
+ 225   }
+ 226 }
+ 227 
+ 228 
+ 229 void Runtime1::initialize_pd() {
+ 230   // compute word offsets from SP at which live (non-windowed) registers are captured by stub routines
+ 231   //
+ 232   // A stub routine will have a frame that is at least large enough to hold
+ 233   // a register window save area (obviously) and the volatile g registers
+ 234   // and floating registers. A user of save_live_registers can have a frame
+ 235   // that has more scratch area in it (although typically they will use L-regs).
+ 236   // in that case the frame will look like this (stack growing down)
+ 237   //
+ 238   // FP -&gt; |             |
+ 239   //       | scratch mem |
+ 240   //       |   "      "  |
+ 241   //       --------------
+ 242   //       | float regs  |
+ 243   //       |   "    "    |
+ 244   //       ---------------
+ 245   //       | G regs      |
+ 246   //       | "  "        |
+ 247   //       ---------------
+ 248   //       | abi reg.    |
+ 249   //       | window save |
+ 250   //       | area        |
+ 251   // SP -&gt; ---------------
+ 252   //
+ 253   int i;
+ 254   int sp_offset = round_to(frame::register_save_words, 2); //  start doubleword aligned
+ 255 
+ 256   // only G int registers are saved explicitly; others are found in register windows
+ 257   for (i = 0; i &lt; FrameMap::nof_cpu_regs; i++) {
+ 258     Register r = as_Register(i);
+ 259     if (r == G1 || r == G3 || r == G4 || r == G5) {
+ 260       cpu_reg_save_offsets[i] = sp_offset;
+ 261       sp_offset++;
+ 262     }
+ 263   }
+ 264 
+ 265   // all float registers are saved explicitly
+ 266   assert(FrameMap::nof_fpu_regs == 32, "double registers not handled here");
+ 267   for (i = 0; i &lt; FrameMap::nof_fpu_regs; i++) {
+ 268     fpu_reg_save_offsets[i] = sp_offset;
+ 269     sp_offset++;
+ 270   }
+ 271   reg_save_size_in_words = sp_offset - frame::memory_parameter_word_sp_offset;
+ 272   // this should match assembler::total_frame_size_in_bytes, which
+ 273   // isn't callable from this context.  It's checked by an assert when
+ 274   // it's used though.
+ 275   frame_size_in_bytes = align_size_up(sp_offset * wordSize, 8);
+ 276 }
+ 277 
+ 278 
+ 279 OopMapSet* Runtime1::generate_exception_throw(StubAssembler* sasm, address target, bool has_argument) {
+ 280   // make a frame and preserve the caller's caller-save registers
+ 281   OopMap* oop_map = save_live_registers(sasm);
+ 282   int call_offset;
+ 283   if (!has_argument) {
+ 284     call_offset = __ call_RT(noreg, noreg, target);
+ 285   } else {
+ 286     call_offset = __ call_RT(noreg, noreg, target, G4);
+ 287   }
+ 288   OopMapSet* oop_maps = new OopMapSet();
+ 289   oop_maps-&gt;add_gc_map(call_offset, oop_map);
+ 290 
+ 291   __ should_not_reach_here();
+ 292   return oop_maps;
+ 293 }
+ 294 
+ 295 
+ 296 OopMapSet* Runtime1::generate_stub_call(StubAssembler* sasm, Register result, address target,
+ 297                                         Register arg1, Register arg2, Register arg3) {
+ 298   // make a frame and preserve the caller's caller-save registers
+ 299   OopMap* oop_map = save_live_registers(sasm);
+ 300 
+ 301   int call_offset;
+ 302   if (arg1 == noreg) {
+ 303     call_offset = __ call_RT(result, noreg, target);
+ 304   } else if (arg2 == noreg) {
+ 305     call_offset = __ call_RT(result, noreg, target, arg1);
+ 306   } else if (arg3 == noreg) {
+ 307     call_offset = __ call_RT(result, noreg, target, arg1, arg2);
+ 308   } else {
+ 309     call_offset = __ call_RT(result, noreg, target, arg1, arg2, arg3);
+ 310   }
+ 311   OopMapSet* oop_maps = NULL;
+ 312 
+ 313   oop_maps = new OopMapSet();
+ 314   oop_maps-&gt;add_gc_map(call_offset, oop_map);
+ 315   restore_live_registers(sasm);
+ 316 
+ 317   __ ret();
+ 318   __ delayed()-&gt;restore();
+ 319 
+ 320   return oop_maps;
+ 321 }
+ 322 
+ 323 
+ 324 OopMapSet* Runtime1::generate_patching(StubAssembler* sasm, address target) {
+ 325   // make a frame and preserve the caller's caller-save registers
+ 326   OopMap* oop_map = save_live_registers(sasm);
+ 327 
+ 328   // call the runtime patching routine, returns non-zero if nmethod got deopted.
+ 329   int call_offset = __ call_RT(noreg, noreg, target);
+ 330   OopMapSet* oop_maps = new OopMapSet();
+ 331   oop_maps-&gt;add_gc_map(call_offset, oop_map);
+ 332 
+ 333   // re-execute the patched instruction or, if the nmethod was deoptmized, return to the
+ 334   // deoptimization handler entry that will cause re-execution of the current bytecode
+ 335   DeoptimizationBlob* deopt_blob = SharedRuntime::deopt_blob();
+ 336   assert(deopt_blob != NULL, "deoptimization blob must have been created");
+ 337 
+ 338   Label no_deopt;
+ 339   __ br_null_short(O0, Assembler::pt, no_deopt);
+ 340 
+ 341   // return to the deoptimization handler entry for unpacking and rexecute
+ 342   // if we simply returned the we'd deopt as if any call we patched had just
+ 343   // returned.
+ 344 
+ 345   restore_live_registers(sasm);
+ 346 
+ 347   AddressLiteral dest(deopt_blob-&gt;unpack_with_reexecution());
+ 348   __ jump_to(dest, O0);
+ 349   __ delayed()-&gt;restore();
+ 350 
+ 351   __ bind(no_deopt);
+ 352   restore_live_registers(sasm);
+ 353   __ ret();
+ 354   __ delayed()-&gt;restore();
+ 355 
+ 356   return oop_maps;
+ 357 }
+ 358 
+ 359 OopMapSet* Runtime1::generate_code_for(StubID id, StubAssembler* sasm) {
+ 360 
+ 361   OopMapSet* oop_maps = NULL;
+ 362   // for better readability
+ 363   const bool must_gc_arguments = true;
+ 364   const bool dont_gc_arguments = false;
+ 365 
+ 366   // stub code &amp; info for the different stubs
+ 367   switch (id) {
+ 368     case forward_exception_id:
+ 369       {
+ 370         oop_maps = generate_handle_exception(id, sasm);
+ 371       }
+ 372       break;
+ 373 
+ 374     case new_instance_id:
+ 375     case fast_new_instance_id:
+ 376     case fast_new_instance_init_check_id:
+ 377       {
+ 378         Register G5_klass = G5; // Incoming
+ 379         Register O0_obj   = O0; // Outgoing
+ 380 
+ 381         if (id == new_instance_id) {
+ 382           __ set_info("new_instance", dont_gc_arguments);
+ 383         } else if (id == fast_new_instance_id) {
+ 384           __ set_info("fast new_instance", dont_gc_arguments);
+ 385         } else {
+ 386           assert(id == fast_new_instance_init_check_id, "bad StubID");
+ 387           __ set_info("fast new_instance init check", dont_gc_arguments);
+ 388         }
+ 389 
+ 390         if ((id == fast_new_instance_id || id == fast_new_instance_init_check_id) &amp;&amp;
+ 391             UseTLAB &amp;&amp; FastTLABRefill) {
+ 392           Label slow_path;
+ 393           Register G1_obj_size = G1;
+ 394           Register G3_t1 = G3;
+ 395           Register G4_t2 = G4;
+ 396           assert_different_registers(G5_klass, G1_obj_size, G3_t1, G4_t2);
+ 397 
+ 398           // Push a frame since we may do dtrace notification for the
+ 399           // allocation which requires calling out and we don't want
+ 400           // to stomp the real return address.
+ 401           __ save_frame(0);
+ 402 
+ 403           if (id == fast_new_instance_init_check_id) {
+ 404             // make sure the klass is initialized
+ 405             __ ldub(G5_klass, in_bytes(InstanceKlass::init_state_offset()), G3_t1);
+ 406             __ cmp(G3_t1, InstanceKlass::fully_initialized);
+ 407             __ br(Assembler::notEqual, false, Assembler::pn, slow_path);
+ 408             __ delayed()-&gt;nop();
+ 409           }
+ 410 #ifdef ASSERT
+ 411           // assert object can be fast path allocated
+ 412           {
+ 413             Label ok, not_ok;
+ 414           __ ld(G5_klass, in_bytes(Klass::layout_helper_offset()), G1_obj_size);
+ 415           // make sure it's an instance (LH &gt; 0)
+ 416           __ cmp_and_br_short(G1_obj_size, 0, Assembler::lessEqual, Assembler::pn, not_ok);
+ 417           __ btst(Klass::_lh_instance_slow_path_bit, G1_obj_size);
+ 418           __ br(Assembler::zero, false, Assembler::pn, ok);
+ 419           __ delayed()-&gt;nop();
+ 420           __ bind(not_ok);
+ 421           __ stop("assert(can be fast path allocated)");
+ 422           __ should_not_reach_here();
+ 423           __ bind(ok);
+ 424           }
+ 425 #endif // ASSERT
+ 426           // if we got here then the TLAB allocation failed, so try
+ 427           // refilling the TLAB or allocating directly from eden.
+ 428           Label retry_tlab, try_eden;
+ 429           __ tlab_refill(retry_tlab, try_eden, slow_path); // preserves G5_klass
+ 430 
+ 431           __ bind(retry_tlab);
+ 432 
+ 433           // get the instance size
+ 434           __ ld(G5_klass, in_bytes(Klass::layout_helper_offset()), G1_obj_size);
+ 435 
+ 436           __ tlab_allocate(O0_obj, G1_obj_size, 0, G3_t1, slow_path);
+ 437 
+ 438           __ initialize_object(O0_obj, G5_klass, G1_obj_size, 0, G3_t1, G4_t2, /* is_tlab_allocated */ true);
+ 439           __ verify_oop(O0_obj);
+ 440           __ mov(O0, I0);
+ 441           __ ret();
+ 442           __ delayed()-&gt;restore();
+ 443 
+ 444           __ bind(try_eden);
+ 445           // get the instance size
+ 446           __ ld(G5_klass, in_bytes(Klass::layout_helper_offset()), G1_obj_size);
+ 447           __ eden_allocate(O0_obj, G1_obj_size, 0, G3_t1, G4_t2, slow_path);
+ 448           __ incr_allocated_bytes(G1_obj_size, G3_t1, G4_t2);
+ 449 
+ 450           __ initialize_object(O0_obj, G5_klass, G1_obj_size, 0, G3_t1, G4_t2, /* is_tlab_allocated */ false);
+ 451           __ verify_oop(O0_obj);
+ 452           __ mov(O0, I0);
+ 453           __ ret();
+ 454           __ delayed()-&gt;restore();
+ 455 
+ 456           __ bind(slow_path);
+ 457 
+ 458           // pop this frame so generate_stub_call can push it's own
+ 459           __ restore();
+ 460         }
+ 461 
+ 462         oop_maps = generate_stub_call(sasm, I0, CAST_FROM_FN_PTR(address, new_instance), G5_klass);
+ 463         // I0-&gt;O0: new instance
+ 464       }
+ 465 
+ 466       break;
+ 467 
+ 468     case counter_overflow_id:
+ 469         // G4 contains bci, G5 contains method
+ 470       oop_maps = generate_stub_call(sasm, noreg, CAST_FROM_FN_PTR(address, counter_overflow), G4, G5);
+ 471       break;
+ 472 
+ 473     case new_type_array_id:
+ 474     case new_object_array_id:
+ 475       {
+ 476         Register G5_klass = G5; // Incoming
+ 477         Register G4_length = G4; // Incoming
+ 478         Register O0_obj   = O0; // Outgoing
+ 479 
+ 480         Address klass_lh(G5_klass, Klass::layout_helper_offset());
+ 481         assert(Klass::_lh_header_size_shift % BitsPerByte == 0, "bytewise");
+ 482         assert(Klass::_lh_header_size_mask == 0xFF, "bytewise");
+ 483         // Use this offset to pick out an individual byte of the layout_helper:
+ 484         const int klass_lh_header_size_offset = ((BytesPerInt - 1)  // 3 - 2 selects byte {0,1,0,0}
+ 485                                                  - Klass::_lh_header_size_shift / BitsPerByte);
+ 486 
+ 487         if (id == new_type_array_id) {
+ 488           __ set_info("new_type_array", dont_gc_arguments);
+ 489         } else {
+ 490           __ set_info("new_object_array", dont_gc_arguments);
+ 491         }
+ 492 
+ 493 #ifdef ASSERT
+ 494         // assert object type is really an array of the proper kind
+ 495         {
+ 496           Label ok;
+ 497           Register G3_t1 = G3;
+ 498           __ ld(klass_lh, G3_t1);
+ 499           __ sra(G3_t1, Klass::_lh_array_tag_shift, G3_t1);
+ 500           int tag = ((id == new_type_array_id)
+ 501                      ? Klass::_lh_array_tag_type_value
+ 502                      : Klass::_lh_array_tag_obj_value);
+ 503           __ cmp_and_brx_short(G3_t1, tag, Assembler::equal, Assembler::pt, ok);
+ 504           __ stop("assert(is an array klass)");
+ 505           __ should_not_reach_here();
+ 506           __ bind(ok);
+ 507         }
+ 508 #endif // ASSERT
+ 509 
+ 510         if (UseTLAB &amp;&amp; FastTLABRefill) {
+ 511           Label slow_path;
+ 512           Register G1_arr_size = G1;
+ 513           Register G3_t1 = G3;
+ 514           Register O1_t2 = O1;
+ 515           assert_different_registers(G5_klass, G4_length, G1_arr_size, G3_t1, O1_t2);
+ 516 
+ 517           // check that array length is small enough for fast path
+ 518           __ set(C1_MacroAssembler::max_array_allocation_length, G3_t1);
+ 519           __ cmp(G4_length, G3_t1);
+ 520           __ br(Assembler::greaterUnsigned, false, Assembler::pn, slow_path);
+ 521           __ delayed()-&gt;nop();
+ 522 
+ 523           // if we got here then the TLAB allocation failed, so try
+ 524           // refilling the TLAB or allocating directly from eden.
+ 525           Label retry_tlab, try_eden;
+ 526           __ tlab_refill(retry_tlab, try_eden, slow_path); // preserves G4_length and G5_klass
+ 527 
+ 528           __ bind(retry_tlab);
+ 529 
+ 530           // get the allocation size: (length &lt;&lt; (layout_helper &amp; 0x1F)) + header_size
+ 531           __ ld(klass_lh, G3_t1);
+ 532           __ sll(G4_length, G3_t1, G1_arr_size);
+ 533           __ srl(G3_t1, Klass::_lh_header_size_shift, G3_t1);
+ 534           __ and3(G3_t1, Klass::_lh_header_size_mask, G3_t1);
+ 535           __ add(G1_arr_size, G3_t1, G1_arr_size);
+ 536           __ add(G1_arr_size, MinObjAlignmentInBytesMask, G1_arr_size);  // align up
+ 537           __ and3(G1_arr_size, ~MinObjAlignmentInBytesMask, G1_arr_size);
+ 538 
+ 539           __ tlab_allocate(O0_obj, G1_arr_size, 0, G3_t1, slow_path);  // preserves G1_arr_size
+ 540 
+ 541           __ initialize_header(O0_obj, G5_klass, G4_length, G3_t1, O1_t2);
+ 542           __ ldub(klass_lh, G3_t1, klass_lh_header_size_offset);
+ 543           __ sub(G1_arr_size, G3_t1, O1_t2);  // body length
+ 544           __ add(O0_obj, G3_t1, G3_t1);       // body start
+ 545           if (!ZeroTLAB) {
+ 546             __ initialize_body(G3_t1, O1_t2);
+ 547           }
+ 548           __ verify_oop(O0_obj);
+ 549           __ retl();
+ 550           __ delayed()-&gt;nop();
+ 551 
+ 552           __ bind(try_eden);
+ 553           // get the allocation size: (length &lt;&lt; (layout_helper &amp; 0x1F)) + header_size
+ 554           __ ld(klass_lh, G3_t1);
+ 555           __ sll(G4_length, G3_t1, G1_arr_size);
+ 556           __ srl(G3_t1, Klass::_lh_header_size_shift, G3_t1);
+ 557           __ and3(G3_t1, Klass::_lh_header_size_mask, G3_t1);
+ 558           __ add(G1_arr_size, G3_t1, G1_arr_size);
+ 559           __ add(G1_arr_size, MinObjAlignmentInBytesMask, G1_arr_size);
+ 560           __ and3(G1_arr_size, ~MinObjAlignmentInBytesMask, G1_arr_size);
+ 561 
+ 562           __ eden_allocate(O0_obj, G1_arr_size, 0, G3_t1, O1_t2, slow_path);  // preserves G1_arr_size
+ 563           __ incr_allocated_bytes(G1_arr_size, G3_t1, O1_t2);
+ 564 
+ 565           __ initialize_header(O0_obj, G5_klass, G4_length, G3_t1, O1_t2);
+ 566           __ ldub(klass_lh, G3_t1, klass_lh_header_size_offset);
+ 567           __ sub(G1_arr_size, G3_t1, O1_t2);  // body length
+ 568           __ add(O0_obj, G3_t1, G3_t1);       // body start
+ 569           __ initialize_body(G3_t1, O1_t2);
+ 570           __ verify_oop(O0_obj);
+ 571           __ retl();
+ 572           __ delayed()-&gt;nop();
+ 573 
+ 574           __ bind(slow_path);
+ 575         }
+ 576 
+ 577         if (id == new_type_array_id) {
+ 578           oop_maps = generate_stub_call(sasm, I0, CAST_FROM_FN_PTR(address, new_type_array), G5_klass, G4_length);
+ 579         } else {
+ 580           oop_maps = generate_stub_call(sasm, I0, CAST_FROM_FN_PTR(address, new_object_array), G5_klass, G4_length);
+ 581         }
+ 582         // I0 -&gt; O0: new array
+ 583       }
+ 584       break;
+ 585 
+ 586     case new_multi_array_id:
+ 587       { // O0: klass
+ 588         // O1: rank
+ 589         // O2: address of 1st dimension
+ 590         __ set_info("new_multi_array", dont_gc_arguments);
+ 591         oop_maps = generate_stub_call(sasm, I0, CAST_FROM_FN_PTR(address, new_multi_array), I0, I1, I2);
+ 592         // I0 -&gt; O0: new multi array
+ 593       }
+ 594       break;
+ 595 
+ 596     case register_finalizer_id:
+ 597       {
+ 598         __ set_info("register_finalizer", dont_gc_arguments);
+ 599 
+ 600         // load the klass and check the has finalizer flag
+ 601         Label register_finalizer;
+ 602         Register t = O1;
+ 603         __ load_klass(O0, t);
+ 604         __ ld(t, in_bytes(Klass::access_flags_offset()), t);
+ 605         __ set(JVM_ACC_HAS_FINALIZER, G3);
+ 606         __ andcc(G3, t, G0);
+ 607         __ br(Assembler::notZero, false, Assembler::pt, register_finalizer);
+ 608         __ delayed()-&gt;nop();
+ 609 
+ 610         // do a leaf return
+ 611         __ retl();
+ 612         __ delayed()-&gt;nop();
+ 613 
+ 614         __ bind(register_finalizer);
+ 615         OopMap* oop_map = save_live_registers(sasm);
+ 616         int call_offset = __ call_RT(noreg, noreg,
+ 617                                      CAST_FROM_FN_PTR(address, SharedRuntime::register_finalizer), I0);
+ 618         oop_maps = new OopMapSet();
+ 619         oop_maps-&gt;add_gc_map(call_offset, oop_map);
+ 620 
+ 621         // Now restore all the live registers
+ 622         restore_live_registers(sasm);
+ 623 
+ 624         __ ret();
+ 625         __ delayed()-&gt;restore();
+ 626       }
+ 627       break;
+ 628 
+ 629     case throw_range_check_failed_id:
+ 630       { __ set_info("range_check_failed", dont_gc_arguments); // arguments will be discarded
+ 631         // G4: index
+ 632         oop_maps = generate_exception_throw(sasm, CAST_FROM_FN_PTR(address, throw_range_check_exception), true);
+ 633       }
+ 634       break;
+ 635 
+ 636     case throw_index_exception_id:
+ 637       { __ set_info("index_range_check_failed", dont_gc_arguments); // arguments will be discarded
+ 638         // G4: index
+ 639         oop_maps = generate_exception_throw(sasm, CAST_FROM_FN_PTR(address, throw_index_exception), true);
+ 640       }
+ 641       break;
+ 642 
+ 643     case throw_div0_exception_id:
+ 644       { __ set_info("throw_div0_exception", dont_gc_arguments);
+ 645         oop_maps = generate_exception_throw(sasm, CAST_FROM_FN_PTR(address, throw_div0_exception), false);
+ 646       }
+ 647       break;
+ 648 
+ 649     case throw_null_pointer_exception_id:
+ 650       { __ set_info("throw_null_pointer_exception", dont_gc_arguments);
+ 651         oop_maps = generate_exception_throw(sasm, CAST_FROM_FN_PTR(address, throw_null_pointer_exception), false);
+ 652       }
+ 653       break;
+ 654 
+ 655     case handle_exception_id:
+ 656       { __ set_info("handle_exception", dont_gc_arguments);
+ 657         oop_maps = generate_handle_exception(id, sasm);
+ 658       }
+ 659       break;
+ 660 
+ 661     case handle_exception_from_callee_id:
+ 662       { __ set_info("handle_exception_from_callee", dont_gc_arguments);
+ 663         oop_maps = generate_handle_exception(id, sasm);
+ 664       }
+ 665       break;
+ 666 
+ 667     case unwind_exception_id:
+ 668       {
+ 669         // O0: exception
+ 670         // I7: address of call to this method
+ 671 
+ 672         __ set_info("unwind_exception", dont_gc_arguments);
+ 673         __ mov(Oexception, Oexception-&gt;after_save());
+ 674         __ add(I7, frame::pc_return_offset, Oissuing_pc-&gt;after_save());
+ 675 
+ 676         __ call_VM_leaf(L7_thread_cache, CAST_FROM_FN_PTR(address, SharedRuntime::exception_handler_for_return_address),
+ 677                         G2_thread, Oissuing_pc-&gt;after_save());
+ 678         __ verify_not_null_oop(Oexception-&gt;after_save());
+ 679 
+ 680         // Restore SP from L7 if the exception PC is a method handle call site.
+ 681         __ mov(O0, G5);  // Save the target address.
+ 682         __ lduw(Address(G2_thread, JavaThread::is_method_handle_return_offset()), L0);
+ 683         __ tst(L0);  // Condition codes are preserved over the restore.
+ 684         __ restore();
+ 685 
+ 686         __ jmp(G5, 0);
+ 687         __ delayed()-&gt;movcc(Assembler::notZero, false, Assembler::icc, L7_mh_SP_save, SP);  // Restore SP if required.
+ 688       }
+ 689       break;
+ 690 
+ 691     case throw_array_store_exception_id:
+ 692       {
+ 693         __ set_info("throw_array_store_exception", dont_gc_arguments);
+ 694         oop_maps = generate_exception_throw(sasm, CAST_FROM_FN_PTR(address, throw_array_store_exception), true);
+ 695       }
+ 696       break;
+ 697 
+ 698     case throw_class_cast_exception_id:
+ 699       {
+ 700         // G4: object
+ 701         __ set_info("throw_class_cast_exception", dont_gc_arguments);
+ 702         oop_maps = generate_exception_throw(sasm, CAST_FROM_FN_PTR(address, throw_class_cast_exception), true);
+ 703       }
+ 704       break;
+ 705 
+ 706     case throw_incompatible_class_change_error_id:
+ 707       {
+ 708         __ set_info("throw_incompatible_class_cast_exception", dont_gc_arguments);
+ 709         oop_maps = generate_exception_throw(sasm, CAST_FROM_FN_PTR(address, throw_incompatible_class_change_error), false);
+ 710       }
+ 711       break;
+ 712 
+ 713     case slow_subtype_check_id:
+ 714       { // Support for uint StubRoutine::partial_subtype_check( Klass sub, Klass super );
+ 715         // Arguments :
+ 716         //
+ 717         //      ret  : G3
+ 718         //      sub  : G3, argument, destroyed
+ 719         //      super: G1, argument, not changed
+ 720         //      raddr: O7, blown by call
+ 721         Label miss;
+ 722 
+ 723         __ save_frame(0);               // Blow no registers!
+ 724 
+ 725         __ check_klass_subtype_slow_path(G3, G1, L0, L1, L2, L4, NULL, &amp;miss);
+ 726 
+ 727         __ mov(1, G3);
+ 728         __ ret();                       // Result in G5 is 'true'
+ 729         __ delayed()-&gt;restore();        // free copy or add can go here
+ 730 
+ 731         __ bind(miss);
+ 732         __ mov(0, G3);
+ 733         __ ret();                       // Result in G5 is 'false'
+ 734         __ delayed()-&gt;restore();        // free copy or add can go here
+ 735       }
+ 736 
+ 737     case monitorenter_nofpu_id:
+ 738     case monitorenter_id:
+ 739       { // G4: object
+ 740         // G5: lock address
+ 741         __ set_info("monitorenter", dont_gc_arguments);
+ 742 
+ 743         int save_fpu_registers = (id == monitorenter_id);
+ 744         // make a frame and preserve the caller's caller-save registers
+ 745         OopMap* oop_map = save_live_registers(sasm, save_fpu_registers);
+ 746 
+ 747         int call_offset = __ call_RT(noreg, noreg, CAST_FROM_FN_PTR(address, monitorenter), G4, G5);
+ 748 
+ 749         oop_maps = new OopMapSet();
+ 750         oop_maps-&gt;add_gc_map(call_offset, oop_map);
+ 751         restore_live_registers(sasm, save_fpu_registers);
+ 752 
+ 753         __ ret();
+ 754         __ delayed()-&gt;restore();
+ 755       }
+ 756       break;
+ 757 
+ 758     case monitorexit_nofpu_id:
+ 759     case monitorexit_id:
+ 760       { // G4: lock address
+ 761         // note: really a leaf routine but must setup last java sp
+ 762         //       =&gt; use call_RT for now (speed can be improved by
+ 763         //       doing last java sp setup manually)
+ 764         __ set_info("monitorexit", dont_gc_arguments);
+ 765 
+ 766         int save_fpu_registers = (id == monitorexit_id);
+ 767         // make a frame and preserve the caller's caller-save registers
+ 768         OopMap* oop_map = save_live_registers(sasm, save_fpu_registers);
+ 769 
+ 770         int call_offset = __ call_RT(noreg, noreg, CAST_FROM_FN_PTR(address, monitorexit), G4);
+ 771 
+ 772         oop_maps = new OopMapSet();
+ 773         oop_maps-&gt;add_gc_map(call_offset, oop_map);
+ 774         restore_live_registers(sasm, save_fpu_registers);
+ 775 
+ 776         __ ret();
+ 777         __ delayed()-&gt;restore();
+ 778       }
+ 779       break;
+ 780 
+ 781     case deoptimize_id:
+ 782       {
+ 783         __ set_info("deoptimize", dont_gc_arguments);
+ 784         OopMap* oop_map = save_live_registers(sasm);
+ 785         int call_offset = __ call_RT(noreg, noreg, CAST_FROM_FN_PTR(address, deoptimize), G4);
+ 786         oop_maps = new OopMapSet();
+ 787         oop_maps-&gt;add_gc_map(call_offset, oop_map);
+ 788         restore_live_registers(sasm);
+ 789         DeoptimizationBlob* deopt_blob = SharedRuntime::deopt_blob();
+ 790         assert(deopt_blob != NULL, "deoptimization blob must have been created");
+ 791         AddressLiteral dest(deopt_blob-&gt;unpack_with_reexecution());
+ 792         __ jump_to(dest, O0);
+ 793         __ delayed()-&gt;restore();
+ 794       }
+ 795       break;
+ 796 
+ 797     case access_field_patching_id:
+ 798       { __ set_info("access_field_patching", dont_gc_arguments);
+ 799         oop_maps = generate_patching(sasm, CAST_FROM_FN_PTR(address, access_field_patching));
+ 800       }
+ 801       break;
+ 802 
+ 803     case load_klass_patching_id:
+ 804       { __ set_info("load_klass_patching", dont_gc_arguments);
+ 805         oop_maps = generate_patching(sasm, CAST_FROM_FN_PTR(address, move_klass_patching));
+ 806       }
+ 807       break;
+ 808 
+ 809     case load_mirror_patching_id:
+ 810       { __ set_info("load_mirror_patching", dont_gc_arguments);
+ 811         oop_maps = generate_patching(sasm, CAST_FROM_FN_PTR(address, move_mirror_patching));
+ 812       }
+ 813       break;
+ 814 
+ 815     case load_appendix_patching_id:
+ 816       { __ set_info("load_appendix_patching", dont_gc_arguments);
+ 817         oop_maps = generate_patching(sasm, CAST_FROM_FN_PTR(address, move_appendix_patching));
+ 818       }
+ 819       break;
+ 820 
+ 821     case dtrace_object_alloc_id:
+ 822       { // O0: object
+ 823         __ set_info("dtrace_object_alloc", dont_gc_arguments);
+ 824         // we can't gc here so skip the oopmap but make sure that all
+ 825         // the live registers get saved.
+ 826         save_live_registers(sasm);
+ 827 
+ 828         __ save_thread(L7_thread_cache);
+ 829         __ call(CAST_FROM_FN_PTR(address, SharedRuntime::dtrace_object_alloc),
+ 830                 relocInfo::runtime_call_type);
+ 831         __ delayed()-&gt;mov(I0, O0);
+ 832         __ restore_thread(L7_thread_cache);
+ 833 
+ 834         restore_live_registers(sasm);
+ 835         __ ret();
+ 836         __ delayed()-&gt;restore();
+ 837       }
+ 838       break;
+ 839 
+ 840 #if INCLUDE_ALL_GCS
+ 841     case g1_pre_barrier_slow_id:
+ 842       { // G4: previous value of memory
+ 843         BarrierSet* bs = Universe::heap()-&gt;barrier_set();
+ 844         if (bs-&gt;kind() != BarrierSet::G1SATBCTLogging) {
+ 845           __ save_frame(0);
+ 846           __ set((int)id, O1);
+ 847           __ call_RT(noreg, noreg, CAST_FROM_FN_PTR(address, unimplemented_entry), I0);
+ 848           __ should_not_reach_here();
+ 849           break;
+ 850         }
+ 851 
+ 852         __ set_info("g1_pre_barrier_slow_id", dont_gc_arguments);
+ 853 
+ 854         Register pre_val = G4;
+ 855         Register tmp  = G1_scratch;
+ 856         Register tmp2 = G3_scratch;
+ 857 
+ 858         Label refill, restart;
+ 859         bool with_frame = false; // I don't know if we can do with-frame.
+ 860         int satb_q_index_byte_offset =
+ 861           in_bytes(JavaThread::satb_mark_queue_offset() +
+ 862                    SATBMarkQueue::byte_offset_of_index());
+ 863         int satb_q_buf_byte_offset =
+ 864           in_bytes(JavaThread::satb_mark_queue_offset() +
+ 865                    SATBMarkQueue::byte_offset_of_buf());
+ 866 
+ 867         __ bind(restart);
+ 868         // Load the index into the SATB buffer. SATBMarkQueue::_index is a
+ 869         // size_t so ld_ptr is appropriate
+ 870         __ ld_ptr(G2_thread, satb_q_index_byte_offset, tmp);
+ 871 
+ 872         // index == 0?
+ 873         __ cmp_and_brx_short(tmp, G0, Assembler::equal, Assembler::pn, refill);
+ 874 
+ 875         __ ld_ptr(G2_thread, satb_q_buf_byte_offset, tmp2);
+ 876         __ sub(tmp, oopSize, tmp);
+ 877 
+ 878         __ st_ptr(pre_val, tmp2, tmp);  // [_buf + index] := &lt;address_of_card&gt;
+ 879         // Use return-from-leaf
+ 880         __ retl();
+ 881         __ delayed()-&gt;st_ptr(tmp, G2_thread, satb_q_index_byte_offset);
+ 882 
+ 883         __ bind(refill);
+ 884 
+ 885         save_live_registers(sasm);
+ 886 
+ 887         __ call_VM_leaf(L7_thread_cache,
+ 888                         CAST_FROM_FN_PTR(address,
+ 889                                          SATBMarkQueueSet::handle_zero_index_for_thread),
+ 890                                          G2_thread);
+ 891 
+ 892         restore_live_registers(sasm);
+ 893 
+ 894         __ br(Assembler::always, /*annul*/false, Assembler::pt, restart);
+ 895         __ delayed()-&gt;restore();
+ 896       }
+ 897       break;
+ 898 
+ 899     case g1_post_barrier_slow_id:
+ 900       {
+ 901         BarrierSet* bs = Universe::heap()-&gt;barrier_set();
+ 902         if (bs-&gt;kind() != BarrierSet::G1SATBCTLogging) {
+ 903           __ save_frame(0);
+ 904           __ set((int)id, O1);
+ 905           __ call_RT(noreg, noreg, CAST_FROM_FN_PTR(address, unimplemented_entry), I0);
+ 906           __ should_not_reach_here();
+ 907           break;
+ 908         }
+ 909 
+ 910         __ set_info("g1_post_barrier_slow_id", dont_gc_arguments);
+ 911 
+ 912         Register addr = G4;
+ 913         Register cardtable = G5;
+ 914         Register tmp  = G1_scratch;
+ 915         Register tmp2 = G3_scratch;
+ 916         jbyte* byte_map_base = barrier_set_cast&lt;CardTableModRefBS&gt;(bs)-&gt;byte_map_base;
+ 917 
+ 918         Label not_already_dirty, restart, refill, young_card;
+ 919 
+ 920 #ifdef _LP64
+ 921         __ srlx(addr, CardTableModRefBS::card_shift, addr);
+ 922 #else
+ 923         __ srl(addr, CardTableModRefBS::card_shift, addr);
+ 924 #endif
+ 925 
+ 926         AddressLiteral rs(byte_map_base);
+ 927         __ set(rs, cardtable);         // cardtable := &lt;card table base&gt;
+ 928         __ ldub(addr, cardtable, tmp); // tmp := [addr + cardtable]
+ 929 
+ 930         __ cmp_and_br_short(tmp, G1SATBCardTableModRefBS::g1_young_card_val(), Assembler::equal, Assembler::pt, young_card);
+ 931 
+ 932         __ membar(Assembler::Membar_mask_bits(Assembler::StoreLoad));
+ 933         __ ldub(addr, cardtable, tmp); // tmp := [addr + cardtable]
+ 934 
+ 935         assert(CardTableModRefBS::dirty_card_val() == 0, "otherwise check this code");
+ 936         __ cmp_and_br_short(tmp, G0, Assembler::notEqual, Assembler::pt, not_already_dirty);
+ 937 
+ 938         __ bind(young_card);
+ 939         // We didn't take the branch, so we're already dirty: return.
+ 940         // Use return-from-leaf
+ 941         __ retl();
+ 942         __ delayed()-&gt;nop();
+ 943 
+ 944         // Not dirty.
+ 945         __ bind(not_already_dirty);
+ 946 
+ 947         // Get cardtable + tmp into a reg by itself
+ 948         __ add(addr, cardtable, tmp2);
+ 949 
+ 950         // First, dirty it.
+ 951         __ stb(G0, tmp2, 0);  // [cardPtr] := 0  (i.e., dirty).
+ 952 
+ 953         Register tmp3 = cardtable;
+ 954         Register tmp4 = tmp;
+ 955 
+ 956         // these registers are now dead
+ 957         addr = cardtable = tmp = noreg;
+ 958 
+ 959         int dirty_card_q_index_byte_offset =
+ 960           in_bytes(JavaThread::dirty_card_queue_offset() +
+ 961                    DirtyCardQueue::byte_offset_of_index());
+ 962         int dirty_card_q_buf_byte_offset =
+ 963           in_bytes(JavaThread::dirty_card_queue_offset() +
+ 964                    DirtyCardQueue::byte_offset_of_buf());
+ 965 
+ 966         __ bind(restart);
+ 967 
+ 968         // Get the index into the update buffer. DirtyCardQueue::_index is
+ 969         // a size_t so ld_ptr is appropriate here.
+ 970         __ ld_ptr(G2_thread, dirty_card_q_index_byte_offset, tmp3);
+ 971 
+ 972         // index == 0?
+ 973         __ cmp_and_brx_short(tmp3, G0, Assembler::equal,  Assembler::pn, refill);
+ 974 
+ 975         __ ld_ptr(G2_thread, dirty_card_q_buf_byte_offset, tmp4);
+ 976         __ sub(tmp3, oopSize, tmp3);
+ 977 
+ 978         __ st_ptr(tmp2, tmp4, tmp3);  // [_buf + index] := &lt;address_of_card&gt;
+ 979         // Use return-from-leaf
+ 980         __ retl();
+ 981         __ delayed()-&gt;st_ptr(tmp3, G2_thread, dirty_card_q_index_byte_offset);
+ 982 
+ 983         __ bind(refill);
+ 984 
+ 985         save_live_registers(sasm);
+ 986 
+ 987         __ call_VM_leaf(L7_thread_cache,
+ 988                         CAST_FROM_FN_PTR(address,
+ 989                                          DirtyCardQueueSet::handle_zero_index_for_thread),
+ 990                                          G2_thread);
+ 991 
+ 992         restore_live_registers(sasm);
+ 993 
+ 994         __ br(Assembler::always, /*annul*/false, Assembler::pt, restart);
+ 995         __ delayed()-&gt;restore();
+ 996       }
+ 997       break;
+ 998 #endif // INCLUDE_ALL_GCS
+ 999 
+1000     case predicate_failed_trap_id:
+1001       {
+1002         __ set_info("predicate_failed_trap", dont_gc_arguments);
+1003         OopMap* oop_map = save_live_registers(sasm);
+1004 
+1005         int call_offset = __ call_RT(noreg, noreg, CAST_FROM_FN_PTR(address, predicate_failed_trap));
+1006 
+1007         oop_maps = new OopMapSet();
+1008         oop_maps-&gt;add_gc_map(call_offset, oop_map);
+1009 
+1010         DeoptimizationBlob* deopt_blob = SharedRuntime::deopt_blob();
+1011         assert(deopt_blob != NULL, "deoptimization blob must have been created");
+1012         restore_live_registers(sasm);
+1013 
+1014         AddressLiteral dest(deopt_blob-&gt;unpack_with_reexecution());
+1015         __ jump_to(dest, O0);
+1016         __ delayed()-&gt;restore();
+1017       }
+1018       break;
+1019 
+1020     default:
+1021       { __ set_info("unimplemented entry", dont_gc_arguments);
+1022         __ save_frame(0);
+1023         __ set((int)id, O1);
+1024         __ call_RT(noreg, noreg, CAST_FROM_FN_PTR(address, unimplemented_entry), O1);
+1025         __ should_not_reach_here();
+1026       }
+1027       break;
+1028   }
+1029   return oop_maps;
+1030 }
+1031 
+1032 
+1033 OopMapSet* Runtime1::generate_handle_exception(StubID id, StubAssembler* sasm) {
+1034   __ block_comment("generate_handle_exception");
+1035 
+1036   // Save registers, if required.
+1037   OopMapSet* oop_maps = new OopMapSet();
+1038   OopMap* oop_map = NULL;
+1039   switch (id) {
+1040   case forward_exception_id:
+1041     // We're handling an exception in the context of a compiled frame.
+1042     // The registers have been saved in the standard places.  Perform
+1043     // an exception lookup in the caller and dispatch to the handler
+1044     // if found.  Otherwise unwind and dispatch to the callers
+1045     // exception handler.
+1046      oop_map = generate_oop_map(sasm, true);
+1047 
+1048      // transfer the pending exception to the exception_oop
+1049      __ ld_ptr(G2_thread, in_bytes(JavaThread::pending_exception_offset()), Oexception);
+1050      __ ld_ptr(Oexception, 0, G0);
+1051      __ st_ptr(G0, G2_thread, in_bytes(JavaThread::pending_exception_offset()));
+1052      __ add(I7, frame::pc_return_offset, Oissuing_pc);
+1053     break;
+1054   case handle_exception_id:
+1055     // At this point all registers MAY be live.
+1056     oop_map = save_live_registers(sasm);
+1057     __ mov(Oexception-&gt;after_save(),  Oexception);
+1058     __ mov(Oissuing_pc-&gt;after_save(), Oissuing_pc);
+1059     break;
+1060   case handle_exception_from_callee_id:
+1061     // At this point all registers except exception oop (Oexception)
+1062     // and exception pc (Oissuing_pc) are dead.
+1063     oop_map = new OopMap(frame_size_in_bytes / sizeof(jint), 0);
+1064     sasm-&gt;set_frame_size(frame_size_in_bytes / BytesPerWord);
+1065     __ save_frame_c1(frame_size_in_bytes);
+1066     __ mov(Oexception-&gt;after_save(),  Oexception);
+1067     __ mov(Oissuing_pc-&gt;after_save(), Oissuing_pc);
+1068     break;
+1069   default:  ShouldNotReachHere();
+1070   }
+1071 
+1072   __ verify_not_null_oop(Oexception);
+1073 
+1074 #ifdef ASSERT
+1075   // check that fields in JavaThread for exception oop and issuing pc are
+1076   // empty before writing to them
+1077   Label oop_empty;
+1078   Register scratch = I7;  // We can use I7 here because it's overwritten later anyway.
+1079   __ ld_ptr(Address(G2_thread, JavaThread::exception_oop_offset()), scratch);
+1080   __ br_null(scratch, false, Assembler::pt, oop_empty);
+1081   __ delayed()-&gt;nop();
+1082   __ stop("exception oop already set");
+1083   __ bind(oop_empty);
+1084 
+1085   Label pc_empty;
+1086   __ ld_ptr(Address(G2_thread, JavaThread::exception_pc_offset()), scratch);
+1087   __ br_null(scratch, false, Assembler::pt, pc_empty);
+1088   __ delayed()-&gt;nop();
+1089   __ stop("exception pc already set");
+1090   __ bind(pc_empty);
+1091 #endif
+1092 
+1093   // save the exception and issuing pc in the thread
+1094   __ st_ptr(Oexception,  G2_thread, in_bytes(JavaThread::exception_oop_offset()));
+1095   __ st_ptr(Oissuing_pc, G2_thread, in_bytes(JavaThread::exception_pc_offset()));
+1096 
+1097   // use the throwing pc as the return address to lookup (has bci &amp; oop map)
+1098   __ mov(Oissuing_pc, I7);
+1099   __ sub(I7, frame::pc_return_offset, I7);
+1100   int call_offset = __ call_RT(noreg, noreg, CAST_FROM_FN_PTR(address, exception_handler_for_pc));
+1101   oop_maps-&gt;add_gc_map(call_offset, oop_map);
+1102 
+1103   // Note: if nmethod has been deoptimized then regardless of
+1104   // whether it had a handler or not we will deoptimize
+1105   // by entering the deopt blob with a pending exception.
+1106 
+1107   // Restore the registers that were saved at the beginning, remove
+1108   // the frame and jump to the exception handler.
+1109   switch (id) {
+1110   case forward_exception_id:
+1111   case handle_exception_id:
+1112     restore_live_registers(sasm);
+1113     __ jmp(O0, 0);
+1114     __ delayed()-&gt;restore();
+1115     break;
+1116   case handle_exception_from_callee_id:
+1117     // Restore SP from L7 if the exception PC is a method handle call site.
+1118     __ mov(O0, G5);  // Save the target address.
+1119     __ lduw(Address(G2_thread, JavaThread::is_method_handle_return_offset()), L0);
+1120     __ tst(L0);  // Condition codes are preserved over the restore.
+1121     __ restore();
+1122 
+1123     __ jmp(G5, 0);  // jump to the exception handler
+1124     __ delayed()-&gt;movcc(Assembler::notZero, false, Assembler::icc, L7_mh_SP_save, SP);  // Restore SP if required.
+1125     break;
+1126   default:  ShouldNotReachHere();
+1127   }
+1128 
+1129   return oop_maps;
+1130 }
+1131 
+1132 
+1133 #undef __
+1134 
+1135 const char *Runtime1::pd_name_for_address(address entry) {
+1136   return "&lt;unknown function&gt;";
+1137 }
+</pre></body></html>

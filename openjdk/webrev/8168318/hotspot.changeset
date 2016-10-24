@@ -1,5 +1,14 @@
---- old/src/cpu/ppc/vm/ppc.ad	2016-10-20 11:02:45.396074966 -0200
-+++ new/src/cpu/ppc/vm/ppc.ad	2016-10-20 11:02:45.328075034 -0200
+# HG changeset patch
+# User Igor Nunes  <igor.nunes@eldorado.org.br>
+# Date 1476968263 7200
+#      Thu Oct 20 10:57:43 2016 -0200
+# Node ID d13eaccb139d17e0307c4bf1ed2861709181f307
+# Parent  b2b2ec149a24b487ace20ef05dec8fdb746bf5e3
+Implement cmpP_reg_null por ppc.ad
+
+diff --git a/src/cpu/ppc/vm/ppc.ad b/src/cpu/ppc/vm/ppc.ad
+--- a/src/cpu/ppc/vm/ppc.ad
++++ b/src/cpu/ppc/vm/ppc.ad
 @@ -11235,6 +11235,18 @@
    ins_pipe(pipe_class_compare);
  %}

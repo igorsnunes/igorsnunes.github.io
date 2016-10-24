@@ -1,0 +1,129 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>hotspot Udiff src/cpu/ppc/vm/templateTable_ppc_64.cpp</title>
+
+<style type="text/css" media="screen">
+span.new {
+    color: blue;
+    font-weight: normal;
+}
+</style>
+
+</head>
+<body id="SUNWwebrev">
+<center><a href='../../../../src/cpu/ppc/vm/templateInterpreterGenerator_ppc.cpp.udiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/cpu/sparc/vm/c1_LIRGenerator_sparc.cpp.udiff.html' target='_top'>next &gt</a></center>
+<h2>src/cpu/ppc/vm/templateTable_ppc_64.cpp</h2>
+        <a class="print" href="javascript:print()">Print this page</a>
+<pre></pre>
+        <pre>
+</pre><hr /><pre>
+<span class="newmarker">@@ -2548,11 +2548,11 @@</span>
+   assert(branch_table[ztos] == 0, "can't compute twice");
+   branch_table[ztos] = __ pc(); // non-volatile_entry point
+   __ lbzx(R17_tos, Rclass_or_obj, Roffset);
+   __ extsb(R17_tos, R17_tos);
+   __ push(ztos);
+<span class="removed">-  if (!is_static) {</span>
+<span class="new">+  if (!is_static &amp;&amp; rc == may_rewrite) {</span>
+     // use btos rewriting, no truncating to t/f bit is needed for getfield.
+     patch_bytecode(Bytecodes::_fast_bgetfield, Rbc, Rscratch);
+   }
+   __ beq(CCR6, Lacquire); // Volatile?
+   __ dispatch_epilog(vtos, Bytecodes::length_for(bytecode()));
+</pre><hr /><pre>
+<span class="newmarker">@@ -2872,11 +2872,13 @@</span>
+   branch_table[ztos] = __ pc(); // non-volatile_entry point
+   __ pop(ztos);
+   if (!is_static) { pop_and_check_object(Rclass_or_obj); } // Kills R11_scratch1.
+   __ andi(R17_tos, R17_tos, 0x1);
+   __ stbx(R17_tos, Rclass_or_obj, Roffset);
+<span class="removed">-  if (!is_static) { patch_bytecode(Bytecodes::_fast_zputfield, Rbc, Rscratch, true, byte_no); }</span>
+<span class="new">+  if (!is_static &amp;&amp; rc == may_rewrite) {</span>
+<span class="new">+    patch_bytecode(Bytecodes::_fast_zputfield, Rbc, Rscratch, true, byte_no);</span>
+<span class="new">+  }</span>
+   if (!support_IRIW_for_not_multiple_copy_atomic_cpu) {
+     __ beq(CR_is_vol, Lvolatile); // Volatile?
+   }
+   __ dispatch_epilog(vtos, Bytecodes::length_for(bytecode()));
+ 
+</pre>
+<center><a href='../../../../src/cpu/ppc/vm/templateInterpreterGenerator_ppc.cpp.udiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/cpu/sparc/vm/c1_LIRGenerator_sparc.cpp.udiff.html' target='_top'>next &gt</a></center>
+</body></html>
+

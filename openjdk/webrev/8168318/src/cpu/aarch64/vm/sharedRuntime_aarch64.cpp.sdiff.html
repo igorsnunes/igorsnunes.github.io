@@ -1,0 +1,287 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>hotspot Sdiff src/cpu/aarch64/vm </title>
+</head><body id="SUNWwebrev">
+<center><a href='../../../../src/cpu/aarch64/vm/interpreterRT_aarch64.cpp.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/cpu/ppc/vm/assembler_ppc.hpp.sdiff.html' target='_top'>next &gt</a></center>
+<h2>src/cpu/aarch64/vm/sharedRuntime_aarch64.cpp</h2>
+<a class="print" href="javascript:print()">Print this page</a>
+<pre></pre>
+
+<table><tr valign="top">
+<td><pre>
+
+</pre><hr></hr><pre>
+ 972     // Store oop in handle area, may be NULL
+ 973     __ str(rOop, Address(sp, offset));
+ 974     if (is_receiver) {
+ 975       *receiver_offset = offset;
+ 976     }
+ 977 
+ 978     __ cmp(rOop, zr);
+ 979     __ lea(rHandle, Address(sp, offset));
+ 980     // conditionally move a NULL
+ 981     __ csel(rHandle, zr, rHandle, Assembler::EQ);
+ 982   }
+ 983 
+ 984   // If arg is on the stack then place it otherwise it is already in correct reg.
+ 985   if (dst.first()-&gt;is_stack()) {
+ 986     __ str(rHandle, Address(sp, reg2offset_out(dst.first())));
+ 987   }
+ 988 }
+ 989 
+ 990 // A float arg may have to do float reg int reg conversion
+ 991 static void float_move(MacroAssembler* masm, VMRegPair src, VMRegPair dst) {
+<span class="changed"> 992   if (src.first() != dst.first()) {</span>
+
+
+
+
+
+
+
+
+
+ 993     if (src.is_single_phys_reg() &amp;&amp; dst.is_single_phys_reg())
+ 994       __ fmovs(dst.first()-&gt;as_FloatRegister(), src.first()-&gt;as_FloatRegister());
+ 995     else
+ 996       ShouldNotReachHere();
+ 997   }
+ 998 }
+ 999 
+1000 // A long move
+1001 static void long_move(MacroAssembler* masm, VMRegPair src, VMRegPair dst) {
+1002   if (src.first()-&gt;is_stack()) {
+1003     if (dst.first()-&gt;is_stack()) {
+1004       // stack to stack
+1005       __ ldr(rscratch1, Address(rfp, reg2offset_in(src.first())));
+1006       __ str(rscratch1, Address(sp, reg2offset_out(dst.first())));
+1007     } else {
+1008       // stack to reg
+1009       __ ldr(dst.first()-&gt;as_Register(), Address(rfp, reg2offset_in(src.first())));
+1010     }
+1011   } else if (dst.first()-&gt;is_stack()) {
+1012     // reg to stack
+1013     // Do we really have to sign extend???
+1014     // __ movslq(src.first()-&gt;as_Register(), src.first()-&gt;as_Register());
+1015     __ str(src.first()-&gt;as_Register(), Address(sp, reg2offset_out(dst.first())));
+1016   } else {
+1017     if (dst.first() != src.first()) {
+1018       __ mov(dst.first()-&gt;as_Register(), src.first()-&gt;as_Register());
+1019     }
+1020   }
+1021 }
+1022 
+1023 
+1024 // A double move
+1025 static void double_move(MacroAssembler* masm, VMRegPair src, VMRegPair dst) {
+<span class="changed">1026   if (src.first() != dst.first()) {</span>
+
+
+
+
+
+
+
+
+
+1027     if (src.is_single_phys_reg() &amp;&amp; dst.is_single_phys_reg())
+1028       __ fmovd(dst.first()-&gt;as_FloatRegister(), src.first()-&gt;as_FloatRegister());
+1029     else
+1030       ShouldNotReachHere();
+1031   }
+1032 }
+1033 
+1034 
+1035 void SharedRuntime::save_native_result(MacroAssembler *masm, BasicType ret_type, int frame_slots) {
+1036   // We always ignore the frame_slots arg and just use the space just below frame pointer
+1037   // which by this time is free to use
+1038   switch (ret_type) {
+1039   case T_FLOAT:
+1040     __ strs(v0, Address(rfp, -wordSize));
+1041     break;
+1042   case T_DOUBLE:
+1043     __ strd(v0, Address(rfp, -wordSize));
+1044     break;
+1045   case T_VOID:  break;
+1046   default: {
+
+</pre><hr></hr>
+</pre></td><td><pre>
+
+</pre><hr></hr><pre>
+ 972     // Store oop in handle area, may be NULL
+ 973     __ str(rOop, Address(sp, offset));
+ 974     if (is_receiver) {
+ 975       *receiver_offset = offset;
+ 976     }
+ 977 
+ 978     __ cmp(rOop, zr);
+ 979     __ lea(rHandle, Address(sp, offset));
+ 980     // conditionally move a NULL
+ 981     __ csel(rHandle, zr, rHandle, Assembler::EQ);
+ 982   }
+ 983 
+ 984   // If arg is on the stack then place it otherwise it is already in correct reg.
+ 985   if (dst.first()-&gt;is_stack()) {
+ 986     __ str(rHandle, Address(sp, reg2offset_out(dst.first())));
+ 987   }
+ 988 }
+ 989 
+ 990 // A float arg may have to do float reg int reg conversion
+ 991 static void float_move(MacroAssembler* masm, VMRegPair src, VMRegPair dst) {
+<span class="changed"> 992   assert(src.first()-&gt;is_stack() &amp;&amp; dst.first()-&gt;is_stack() ||</span>
+<span class="changed"> 993          src.first()-&gt;is_reg() &amp;&amp; dst.first()-&gt;is_reg(), "Unexpected error");</span>
+<span class="changed"> 994   if (src.first()-&gt;is_stack()) {</span>
+<span class="changed"> 995     if (dst.first()-&gt;is_stack()) {</span>
+<span class="changed"> 996       __ ldrw(rscratch1, Address(rfp, reg2offset_in(src.first())));</span>
+<span class="changed"> 997       __ strw(rscratch1, Address(sp, reg2offset_out(dst.first())));</span>
+<span class="changed"> 998     } else {</span>
+<span class="changed"> 999       ShouldNotReachHere();</span>
+<span class="changed">1000     }</span>
+<span class="changed">1001   } else if (src.first() != dst.first()) {</span>
+1002     if (src.is_single_phys_reg() &amp;&amp; dst.is_single_phys_reg())
+1003       __ fmovs(dst.first()-&gt;as_FloatRegister(), src.first()-&gt;as_FloatRegister());
+1004     else
+1005       ShouldNotReachHere();
+1006   }
+1007 }
+1008 
+1009 // A long move
+1010 static void long_move(MacroAssembler* masm, VMRegPair src, VMRegPair dst) {
+1011   if (src.first()-&gt;is_stack()) {
+1012     if (dst.first()-&gt;is_stack()) {
+1013       // stack to stack
+1014       __ ldr(rscratch1, Address(rfp, reg2offset_in(src.first())));
+1015       __ str(rscratch1, Address(sp, reg2offset_out(dst.first())));
+1016     } else {
+1017       // stack to reg
+1018       __ ldr(dst.first()-&gt;as_Register(), Address(rfp, reg2offset_in(src.first())));
+1019     }
+1020   } else if (dst.first()-&gt;is_stack()) {
+1021     // reg to stack
+1022     // Do we really have to sign extend???
+1023     // __ movslq(src.first()-&gt;as_Register(), src.first()-&gt;as_Register());
+1024     __ str(src.first()-&gt;as_Register(), Address(sp, reg2offset_out(dst.first())));
+1025   } else {
+1026     if (dst.first() != src.first()) {
+1027       __ mov(dst.first()-&gt;as_Register(), src.first()-&gt;as_Register());
+1028     }
+1029   }
+1030 }
+1031 
+1032 
+1033 // A double move
+1034 static void double_move(MacroAssembler* masm, VMRegPair src, VMRegPair dst) {
+<span class="changed">1035   assert(src.first()-&gt;is_stack() &amp;&amp; dst.first()-&gt;is_stack() ||</span>
+<span class="changed">1036          src.first()-&gt;is_reg() &amp;&amp; dst.first()-&gt;is_reg(), "Unexpected error");</span>
+<span class="changed">1037   if (src.first()-&gt;is_stack()) {</span>
+<span class="changed">1038     if (dst.first()-&gt;is_stack()) {</span>
+<span class="changed">1039       __ ldr(rscratch1, Address(rfp, reg2offset_in(src.first())));</span>
+<span class="changed">1040       __ str(rscratch1, Address(sp, reg2offset_out(dst.first())));</span>
+<span class="changed">1041     } else {</span>
+<span class="changed">1042       ShouldNotReachHere();</span>
+<span class="changed">1043     }</span>
+<span class="changed">1044   } else if (src.first() != dst.first()) {</span>
+1045     if (src.is_single_phys_reg() &amp;&amp; dst.is_single_phys_reg())
+1046       __ fmovd(dst.first()-&gt;as_FloatRegister(), src.first()-&gt;as_FloatRegister());
+1047     else
+1048       ShouldNotReachHere();
+1049   }
+1050 }
+1051 
+1052 
+1053 void SharedRuntime::save_native_result(MacroAssembler *masm, BasicType ret_type, int frame_slots) {
+1054   // We always ignore the frame_slots arg and just use the space just below frame pointer
+1055   // which by this time is free to use
+1056   switch (ret_type) {
+1057   case T_FLOAT:
+1058     __ strs(v0, Address(rfp, -wordSize));
+1059     break;
+1060   case T_DOUBLE:
+1061     __ strd(v0, Address(rfp, -wordSize));
+1062     break;
+1063   case T_VOID:  break;
+1064   default: {
+
+</pre><hr></hr>
+</pre></td>
+</tr></table>
+<center><a href='../../../../src/cpu/aarch64/vm/interpreterRT_aarch64.cpp.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/cpu/ppc/vm/assembler_ppc.hpp.sdiff.html' target='_top'>next &gt</a></center>
+</body></html>

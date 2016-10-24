@@ -1,0 +1,257 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>Old make/gensrc/GensrcJvmti.gmk</title>
+<body id="SUNWwebrev">
+<pre>
+   1 #
+   2 # Copyright (c) 2013, 2016, Oracle and/or its affiliates. All rights reserved.
+   3 # DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+   4 #
+   5 # This code is free software; you can redistribute it and/or modify it
+   6 # under the terms of the GNU General Public License version 2 only, as
+   7 # published by the Free Software Foundation.  Oracle designates this
+   8 # particular file as subject to the "Classpath" exception as provided
+   9 # by Oracle in the LICENSE file that accompanied this code.
+  10 #
+  11 # This code is distributed in the hope that it will be useful, but WITHOUT
+  12 # ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+  13 # FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+  14 # version 2 for more details (a copy is included in the LICENSE file that
+  15 # accompanied this code).
+  16 #
+  17 # You should have received a copy of the GNU General Public License version
+  18 # 2 along with this work; if not, write to the Free Software Foundation,
+  19 # Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+  20 #
+  21 # Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+  22 # or visit www.oracle.com if you need additional information or have any
+  23 # questions.
+  24 #
+  25 
+  26 $(eval $(call IncludeCustomExtension, hotspot, gensrc/GensrcJvmti.gmk))
+  27 
+  28 ################################################################################
+  29 # Build tools needed for the JVMTI source code generation
+  30 
+  31 JVMTI_TOOLS_SRCDIR := $(HOTSPOT_TOPDIR)/src/share/vm/prims
+  32 JVMTI_TOOLS_OUTPUTDIR := $(JVM_VARIANT_OUTPUTDIR)/tools/jvmti
+  33 
+  34 $(eval $(call SetupJavaCompiler, GENERATE_OLDBYTECODE, \
+  35     JAVAC := $(JAVAC), \
+  36     FLAGS := $(DISABLE_WARNINGS), \
+  37     SERVER_DIR := $(SJAVAC_SERVER_DIR), \
+  38     SERVER_JVM := $(SJAVAC_SERVER_JAVA), \
+  39     DISABLE_SJAVAC := true, \
+  40 ))
+  41 
+  42 $(eval $(call SetupJavaCompilation, BUILD_JVMTI_TOOLS, \
+  43     SETUP := GENERATE_OLDBYTECODE, \
+  44     SRC := $(JVMTI_TOOLS_SRCDIR), \
+  45     INCLUDE_FILES := jvmtiGen.java jvmtiEnvFill.java, \
+  46     BIN := $(JVMTI_TOOLS_OUTPUTDIR), \
+  47 ))
+  48 
+  49 TOOL_JVMTI_GEN := $(JAVA_SMALL) -cp $(JVMTI_TOOLS_OUTPUTDIR) jvmtiGen
+  50 TOOL_JVMTI_ENV_FILL := $(JAVA_SMALL) -cp $(JVMTI_TOOLS_OUTPUTDIR) jvmtiEnvFill
+  51 
+  52 ################################################################################
+  53 # Setup make rules for an xml transform for jvmti/trace file generation.
+  54 #
+  55 # Parameter 1 is the name of the rule. This name is used as variable prefix,
+  56 # and the targets generated are listed in a variable by that name. This name is
+  57 # also used as the name of the output file.
+  58 #
+  59 # Remaining parameters are named arguments. These include:
+  60 #   XML_FILE -- The input source file to use
+  61 #   XSL_FILE -- The xsl file to use
+  62 #   OUTPUT_DIR -- The directory to put the generated file in
+  63 #   ARGS -- Additional arguments to the jvmtiGen tool
+  64 #   DEPS -- Additional dependencies
+  65 SetupXslTransform = $(NamedParamsMacroTemplate)
+  66 define SetupXslTransformBody
+  67   $$($1_OUTPUT_DIR)/$1: $$($1_XML_FILE) $$($1_XSL_FILE) $$($1_DEPS) $$(BUILD_JVMTI_TOOLS)
+  68         $$(call LogInfo, Generating $$(@F))
+  69         $$(call MakeDir, $$(@D))
+  70         $$(call ExecuteWithLog, $$@, $$(TOOL_JVMTI_GEN) -IN $$($1_XML_FILE) -XSL $$($1_XSL_FILE) -OUT $$@ $$($1_ARGS))
+  71         # jvmtiGen does not return error code properly on fail.
+  72         # NOTE: We should really fix jvmtiGen.java instead.
+  73         test -f $$@
+  74 
+  75   TARGETS += $$($1_OUTPUT_DIR)/$1
+  76 endef
+  77 
+  78 ################################################################################
+  79 # Create JVMTI files in gensrc/jvmtifiles
+  80 
+  81 JVMTI_SRCDIR := $(HOTSPOT_TOPDIR)/src/share/vm/prims
+  82 JVMTI_OUTPUTDIR := $(JVM_VARIANT_OUTPUTDIR)/gensrc/jvmtifiles
+  83 
+  84 # Setup rule for generating a jvmti file
+  85 #
+  86 # $1 is generated source file name in $(JVMTI_OUTPUTDIR)
+  87 # $2 is XSL file to use in $(JVMTI_SRCDIR)
+  88 # $3 is optional extra arguments to jvmtiGen
+  89 define SetupJvmtiGeneration
+  90   $$(eval $$(call SetupXslTransform, $1, \
+  91       XML_FILE := $$(JVMTI_SRCDIR)/jvmti.xml, \
+  92       XSL_FILE := $$(JVMTI_SRCDIR)/$(strip $2), \
+  93       OUTPUT_DIR := $$(JVMTI_OUTPUTDIR), \
+  94       ARGS := $3, \
+  95       DEPS := $$(JVMTI_SRCDIR)/jvmtiLib.xsl, \
+  96   ))
+  97 endef
+  98 
+  99 $(eval $(call SetupJvmtiGeneration, jvmtiEnter.cpp, jvmtiEnter.xsl, \
+ 100     -PARAM interface jvmti))
+ 101 $(eval $(call SetupJvmtiGeneration, jvmtiEnterTrace.cpp, jvmtiEnter.xsl, \
+ 102     -PARAM interface jvmti -PARAM trace Trace))
+ 103 $(eval $(call SetupJvmtiGeneration, jvmtiEnv.hpp, jvmtiHpp.xsl))
+ 104 $(eval $(call SetupJvmtiGeneration, jvmti.h, jvmtiH.xsl))
+ 105 $(eval $(call SetupJvmtiGeneration, jvmti.html, jvmti.xsl))
+ 106 $(eval $(call SetupJvmtiGeneration, jvmtiEnvStub.cpp, jvmtiEnv.xsl))
+ 107 
+ 108 JVMTI_BC_SRCDIR := $(HOTSPOT_TOPDIR)/src/share/vm/interpreter
+ 109 
+ 110 $(eval $(call SetupXslTransform, bytecodeInterpreterWithChecks.cpp, \
+ 111     XML_FILE := $(JVMTI_BC_SRCDIR)/bytecodeInterpreterWithChecks.xml, \
+ 112     XSL_FILE := $(JVMTI_BC_SRCDIR)/bytecodeInterpreterWithChecks.xsl, \
+ 113     OUTPUT_DIR := $(JVMTI_OUTPUTDIR), \
+ 114     DEPS := $(JVMTI_BC_SRCDIR)/bytecodeInterpreter.cpp, \
+ 115 ))
+ 116 
+ 117 # We need $(JVMTI_OUTPUTDIR)/jvmtiEnvStub.cpp (generated above) as input
+ 118 $(JVMTI_OUTPUTDIR)/jvmtiEnvRecommended.cpp: $(JVMTI_SRCDIR)/jvmtiEnv.cpp \
+ 119     $(JVMTI_OUTPUTDIR)/jvmtiEnvStub.cpp $(BUILD_JVMTI_TOOLS)
+ 120         $(call LogInfo, Generating $(@F))
+ 121         $(call MakeDir, $(@D))
+ 122         $(call ExecuteWithLog, $@, $(TOOL_JVMTI_ENV_FILL) $(JVMTI_SRCDIR)/jvmtiEnv.cpp \
+ 123             $(JVMTI_OUTPUTDIR)/jvmtiEnvStub.cpp \
+ 124             $(JVMTI_OUTPUTDIR)/jvmtiEnvRecommended.cpp)
+ 125         # jvmtiEnvFill does not necessarily return an error code on failure.
+ 126         # NOTE: We should really fix jvmtiEnvFill.java instead.
+ 127         test -f $@
+ 128 
+ 129 TARGETS += $(JVMTI_OUTPUTDIR)/jvmtiEnvRecommended.cpp
+ 130 
+ 131 ################################################################################
+ 132 # Create trace files in gensrc/tracefiles
+ 133 
+ 134 TRACE_OUTPUTDIR := $(JVM_VARIANT_OUTPUTDIR)/gensrc/tracefiles
+ 135 TRACE_SRCDIR := $(HOTSPOT_TOPDIR)/src/share/vm/trace
+ 136 
+ 137 # Append directories to search (might have been set by custom extensions)
+ 138 TRACE_SEARCH_DIRS += $(TRACE_SRCDIR)
+ 139 
+ 140 TRACE_XML ?= $(TRACE_SRCDIR)/trace.xml
+ 141 
+ 142 # Changing these will trigger a rebuild of generated trace files.
+ 143 TRACE_DEPS += \
+ 144     $(TRACE_XML) \
+ 145     $(TRACE_SRCDIR)/tracetypes.xml \
+ 146     $(TRACE_SRCDIR)/tracerelationdecls.xml \
+ 147     $(TRACE_SRCDIR)/traceevents.xml \
+ 148     $(TRACE_SRCDIR)/trace.dtd \
+ 149     $(TRACE_SRCDIR)/xinclude.mod \
+ 150     #
+ 151 
+ 152 # Setup rule for generating a trace file
+ 153 #
+ 154 # $1 is generated source file name in $(TRACE_OUTPUTDIR)
+ 155 define SetupTraceGeneration
+ 156   $$(eval $$(call SetupXslTransform, $1, \
+ 157       XML_FILE := $$(TRACE_XML), \
+ 158       XSL_FILE := $$(firstword $$(wildcard $$(addsuffix /$$(basename $1).xsl, $$(TRACE_SEARCH_DIRS)))), \
+ 159       OUTPUT_DIR := $$(TRACE_OUTPUTDIR), \
+ 160       DEPS := $$(TRACE_DEPS), \
+ 161   ))
+ 162 endef
+ 163 
+ 164 # Append files to generated (might have been set by custom extensions)
+ 165 TRACE_GENSRC_FILES += \
+ 166     traceEventClasses.hpp \
+ 167     traceEventIds.hpp \
+ 168     traceTypes.hpp \
+ 169     #
+ 170 
+ 171 # Call SetupTraceGeneration for all trace gensrc files
+ 172 $(foreach tracefile, $(TRACE_GENSRC_FILES), \
+ 173   $(eval $(call SetupTraceGeneration, $(tracefile))) \
+ 174 )
+</pre></body></html>

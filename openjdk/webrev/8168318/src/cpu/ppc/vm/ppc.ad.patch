@@ -1,5 +1,5 @@
---- old/src/cpu/ppc/vm/ppc.ad	2016-10-20 11:02:45.396074966 -0200
-+++ new/src/cpu/ppc/vm/ppc.ad	2016-10-20 11:02:45.328075034 -0200
+--- old/src/cpu/ppc/vm/ppc.ad	2016-10-20 11:39:35.398455934 -0200
++++ new/src/cpu/ppc/vm/ppc.ad	2016-10-20 11:39:35.330455662 -0200
 @@ -11235,6 +11235,18 @@
    ins_pipe(pipe_class_compare);
  %}

@@ -1,5 +1,5 @@
---- old/src/cpu/ppc/vm/assembler_ppc.inline.hpp	2016-10-20 11:02:18.808101554 -0200
-+++ new/src/cpu/ppc/vm/assembler_ppc.inline.hpp	2016-10-20 11:02:18.744101618 -0200
+--- old/src/cpu/ppc/vm/assembler_ppc.inline.hpp	2016-10-20 11:39:34.582452670 -0200
++++ new/src/cpu/ppc/vm/assembler_ppc.inline.hpp	2016-10-20 11:39:34.518452414 -0200
 @@ -349,6 +349,9 @@
  inline void Assembler::stdu( Register d, int si16,    Register s1) { emit_int32(STDU_OPCODE | rs(d) | ds(si16)   | rta0mem(s1));}
  inline void Assembler::stdux(Register s, Register a,  Register b)  { emit_int32(STDUX_OPCODE| rs(s) | rta0mem(a) | rb(b));}

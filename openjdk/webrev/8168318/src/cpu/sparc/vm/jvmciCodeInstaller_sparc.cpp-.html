@@ -1,0 +1,293 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>Old src/cpu/sparc/vm/jvmciCodeInstaller_sparc.cpp</title>
+<body id="SUNWwebrev">
+<pre>
+   1 /*
+   2  * Copyright (c) 2013, 2016, Oracle and/or its affiliates. All rights reserved.
+   3  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+   4  *
+   5  * This code is free software; you can redistribute it and/or modify it
+   6  * under the terms of the GNU General Public License version 2 only, as
+   7  * published by the Free Software Foundation.
+   8  *
+   9  * This code is distributed in the hope that it will be useful, but WITHOUT
+  10  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+  11  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+  12  * version 2 for more details (a copy is included in the LICENSE file that
+  13  * accompanied this code).
+  14  *
+  15  * You should have received a copy of the GNU General Public License version
+  16  * 2 along with this work; if not, write to the Free Software Foundation,
+  17  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+  18  *
+  19  * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+  20  * or visit www.oracle.com if you need additional information or have any
+  21  * questions.
+  22  */
+  23 
+  24 #include "jvmci/jvmciCodeInstaller.hpp"
+  25 #include "jvmci/jvmciRuntime.hpp"
+  26 #include "jvmci/jvmciCompilerToVM.hpp"
+  27 #include "jvmci/jvmciJavaClasses.hpp"
+  28 #include "oops/oop.inline.hpp"
+  29 #include "runtime/sharedRuntime.hpp"
+  30 #include "vmreg_sparc.inline.hpp"
+  31 
+  32 jint CodeInstaller::pd_next_offset(NativeInstruction* inst, jint pc_offset, Handle method, TRAPS) {
+  33   if (inst-&gt;is_call() || inst-&gt;is_jump()) {
+  34     return pc_offset + NativeCall::instruction_size;
+  35   } else if (inst-&gt;is_call_reg()) {
+  36     return pc_offset + NativeCallReg::instruction_size;
+  37   } else if (inst-&gt;is_sethi()) {
+  38     return pc_offset + NativeFarCall::instruction_size;
+  39   } else {
+  40     JVMCI_ERROR_0("unsupported type of instruction for call site");
+  41     return 0;
+  42   }
+  43 }
+  44 
+  45 void CodeInstaller::pd_patch_OopConstant(int pc_offset, Handle constant, TRAPS) {
+  46   address pc = _instructions-&gt;start() + pc_offset;
+  47   Handle obj = HotSpotObjectConstantImpl::object(constant);
+  48   jobject value = JNIHandles::make_local(obj());
+  49   if (HotSpotObjectConstantImpl::compressed(constant)) {
+  50 #ifdef _LP64
+  51     int oop_index = _oop_recorder-&gt;find_index(value);
+  52     RelocationHolder rspec = oop_Relocation::spec(oop_index);
+  53     _instructions-&gt;relocate(pc, rspec, 1);
+  54 #else
+  55     JVMCI_ERROR("compressed oop on 32bit");
+  56 #endif
+  57   } else {
+  58     NativeMovConstReg* move = nativeMovConstReg_at(pc);
+  59     move-&gt;set_data((intptr_t) value);
+  60 
+  61     // We need two relocations:  one on the sethi and one on the add.
+  62     int oop_index = _oop_recorder-&gt;find_index(value);
+  63     RelocationHolder rspec = oop_Relocation::spec(oop_index);
+  64     _instructions-&gt;relocate(pc + NativeMovConstReg::sethi_offset, rspec);
+  65     _instructions-&gt;relocate(pc + NativeMovConstReg::add_offset, rspec);
+  66   }
+  67 }
+  68 
+  69 void CodeInstaller::pd_patch_MetaspaceConstant(int pc_offset, Handle constant, TRAPS) {
+  70   address pc = _instructions-&gt;start() + pc_offset;
+  71   if (HotSpotMetaspaceConstantImpl::compressed(constant)) {
+  72 #ifdef _LP64
+  73     NativeMovConstReg32* move = nativeMovConstReg32_at(pc);
+  74     narrowKlass narrowOop = record_narrow_metadata_reference(constant, CHECK);
+  75     move-&gt;set_data((intptr_t)narrowOop);
+  76     TRACE_jvmci_3("relocating (narrow metaspace constant) at " PTR_FORMAT "/0x%x", p2i(pc), narrowOop);
+  77 #else
+  78     JVMCI_ERROR("compressed Klass* on 32bit");
+  79 #endif
+  80   } else {
+  81     NativeMovConstReg* move = nativeMovConstReg_at(pc);
+  82     void* reference = record_metadata_reference(constant, CHECK);
+  83     move-&gt;set_data((intptr_t)reference);
+  84     TRACE_jvmci_3("relocating (metaspace constant) at " PTR_FORMAT "/" PTR_FORMAT, p2i(pc), p2i(reference));
+  85   }
+  86 }
+  87 
+  88 void CodeInstaller::pd_patch_DataSectionReference(int pc_offset, int data_offset, TRAPS) {
+  89   address pc = _instructions-&gt;start() + pc_offset;
+  90   NativeInstruction* inst = nativeInstruction_at(pc);
+  91   NativeInstruction* inst1 = nativeInstruction_at(pc + 4);
+  92   if(inst-&gt;is_sethi() &amp;&amp; inst1-&gt;is_nop()) {
+  93       address const_start = _constants-&gt;start();
+  94       address dest = _constants-&gt;start() + data_offset;
+  95       if(_constants_size &gt; 0) {
+  96         _instructions-&gt;relocate(pc + NativeMovConstReg::sethi_offset, internal_word_Relocation::spec((address) dest));
+  97         _instructions-&gt;relocate(pc + NativeMovConstReg::add_offset, internal_word_Relocation::spec((address) dest));
+  98       }
+  99       TRACE_jvmci_3("relocating at " PTR_FORMAT " (+%d) with destination at %d", p2i(pc), pc_offset, data_offset);
+ 100   }else {
+ 101     int const_size = align_size_up(_constants-&gt;end()-_constants-&gt;start(), CodeEntryAlignment);
+ 102     NativeMovRegMem* load = nativeMovRegMem_at(pc);
+ 103     // This offset must match with SPARCLoadConstantTableBaseOp.emitCode
+ 104     load-&gt;set_offset(- (const_size - data_offset + Assembler::min_simm13()));
+ 105     TRACE_jvmci_3("relocating ld at " PTR_FORMAT " (+%d) with destination at %d", p2i(pc), pc_offset, data_offset);
+ 106   }
+ 107 }
+ 108 
+ 109 void CodeInstaller::pd_relocate_ForeignCall(NativeInstruction* inst, jlong foreign_call_destination, TRAPS) {
+ 110   address pc = (address) inst;
+ 111   if (inst-&gt;is_call()) {
+ 112     NativeCall* call = nativeCall_at(pc);
+ 113     call-&gt;set_destination((address) foreign_call_destination);
+ 114     _instructions-&gt;relocate(call-&gt;instruction_address(), runtime_call_Relocation::spec());
+ 115   } else if (inst-&gt;is_sethi()) {
+ 116     NativeJump* jump = nativeJump_at(pc);
+ 117     jump-&gt;set_jump_destination((address) foreign_call_destination);
+ 118     _instructions-&gt;relocate(jump-&gt;instruction_address(), runtime_call_Relocation::spec());
+ 119   } else {
+ 120     JVMCI_ERROR("unknown call or jump instruction at " PTR_FORMAT, p2i(pc));
+ 121   }
+ 122   TRACE_jvmci_3("relocating (foreign call) at " PTR_FORMAT, p2i(inst));
+ 123 }
+ 124 
+ 125 void CodeInstaller::pd_relocate_JavaMethod(Handle hotspot_method, jint pc_offset, TRAPS) {
+ 126 #ifdef ASSERT
+ 127   Method* method = NULL;
+ 128   // we need to check, this might also be an unresolved method
+ 129   if (hotspot_method-&gt;is_a(HotSpotResolvedJavaMethodImpl::klass())) {
+ 130     method = getMethodFromHotSpotMethod(hotspot_method());
+ 131   }
+ 132 #endif
+ 133   switch (_next_call_type) {
+ 134     case INLINE_INVOKE:
+ 135       break;
+ 136     case INVOKEVIRTUAL:
+ 137     case INVOKEINTERFACE: {
+ 138       assert(method == NULL || !method-&gt;is_static(), "cannot call static method with invokeinterface");
+ 139       NativeCall* call = nativeCall_at(_instructions-&gt;start() + pc_offset);
+ 140       call-&gt;set_destination(SharedRuntime::get_resolve_virtual_call_stub());
+ 141       _instructions-&gt;relocate(call-&gt;instruction_address(), virtual_call_Relocation::spec(_invoke_mark_pc));
+ 142       break;
+ 143     }
+ 144     case INVOKESTATIC: {
+ 145       assert(method == NULL || method-&gt;is_static(), "cannot call non-static method with invokestatic");
+ 146       NativeCall* call = nativeCall_at(_instructions-&gt;start() + pc_offset);
+ 147       call-&gt;set_destination(SharedRuntime::get_resolve_static_call_stub());
+ 148       _instructions-&gt;relocate(call-&gt;instruction_address(), relocInfo::static_call_type);
+ 149       break;
+ 150     }
+ 151     case INVOKESPECIAL: {
+ 152       assert(method == NULL || !method-&gt;is_static(), "cannot call static method with invokespecial");
+ 153       NativeCall* call = nativeCall_at(_instructions-&gt;start() + pc_offset);
+ 154       call-&gt;set_destination(SharedRuntime::get_resolve_opt_virtual_call_stub());
+ 155       _instructions-&gt;relocate(call-&gt;instruction_address(), relocInfo::opt_virtual_call_type);
+ 156       break;
+ 157     }
+ 158     default:
+ 159       JVMCI_ERROR("invalid _next_call_type value");
+ 160       break;
+ 161   }
+ 162 }
+ 163 
+ 164 void CodeInstaller::pd_relocate_poll(address pc, jint mark, TRAPS) {
+ 165   switch (mark) {
+ 166     case POLL_NEAR:
+ 167       JVMCI_ERROR("unimplemented");
+ 168       break;
+ 169     case POLL_FAR:
+ 170       _instructions-&gt;relocate(pc, relocInfo::poll_type);
+ 171       break;
+ 172     case POLL_RETURN_NEAR:
+ 173       JVMCI_ERROR("unimplemented");
+ 174       break;
+ 175     case POLL_RETURN_FAR:
+ 176       _instructions-&gt;relocate(pc, relocInfo::poll_return_type);
+ 177       break;
+ 178     default:
+ 179       JVMCI_ERROR("invalid mark value");
+ 180       break;
+ 181   }
+ 182 }
+ 183 
+ 184 // convert JVMCI register indices (as used in oop maps) to HotSpot registers
+ 185 VMReg CodeInstaller::get_hotspot_reg(jint jvmci_reg, TRAPS) {
+ 186   // JVMCI Registers are numbered as follows:
+ 187   //   0..31: Thirty-two General Purpose registers (CPU Registers)
+ 188   //   32..63: Thirty-two single precision float registers
+ 189   //   64..95: Thirty-two double precision float registers
+ 190   //   96..111: Sixteen quad precision float registers
+ 191   if (jvmci_reg &lt; 32) {
+ 192     return as_Register(jvmci_reg)-&gt;as_VMReg();
+ 193   } else {
+ 194     jint floatRegisterNumber;
+ 195     if(jvmci_reg &lt; 64) { // Single precision
+ 196       floatRegisterNumber = jvmci_reg - 32;
+ 197     } else if(jvmci_reg &lt; 96) {
+ 198       floatRegisterNumber = 2 * (jvmci_reg - 64);
+ 199     } else if(jvmci_reg &lt; 112) {
+ 200       floatRegisterNumber = 4 * (jvmci_reg - 96);
+ 201     } else {
+ 202       JVMCI_ERROR_NULL("invalid register number: %d", jvmci_reg);
+ 203     }
+ 204     return as_FloatRegister(floatRegisterNumber)-&gt;as_VMReg();
+ 205   }
+ 206 }
+ 207 
+ 208 bool CodeInstaller::is_general_purpose_reg(VMReg hotspotRegister) {
+ 209   return !hotspotRegister-&gt;is_FloatRegister();
+ 210 }
+</pre></body></html>

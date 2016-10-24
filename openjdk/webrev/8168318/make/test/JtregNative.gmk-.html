@@ -1,0 +1,204 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>Old make/test/JtregNative.gmk</title>
+<body id="SUNWwebrev">
+<pre>
+   1 #
+   2 # Copyright (c) 2015, 2016, Oracle and/or its affiliates. All rights reserved.
+   3 # DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+   4 #
+   5 # This code is free software; you can redistribute it and/or modify it
+   6 # under the terms of the GNU General Public License version 2 only, as
+   7 # published by the Free Software Foundation.  Oracle designates this
+   8 # particular file as subject to the "Classpath" exception as provided
+   9 # by Oracle in the LICENSE file that accompanied this code.
+  10 #
+  11 # This code is distributed in the hope that it will be useful, but WITHOUT
+  12 # ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+  13 # FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+  14 # version 2 for more details (a copy is included in the LICENSE file that
+  15 # accompanied this code).
+  16 #
+  17 # You should have received a copy of the GNU General Public License version
+  18 # 2 along with this work; if not, write to the Free Software Foundation,
+  19 # Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+  20 #
+  21 # Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+  22 # or visit www.oracle.com if you need additional information or have any
+  23 # questions.
+  24 #
+  25 
+  26 ################################################################################
+  27 # This file builds the native component of the JTReg tests for Hotspot.
+  28 # It also covers the test-image part, where the built files are copied to the
+  29 # test image.
+  30 ################################################################################
+  31 
+  32 default: all
+  33 
+  34 include $(SPEC)
+  35 include MakeBase.gmk
+  36 include TestFilesCompilation.gmk
+  37 
+  38 ################################################################################
+  39 # Targets for building the native tests themselves.
+  40 ################################################################################
+  41 
+  42 # Add more directories here when needed.
+  43 BUILD_HOTSPOT_JTREG_NATIVE_SRC := \
+  44     $(HOTSPOT_TOPDIR)/test/native_sanity \
+  45     $(HOTSPOT_TOPDIR)/test/runtime/jni/8025979 \
+  46     $(HOTSPOT_TOPDIR)/test/runtime/jni/8033445 \
+  47     $(HOTSPOT_TOPDIR)/test/runtime/jni/checked \
+  48     $(HOTSPOT_TOPDIR)/test/runtime/jni/ToStringInInterfaceTest \
+  49     $(HOTSPOT_TOPDIR)/test/runtime/modules/getModuleJNI \
+  50     $(HOTSPOT_TOPDIR)/test/runtime/SameObject \
+  51     $(HOTSPOT_TOPDIR)/test/runtime/BoolReturn \
+  52     $(HOTSPOT_TOPDIR)/test/compiler/floatingpoint/ \
+  53     $(HOTSPOT_TOPDIR)/test/compiler/calls \
+  54     $(HOTSPOT_TOPDIR)/test/serviceability/jvmti/GetNamedModule \
+  55     $(HOTSPOT_TOPDIR)/test/testlibrary/jvmti \
+  56     $(HOTSPOT_TOPDIR)/test/compiler/jvmci/jdk.vm.ci.code.test \
+  57     $(HOTSPOT_TOPDIR)/test/serviceability/jvmti/GetModulesInfo \
+  58     #
+  59 
+  60 # Add conditional directories here when needed.
+  61 ifeq ($(OPENJDK_TARGET_OS)-$(OPENJDK_TARGET_CPU_ARCH), solaris-sparc)
+  62 BUILD_HOTSPOT_JTREG_NATIVE_SRC += \
+  63     $(HOTSPOT_TOPDIR)/test/runtime/libadimalloc.solaris.sparc \
+  64     $(HOTSPOT_TOPDIR)/test/runtime/ThreadSignalMask
+  65 endif
+  66 
+  67 ifeq ($(OPENJDK_TARGET_OS), linux)
+  68 BUILD_HOTSPOT_JTREG_NATIVE_SRC += \
+  69     $(HOTSPOT_TOPDIR)/test/runtime/execstack \
+  70     $(HOTSPOT_TOPDIR)/test/runtime/jsig \
+  71     $(HOTSPOT_TOPDIR)/test/runtime/StackGuardPages
+  72 endif
+  73 
+  74 ifeq ($(TOOLCHAIN_TYPE), solstudio)
+  75     BUILD_HOTSPOT_JTREG_LIBRARIES_LIBS_liboverflow := -lc
+  76     BUILD_HOTSPOT_JTREG_LIBRARIES_LIBS_libSimpleClassFileLoadHook := -lc
+  77     BUILD_HOTSPOT_JTREG_LIBRARIES_LIBS_libGetNamedModuleTest := -lc
+  78 endif
+  79 
+  80 ifeq ($(OPENJDK_TARGET_OS), linux)
+  81     BUILD_HOTSPOT_JTREG_LIBRARIES_LDFLAGS_libtest-rw := -z noexecstack
+  82     BUILD_HOTSPOT_JTREG_LIBRARIES_LDFLAGS_libtest-rwx := -z execstack
+  83     BUILD_HOTSPOT_JTREG_EXECUTABLES_LIBS_exeinvoke := -ljvm -lpthread
+  84     BUILD_TEST_invoke_exeinvoke.c_OPTIMIZATION := NONE
+  85 endif
+  86 
+  87 BUILD_HOTSPOT_JTREG_OUTPUT_DIR := $(BUILD_OUTPUT)/support/test/hotspot/jtreg/native
+  88 
+  89 BUILD_HOTSPOT_JTREG_IMAGE_DIR := $(TEST_IMAGE_DIR)/hotspot/jtreg
+  90 
+  91 $(eval $(call SetupTestFilesCompilation, BUILD_HOTSPOT_JTREG_LIBRARIES, \
+  92     TYPE := LIBRARY, \
+  93     SOURCE_DIRS := $(BUILD_HOTSPOT_JTREG_NATIVE_SRC), \
+  94     OUTPUT_DIR := $(BUILD_HOTSPOT_JTREG_OUTPUT_DIR), \
+  95 ))
+  96 
+  97 $(eval $(call SetupTestFilesCompilation, BUILD_HOTSPOT_JTREG_EXECUTABLES, \
+  98     TYPE := PROGRAM, \
+  99     SOURCE_DIRS := $(BUILD_HOTSPOT_JTREG_NATIVE_SRC), \
+ 100     OUTPUT_DIR := $(BUILD_HOTSPOT_JTREG_OUTPUT_DIR), \
+ 101 ))
+ 102 
+ 103 build-test-hotspot-jtreg-native: $(BUILD_HOTSPOT_JTREG_LIBRARIES) $(BUILD_HOTSPOT_JTREG_EXECUTABLES)
+ 104 
+ 105 ################################################################################
+ 106 # Targets for building test-image.
+ 107 ################################################################################
+ 108 
+ 109 # Copy to hotspot jtreg test image
+ 110 $(eval $(call SetupCopyFiles,COPY_HOTSPOT_JTREG_NATIVE, \
+ 111     SRC := $(BUILD_HOTSPOT_JTREG_OUTPUT_DIR), \
+ 112     DEST := $(TEST_IMAGE_DIR)/hotspot/jtreg/native, \
+ 113     FILES := $(BUILD_HOTSPOT_JTREG_LIBRARIES) $(BUILD_HOTSPOT_JTREG_EXECUTABLES), \
+ 114     FLATTEN := true))
+ 115 
+ 116 test-image-hotspot-jtreg-native: $(COPY_HOTSPOT_JTREG_NATIVE)
+ 117 
+ 118 all: build-test-hotspot-jtreg-native
+ 119 test-image: test-image-hotspot-jtreg-native
+ 120 
+ 121 .PHONY: default all build-test-hotspot-jtreg-native test-image-hotspot-jtreg-native test-image
+</pre></body></html>

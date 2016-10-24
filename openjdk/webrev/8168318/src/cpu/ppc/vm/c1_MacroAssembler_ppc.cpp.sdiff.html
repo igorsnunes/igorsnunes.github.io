@@ -1,0 +1,207 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>hotspot Sdiff src/cpu/ppc/vm </title>
+</head><body id="SUNWwebrev">
+<center><a href='../../../../src/cpu/ppc/vm/c1_LIRGenerator_ppc.cpp.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/cpu/ppc/vm/interp_masm_ppc_64.cpp.sdiff.html' target='_top'>next &gt</a></center>
+<h2>src/cpu/ppc/vm/c1_MacroAssembler_ppc.cpp</h2>
+<a class="print" href="javascript:print()">Print this page</a>
+<pre></pre>
+
+<table><tr valign="top">
+<td><pre>
+
+</pre><hr></hr><pre>
+  47   } else {
+  48     Label L;
+  49     cmpd(CCR0, temp_reg, iCache);
+  50     beq(CCR0, L);
+  51     //load_const_optimized(temp_reg, SharedRuntime::get_ic_miss_stub(), R0);
+  52     calculate_address_from_global_toc(temp_reg, SharedRuntime::get_ic_miss_stub(), true, true, false);
+  53     mtctr(temp_reg);
+  54     bctr();
+  55     align(32, 12);
+  56     bind(L);
+  57   }
+  58 }
+  59 
+  60 
+  61 void C1_MacroAssembler::explicit_null_check(Register base) {
+  62   Unimplemented();
+  63 }
+  64 
+  65 
+  66 void C1_MacroAssembler::build_frame(int frame_size_in_bytes, int bang_size_in_bytes) {
+<span class="changed">  67   assert(bang_size_in_bytes &gt;= frame_size_in_bytes, "stack bang size incorrect");</span>
+
+
+
+  68   // Make sure there is enough stack space for this method's activation.
+
+  69   generate_stack_overflow_check(bang_size_in_bytes);
+  70 
+<span class="removed">  71   // Create the frame.</span>
+<span class="removed">  72   const Register return_pc  = R0;</span>
+<span class="removed">  73 </span>
+<span class="removed">  74   mflr(return_pc);</span>
+<span class="removed">  75   // Get callers sp.</span>
+  76   std(return_pc, _abi(lr), R1_SP);           // SP-&gt;lr = return_pc
+  77   push_frame(frame_size_in_bytes, R0);       // SP -= frame_size_in_bytes
+  78 }
+  79 
+  80 
+  81 void C1_MacroAssembler::unverified_entry(Register receiver, Register ic_klass) {
+  82   Unimplemented(); // Currently unused.
+  83   //if (C1Breakpoint) illtrap();
+  84   //inline_cache_check(receiver, ic_klass);
+  85 }
+  86 
+  87 
+  88 void C1_MacroAssembler::verified_entry() {
+  89   if (C1Breakpoint) illtrap();
+  90   // build frame
+  91 }
+  92 
+  93 
+  94 void C1_MacroAssembler::lock_object(Register Rmark, Register Roop, Register Rbox, Register Rscratch, Label&amp; slow_case) {
+  95   assert_different_registers(Rmark, Roop, Rbox, Rscratch);
+
+</pre><hr></hr>
+</pre></td><td><pre>
+
+</pre><hr></hr><pre>
+  47   } else {
+  48     Label L;
+  49     cmpd(CCR0, temp_reg, iCache);
+  50     beq(CCR0, L);
+  51     //load_const_optimized(temp_reg, SharedRuntime::get_ic_miss_stub(), R0);
+  52     calculate_address_from_global_toc(temp_reg, SharedRuntime::get_ic_miss_stub(), true, true, false);
+  53     mtctr(temp_reg);
+  54     bctr();
+  55     align(32, 12);
+  56     bind(L);
+  57   }
+  58 }
+  59 
+  60 
+  61 void C1_MacroAssembler::explicit_null_check(Register base) {
+  62   Unimplemented();
+  63 }
+  64 
+  65 
+  66 void C1_MacroAssembler::build_frame(int frame_size_in_bytes, int bang_size_in_bytes) {
+<span class="changed">  67   // Avoid stack bang as first instruction. It may get overwritten by patch_verified_entry.</span>
+<span class="changed">  68   const Register return_pc = R20;</span>
+<span class="changed">  69   mflr(return_pc);</span>
+<span class="changed">  70 </span>
+  71   // Make sure there is enough stack space for this method's activation.
+<span class="new">  72   assert(bang_size_in_bytes &gt;= frame_size_in_bytes, "stack bang size incorrect");</span>
+  73   generate_stack_overflow_check(bang_size_in_bytes);
+  74 
+
+
+
+
+
+  75   std(return_pc, _abi(lr), R1_SP);     // SP-&gt;lr = return_pc
+  76   push_frame(frame_size_in_bytes, R0); // SP -= frame_size_in_bytes
+  77 }
+  78 
+  79 
+  80 void C1_MacroAssembler::unverified_entry(Register receiver, Register ic_klass) {
+  81   Unimplemented(); // Currently unused.
+  82   //if (C1Breakpoint) illtrap();
+  83   //inline_cache_check(receiver, ic_klass);
+  84 }
+  85 
+  86 
+  87 void C1_MacroAssembler::verified_entry() {
+  88   if (C1Breakpoint) illtrap();
+  89   // build frame
+  90 }
+  91 
+  92 
+  93 void C1_MacroAssembler::lock_object(Register Rmark, Register Roop, Register Rbox, Register Rscratch, Label&amp; slow_case) {
+  94   assert_different_registers(Rmark, Roop, Rbox, Rscratch);
+
+</pre><hr></hr>
+</pre></td>
+</tr></table>
+<center><a href='../../../../src/cpu/ppc/vm/c1_LIRGenerator_ppc.cpp.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/cpu/ppc/vm/interp_masm_ppc_64.cpp.sdiff.html' target='_top'>next &gt</a></center>
+</body></html>

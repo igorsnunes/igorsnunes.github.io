@@ -1,5 +1,5 @@
---- old/src/cpu/ppc/vm/interp_masm_ppc_64.cpp	2016-10-20 11:02:19.208101154 -0200
-+++ new/src/cpu/ppc/vm/interp_masm_ppc_64.cpp	2016-10-20 11:02:19.144101218 -0200
+--- old/src/cpu/ppc/vm/interp_masm_ppc_64.cpp	2016-10-20 11:39:34.986454286 -0200
++++ new/src/cpu/ppc/vm/interp_masm_ppc_64.cpp	2016-10-20 11:39:34.922454030 -0200
 @@ -261,6 +261,9 @@
  }
  

@@ -1,0 +1,273 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>hotspot Sdiff src/cpu/ppc/vm </title>
+</head><body id="SUNWwebrev">
+<center><a href='../../../../src/cpu/ppc/vm/templateInterpreterGenerator_ppc.cpp.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/cpu/sparc/vm/c1_LIRGenerator_sparc.cpp.sdiff.html' target='_top'>next &gt</a></center>
+<h2>src/cpu/ppc/vm/templateTable_ppc_64.cpp</h2>
+<a class="print" href="javascript:print()">Print this page</a>
+<pre></pre>
+
+<table><tr valign="top">
+<td><pre>
+
+</pre><hr></hr><pre>
+2533   __ fence(); // Volatile entry point (one instruction before non-volatile_entry point).
+2534   assert(branch_table[btos] == 0, "can't compute twice");
+2535   branch_table[btos] = __ pc(); // non-volatile_entry point
+2536   __ lbzx(R17_tos, Rclass_or_obj, Roffset);
+2537   __ extsb(R17_tos, R17_tos);
+2538   __ push(btos);
+2539   if (!is_static &amp;&amp; rc == may_rewrite) {
+2540     patch_bytecode(Bytecodes::_fast_bgetfield, Rbc, Rscratch);
+2541   }
+2542   __ beq(CCR6, Lacquire); // Volatile?
+2543   __ dispatch_epilog(vtos, Bytecodes::length_for(bytecode()));
+2544 
+2545   __ align(32, 28, 28); // Align load.
+2546   // __ bind(Lztos); (same code as btos)
+2547   __ fence(); // Volatile entry point (one instruction before non-volatile_entry point).
+2548   assert(branch_table[ztos] == 0, "can't compute twice");
+2549   branch_table[ztos] = __ pc(); // non-volatile_entry point
+2550   __ lbzx(R17_tos, Rclass_or_obj, Roffset);
+2551   __ extsb(R17_tos, R17_tos);
+2552   __ push(ztos);
+<span class="changed">2553   if (!is_static) {</span>
+2554     // use btos rewriting, no truncating to t/f bit is needed for getfield.
+2555     patch_bytecode(Bytecodes::_fast_bgetfield, Rbc, Rscratch);
+2556   }
+2557   __ beq(CCR6, Lacquire); // Volatile?
+2558   __ dispatch_epilog(vtos, Bytecodes::length_for(bytecode()));
+2559 
+2560   __ align(32, 28, 28); // Align load.
+2561   // __ bind(Lctos);
+2562   __ fence(); // Volatile entry point (one instruction before non-volatile_entry point).
+2563   assert(branch_table[ctos] == 0, "can't compute twice");
+2564   branch_table[ctos] = __ pc(); // non-volatile_entry point
+2565   __ lhzx(R17_tos, Rclass_or_obj, Roffset);
+2566   __ push(ctos);
+2567   if (!is_static &amp;&amp; rc == may_rewrite) {
+2568     patch_bytecode(Bytecodes::_fast_cgetfield, Rbc, Rscratch);
+2569   }
+2570   __ beq(CCR6, Lacquire); // Volatile?
+2571   __ dispatch_epilog(vtos, Bytecodes::length_for(bytecode()));
+2572 
+2573   __ align(32, 28, 28); // Align load.
+
+</pre><hr></hr><pre>
+2857   __ pop(btos);
+2858   if (!is_static) { pop_and_check_object(Rclass_or_obj); } // Kills R11_scratch1.
+2859   __ stbx(R17_tos, Rclass_or_obj, Roffset);
+2860   if (!is_static &amp;&amp; rc == may_rewrite) {
+2861     patch_bytecode(Bytecodes::_fast_bputfield, Rbc, Rscratch, true, byte_no);
+2862   }
+2863   if (!support_IRIW_for_not_multiple_copy_atomic_cpu) {
+2864     __ beq(CR_is_vol, Lvolatile); // Volatile?
+2865   }
+2866   __ dispatch_epilog(vtos, Bytecodes::length_for(bytecode()));
+2867 
+2868   __ align(32, 28, 28); // Align pop.
+2869   // __ bind(Lztos);
+2870   __ release(); // Volatile entry point (one instruction before non-volatile_entry point).
+2871   assert(branch_table[ztos] == 0, "can't compute twice");
+2872   branch_table[ztos] = __ pc(); // non-volatile_entry point
+2873   __ pop(ztos);
+2874   if (!is_static) { pop_and_check_object(Rclass_or_obj); } // Kills R11_scratch1.
+2875   __ andi(R17_tos, R17_tos, 0x1);
+2876   __ stbx(R17_tos, Rclass_or_obj, Roffset);
+<span class="changed">2877   if (!is_static) { patch_bytecode(Bytecodes::_fast_zputfield, Rbc, Rscratch, true, byte_no); }</span>
+
+
+2878   if (!support_IRIW_for_not_multiple_copy_atomic_cpu) {
+2879     __ beq(CR_is_vol, Lvolatile); // Volatile?
+2880   }
+2881   __ dispatch_epilog(vtos, Bytecodes::length_for(bytecode()));
+2882 
+2883   __ align(32, 28, 28); // Align pop.
+2884   // __ bind(Lctos);
+2885   __ release(); // Volatile entry point (one instruction before non-volatile_entry point).
+2886   assert(branch_table[ctos] == 0, "can't compute twice");
+2887   branch_table[ctos] = __ pc(); // non-volatile_entry point
+2888   __ pop(ctos);
+2889   if (!is_static) { pop_and_check_object(Rclass_or_obj); } // Kills R11_scratch1..
+2890   __ sthx(R17_tos, Rclass_or_obj, Roffset);
+2891   if (!is_static &amp;&amp; rc == may_rewrite) {
+2892     patch_bytecode(Bytecodes::_fast_cputfield, Rbc, Rscratch, true, byte_no);
+2893   }
+2894   if (!support_IRIW_for_not_multiple_copy_atomic_cpu) {
+2895     __ beq(CR_is_vol, Lvolatile); // Volatile?
+2896   }
+2897   __ dispatch_epilog(vtos, Bytecodes::length_for(bytecode()));
+
+</pre><hr></hr>
+</pre></td><td><pre>
+
+</pre><hr></hr><pre>
+2533   __ fence(); // Volatile entry point (one instruction before non-volatile_entry point).
+2534   assert(branch_table[btos] == 0, "can't compute twice");
+2535   branch_table[btos] = __ pc(); // non-volatile_entry point
+2536   __ lbzx(R17_tos, Rclass_or_obj, Roffset);
+2537   __ extsb(R17_tos, R17_tos);
+2538   __ push(btos);
+2539   if (!is_static &amp;&amp; rc == may_rewrite) {
+2540     patch_bytecode(Bytecodes::_fast_bgetfield, Rbc, Rscratch);
+2541   }
+2542   __ beq(CCR6, Lacquire); // Volatile?
+2543   __ dispatch_epilog(vtos, Bytecodes::length_for(bytecode()));
+2544 
+2545   __ align(32, 28, 28); // Align load.
+2546   // __ bind(Lztos); (same code as btos)
+2547   __ fence(); // Volatile entry point (one instruction before non-volatile_entry point).
+2548   assert(branch_table[ztos] == 0, "can't compute twice");
+2549   branch_table[ztos] = __ pc(); // non-volatile_entry point
+2550   __ lbzx(R17_tos, Rclass_or_obj, Roffset);
+2551   __ extsb(R17_tos, R17_tos);
+2552   __ push(ztos);
+<span class="changed">2553   if (!is_static &amp;&amp; rc == may_rewrite) {</span>
+2554     // use btos rewriting, no truncating to t/f bit is needed for getfield.
+2555     patch_bytecode(Bytecodes::_fast_bgetfield, Rbc, Rscratch);
+2556   }
+2557   __ beq(CCR6, Lacquire); // Volatile?
+2558   __ dispatch_epilog(vtos, Bytecodes::length_for(bytecode()));
+2559 
+2560   __ align(32, 28, 28); // Align load.
+2561   // __ bind(Lctos);
+2562   __ fence(); // Volatile entry point (one instruction before non-volatile_entry point).
+2563   assert(branch_table[ctos] == 0, "can't compute twice");
+2564   branch_table[ctos] = __ pc(); // non-volatile_entry point
+2565   __ lhzx(R17_tos, Rclass_or_obj, Roffset);
+2566   __ push(ctos);
+2567   if (!is_static &amp;&amp; rc == may_rewrite) {
+2568     patch_bytecode(Bytecodes::_fast_cgetfield, Rbc, Rscratch);
+2569   }
+2570   __ beq(CCR6, Lacquire); // Volatile?
+2571   __ dispatch_epilog(vtos, Bytecodes::length_for(bytecode()));
+2572 
+2573   __ align(32, 28, 28); // Align load.
+
+</pre><hr></hr><pre>
+2857   __ pop(btos);
+2858   if (!is_static) { pop_and_check_object(Rclass_or_obj); } // Kills R11_scratch1.
+2859   __ stbx(R17_tos, Rclass_or_obj, Roffset);
+2860   if (!is_static &amp;&amp; rc == may_rewrite) {
+2861     patch_bytecode(Bytecodes::_fast_bputfield, Rbc, Rscratch, true, byte_no);
+2862   }
+2863   if (!support_IRIW_for_not_multiple_copy_atomic_cpu) {
+2864     __ beq(CR_is_vol, Lvolatile); // Volatile?
+2865   }
+2866   __ dispatch_epilog(vtos, Bytecodes::length_for(bytecode()));
+2867 
+2868   __ align(32, 28, 28); // Align pop.
+2869   // __ bind(Lztos);
+2870   __ release(); // Volatile entry point (one instruction before non-volatile_entry point).
+2871   assert(branch_table[ztos] == 0, "can't compute twice");
+2872   branch_table[ztos] = __ pc(); // non-volatile_entry point
+2873   __ pop(ztos);
+2874   if (!is_static) { pop_and_check_object(Rclass_or_obj); } // Kills R11_scratch1.
+2875   __ andi(R17_tos, R17_tos, 0x1);
+2876   __ stbx(R17_tos, Rclass_or_obj, Roffset);
+<span class="changed">2877   if (!is_static &amp;&amp; rc == may_rewrite) {</span>
+<span class="changed">2878     patch_bytecode(Bytecodes::_fast_zputfield, Rbc, Rscratch, true, byte_no);</span>
+<span class="changed">2879   }</span>
+2880   if (!support_IRIW_for_not_multiple_copy_atomic_cpu) {
+2881     __ beq(CR_is_vol, Lvolatile); // Volatile?
+2882   }
+2883   __ dispatch_epilog(vtos, Bytecodes::length_for(bytecode()));
+2884 
+2885   __ align(32, 28, 28); // Align pop.
+2886   // __ bind(Lctos);
+2887   __ release(); // Volatile entry point (one instruction before non-volatile_entry point).
+2888   assert(branch_table[ctos] == 0, "can't compute twice");
+2889   branch_table[ctos] = __ pc(); // non-volatile_entry point
+2890   __ pop(ctos);
+2891   if (!is_static) { pop_and_check_object(Rclass_or_obj); } // Kills R11_scratch1..
+2892   __ sthx(R17_tos, Rclass_or_obj, Roffset);
+2893   if (!is_static &amp;&amp; rc == may_rewrite) {
+2894     patch_bytecode(Bytecodes::_fast_cputfield, Rbc, Rscratch, true, byte_no);
+2895   }
+2896   if (!support_IRIW_for_not_multiple_copy_atomic_cpu) {
+2897     __ beq(CR_is_vol, Lvolatile); // Volatile?
+2898   }
+2899   __ dispatch_epilog(vtos, Bytecodes::length_for(bytecode()));
+
+</pre><hr></hr>
+</pre></td>
+</tr></table>
+<center><a href='../../../../src/cpu/ppc/vm/templateInterpreterGenerator_ppc.cpp.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/cpu/sparc/vm/c1_LIRGenerator_sparc.cpp.sdiff.html' target='_top'>next &gt</a></center>
+</body></html>
