@@ -2,9 +2,11 @@
 # User Igor Nunes  <igor.nunes@eldorado.org.br>
 # Date 1476968263 7200
 #      Thu Oct 20 10:57:43 2016 -0200
-# Node ID 8a707afb71c6bff90ed5e51d94db445b470f44e0
+# Node ID d52de290ff063f47a5155192e4e35936f3273e5e
 # Parent  b2b2ec149a24b487ace20ef05dec8fdb746bf5e3
-PPC64: Use cmpldi instead of li/cmpld
+8168318: PPC64: Use cmpldi instead of li/cmpld
+
+Reviewed-by: goetz
 
 diff --git a/src/cpu/ppc/vm/ppc.ad b/src/cpu/ppc/vm/ppc.ad
 --- a/src/cpu/ppc/vm/ppc.ad
