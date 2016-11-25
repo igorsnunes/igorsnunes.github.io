@@ -1,12 +1,10 @@
 # HG changeset patch
 # User Igor Nunes  <igor.nunes@eldorado.org.br>
-# Date 1480017996 7200
-#      Thu Nov 24 18:06:36 2016 -0200
-# Node ID 8998e5caaec357dbcd01fbb7dce743d03e8adbe7
+# Date 1480079712 7200
+#      Fri Nov 25 11:15:12 2016 -0200
+# Node ID f5a8d47299a941ba15d7ae71070bd20c033e1223
 # Parent  5186b4a73b5ced16464970328cc10497af0b84d8
 PPC64: Use andis instead of lis/and
-
-Add match rule to replace lis/and for an andis.
 
 diff --git a/src/cpu/ppc/vm/ppc.ad b/src/cpu/ppc/vm/ppc.ad
 --- a/src/cpu/ppc/vm/ppc.ad
@@ -23,7 +21,7 @@ diff --git a/src/cpu/ppc/vm/ppc.ad b/src/cpu/ppc/vm/ppc.ad
 +  size(4);
 +  ins_encode %{
 +    // TODO: PPC port $archOpcode(ppc64Opcode_andis_);
-+    __ andis_($dst$$Register, $src1$$Register, (int)((short)(($src2$$constant & 0xFFFF0000) >> 16)));
++    __ andis_($dst$$Register, $src1$$Register, (int)((unsigned short)(($src2$$constant & 0xFFFF0000) >> 16)));
 +  %}
 +  ins_pipe(pipe_class_default);
 +%}
@@ -31,25 +29,3 @@ diff --git a/src/cpu/ppc/vm/ppc.ad b/src/cpu/ppc/vm/ppc.ad
  // Immediate And
  instruct andI_reg_uimm16(iRegIdst dst, iRegIsrc src1, uimmI16 src2, flagsRegCR0 cr0) %{
    match(Set dst (AndI src1 src2));
-# HG changeset patch
-# User Igor Nunes  <igor.nunes@eldorado.org.br>
-# Date 1480079712 7200
-#      Fri Nov 25 11:15:12 2016 -0200
-# Node ID 3607196d17d05f0b5dbef3ad7a2b7de47b53a6f7
-# Parent  8998e5caaec357dbcd01fbb7dce743d03e8adbe7
-PPC64: Use andis instead of lis/and
-
-Fix unsigned short
-
-diff --git a/src/cpu/ppc/vm/ppc.ad b/src/cpu/ppc/vm/ppc.ad
---- a/src/cpu/ppc/vm/ppc.ad
-+++ b/src/cpu/ppc/vm/ppc.ad
-@@ -9588,7 +9588,7 @@
-   size(4);
-   ins_encode %{
-     // TODO: PPC port $archOpcode(ppc64Opcode_andis_);
--    __ andis_($dst$$Register, $src1$$Register, (int)((short)(($src2$$constant & 0xFFFF0000) >> 16)));
-+    __ andis_($dst$$Register, $src1$$Register, (int)((unsigned short)(($src2$$constant & 0xFFFF0000) >> 16)));
-   %}
-   ins_pipe(pipe_class_default);
- %}
