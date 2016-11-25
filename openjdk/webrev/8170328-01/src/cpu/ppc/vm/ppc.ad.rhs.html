@@ -81,7 +81,12 @@ hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
     </head>
     <body id="SUNWwebrev" onkeypress="keypress(event);">
     <a name="0"></a>
-    <pre></pre><hr></hr>
+    <pre>rev <a href="https://bugs.openjdk.java.net/browse/JDK-12338">12338</a> : PPC64: Use andis instead of lis/and
+
+Add match rule to replace lis/and for an andis.
+rev <a href="https://bugs.openjdk.java.net/browse/JDK-12339">12339</a> : PPC64: Use andis instead of lis/and
+
+Fix unsigned short</pre><hr></hr>
 <pre>
    1 //
    2 // Copyright (c) 2011, 2016, Oracle and/or its affiliates. All rights reserved.
