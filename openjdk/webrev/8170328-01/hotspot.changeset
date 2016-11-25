@@ -1,0 +1,33 @@
+# HG changeset patch
+# User Igor Nunes  <igor.nunes@eldorado.org.br>
+# Date 1480017996 7200
+#      Thu Nov 24 18:06:36 2016 -0200
+# Node ID 8998e5caaec357dbcd01fbb7dce743d03e8adbe7
+# Parent  5186b4a73b5ced16464970328cc10497af0b84d8
+PPC64: Use andis instead of lis/and
+
+Add match rule to replace lis/and for an andis.
+
+diff --git a/src/cpu/ppc/vm/ppc.ad b/src/cpu/ppc/vm/ppc.ad
+--- a/src/cpu/ppc/vm/ppc.ad
++++ b/src/cpu/ppc/vm/ppc.ad
+@@ -9580,6 +9580,19 @@
+   ins_pipe(pipe_class_default);
+ %}
+ 
++// Left shifted Immediate And
++instruct andI_reg_immIhi16(iRegIdst dst, iRegIsrc src1, immIhi16  src2, flagsRegCR0 cr0) %{
++  match(Set dst (AndI src1 src2));
++  effect(KILL cr0);
++  format %{ "ANDIS   $dst, $src1, $src2.hi" %}
++  size(4);
++  ins_encode %{
++    // TODO: PPC port $archOpcode(ppc64Opcode_andis_);
++    __ andis_($dst$$Register, $src1$$Register, (int)((short)(($src2$$constant & 0xFFFF0000) >> 16)));
++  %}
++  ins_pipe(pipe_class_default);
++%}
++
+ // Immediate And
+ instruct andI_reg_uimm16(iRegIdst dst, iRegIsrc src1, uimmI16 src2, flagsRegCR0 cr0) %{
+   match(Set dst (AndI src1 src2));
