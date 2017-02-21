@@ -1,0 +1,29 @@
+# HG changeset patch
+# User Gustavo Serra Scalet <gustavo.scalet@eldorado.org.br>
+# Date 1487694989 10800
+#      Tue Feb 21 13:36:29 2017 -0300
+# Node ID 66e6191ca62108ddcc91a8af76e2d5b756377b00
+# Parent  9e017f35599e424599adb913085a0bf979fd8a30
+Shift and xor removing unecessary mr's
+
+diff --git a/src/cpu/ppc/vm/ppc.ad b/src/cpu/ppc/vm/ppc.ad
+--- a/src/cpu/ppc/vm/ppc.ad
++++ b/src/cpu/ppc/vm/ppc.ad
+@@ -9306,6 +9306,17 @@
+   ins_pipe(pipe_class_default);
+ %}
+ 
++// Register Shift Right Immediate with  xor'd  CastP2X
++instruct shrP_xored_convP2X_reg_imm6(iRegLdst dst, iRegP_N2P src1, iRegLsrc src2, immI src3) %{
++  match(Set dst (URShiftL (XorL (CastP2X src1) src2) src3));
++  expand %{
++    iRegIdst tmp1;
++    xorI_reg_reg_2(tmp1, src1, src2);
++    urShiftL_regL_immI(dst, tmp1, src3);
++  %}
++%}
++
++
+ instruct sxtI_reg(iRegIdst dst, iRegIsrc src) %{
+   match(Set dst (ConvL2I (ConvI2L src)));
+ 
