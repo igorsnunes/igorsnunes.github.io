@@ -2,9 +2,7 @@
 <!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
     "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
 <html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
-<head>
-<meta name="scm" content="mercurial" />
-<meta charset="utf-8">
+<head><meta charset="utf-8">
 <meta http-equiv="cache-control" content="no-cache" />
 <meta http-equiv="Pragma" content="no-cache" />
 <meta http-equiv="Expires" content="-1" />
@@ -79,49 +77,49 @@ a.print {display: none}
 hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
 </style>
 
-<title>hotspot</title>
+<title>hotspot Udiff src/cpu/ppc/vm/ppc.ad</title>
+
+<style type="text/css" media="screen">
+span.new {
+    color: blue;
+    font-weight: normal;
+}
+</style>
+
 </head>
 <body id="SUNWwebrev">
-<div class="summary">
-<h2>Code Review for hotspot</h2>
-<table>
-<tr><th>Prepared by:</th><td>Gustavo Serra Scalet <gustavo.scalet@eldorado.org.br> on Tue Feb 21 13:27:07 BRT 2017</td></tr>
-<tr><th>Workspace:</th><td>/home/igor/hs/hotspot</td></tr>
-<tr><th>Compare against:</th><td>
-http://hg.openjdk.java.net/jdk9/hs/hotspot
-</td></tr>
-<tr><th>Compare against version:</th><td>12650</td></tr>
-<tr><th>Summary of changes:</th><td>
-14 lines changed: 14 ins; 0 del; 0 mod; 13465 unchg</td></tr>
-<tr><th>Changeset:</th><td>
-<a href="hotspot.changeset">hotspot.changeset</a></td></tr>
-<tr><th>Bug id:</th><td>
-<a href="https://bugs.openjdk.java.net/browse/001">001</a>
-</td></tr>
-<tr><th>Legend:</th><td>
-<b>Modified file</b><br><font color=red><b>Deleted file</b></font><br><font color=green><b>New file</b></font></td></tr>
-</table>
-</div>
-<p><code>
-<a href="src/cpu/ppc/vm/ppc.ad.cdiff.html">Cdiffs</a>
-<a href="src/cpu/ppc/vm/ppc.ad.udiff.html">Udiffs</a>
-<a href="src/cpu/ppc/vm/ppc.ad.sdiff.html">Sdiffs</a>
-<a href="src/cpu/ppc/vm/ppc.ad.frames.html">Frames</a>
-<a href="src/cpu/ppc/vm/ppc.ad-.html">Old</a>
-<a href="src/cpu/ppc/vm/ppc.ad.html">New</a>
- -----
-<a href="raw_files/new/src/cpu/ppc/vm/ppc.ad">Raw</a>
-</code>
-<b>src/cpu/ppc/vm/ppc.ad</b> 
-</p><blockquote><pre>rev <a href="https://bugs.openjdk.java.net/browse/JDK-12651">12651</a> : Shift left element and compare with zero</pre>
-<!-- Add comments to explain changes in src/cpu/ppc/vm/ppc.ad here -->
-<span class="lineschanged">14 lines changed: 14 ins; 0 del; 0 mod; 13465 unchg</span>
-</blockquote>
+<center>&lt prev <a href='../../../../index.html' target='_top'>index</a> next &gt</center>
+<h2>src/cpu/ppc/vm/ppc.ad</h2>
+        <a class="print" href="javascript:print()">Print this page</a>
+<pre>rev <a href="https://bugs.openjdk.java.net/browse/JDK-12651">12651</a> : Shift left element and compare with zero</pre>
+        <pre>
+</pre><hr /><pre>
+<span class="newmarker">@@ -9278,10 +9278,24 @@</span>
+     __ srdi($dst$$Register, $src1$$Register, ($src2$$constant) &amp; 0x3f);
+   %}
+   ins_pipe(pipe_class_default);
+ %}
+ 
+<span class="new">+// Register Shift Right Immediate</span>
+<span class="new">+instruct urShiftL_regL_immI_cmp_0(flagsRegCR0 cr0, iRegLsrc src1, immI src2, immL_0 src3) %{</span>
+<span class="new">+  match(Set cr0 (CmpL (URShiftL src1 src2) src3 ));</span>
+<span class="new">+</span>
+<span class="new">+  format %{ "SRDI.   R0, $src1, ($src2 &amp; 0x3f)" %}</span>
+<span class="new">+  size(4);</span>
+<span class="new">+  ins_encode %{</span>
+<span class="new">+    // TODO: PPC port $archOpcode(ppc64Opcode_rldicl);</span>
+<span class="new">+    __ srdi_(R0, $src1$$Register, ($src2$$constant) &amp; 0x3f);</span>
+<span class="new">+  %}</span>
+<span class="new">+</span>
+<span class="new">+  ins_pipe(pipe_class_default);</span>
+<span class="new">+%}</span>
+<span class="new">+</span>
+ // URShiftL + ConvL2I.
+ instruct convL2I_urShiftL_regL_immI(iRegIdst dst, iRegLsrc src1, immI src2) %{
+   match(Set dst (ConvL2I (URShiftL src1 src2)));
+ 
+   format %{ "SRDI    $dst, $src1, ($src2 &amp; 0x3f) \t// long + l2i" %}
+</pre>
+<center>&lt prev <a href='../../../../index.html' target='_top'>index</a> next &gt</center>
+</body></html>
 
-
-<hr />
-<p style="font-size: small">
-This code review page was prepared using <b>./webrev.ksh</b>
-(vers 25.16-hg+openjdk.java.net).
-</body>
-</html>

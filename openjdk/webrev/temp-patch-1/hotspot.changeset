@@ -1,0 +1,32 @@
+# HG changeset patch
+# User Gustavo Serra Scalet <gustavo.scalet@eldorado.org.br>
+# Date 1487693404 10800
+#      Tue Feb 21 13:10:04 2017 -0300
+# Node ID ed5a8acb330e9178f9f96426237e41809e9b78cb
+# Parent  9e017f35599e424599adb913085a0bf979fd8a30
+Shift left element and compare with zero
+
+diff --git a/src/cpu/ppc/vm/ppc.ad b/src/cpu/ppc/vm/ppc.ad
+--- a/src/cpu/ppc/vm/ppc.ad
++++ b/src/cpu/ppc/vm/ppc.ad
+@@ -9280,6 +9280,20 @@
+   ins_pipe(pipe_class_default);
+ %}
+ 
++// Register Shift Right Immediate
++instruct urShiftL_regL_immI_cmp_0(flagsRegCR0 cr0, iRegLsrc src1, immI src2, immL_0 src3) %{
++  match(Set cr0 (CmpL (URShiftL src1 src2) src3 ));
++
++  format %{ "SRDI.   R0, $src1, ($src2 & 0x3f)" %}
++  size(4);
++  ins_encode %{
++    // TODO: PPC port $archOpcode(ppc64Opcode_rldicl);
++    __ srdi_(R0, $src1$$Register, ($src2$$constant) & 0x3f);
++  %}
++
++  ins_pipe(pipe_class_default);
++%}
++
+ // URShiftL + ConvL2I.
+ instruct convL2I_urShiftL_regL_immI(iRegIdst dst, iRegLsrc src1, immI src2) %{
+   match(Set dst (ConvL2I (URShiftL src1 src2)));
