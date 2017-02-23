@@ -1,0 +1,31 @@
+# HG changeset patch
+# User Igor Nunes <igor.nunes@eldorado.org.br>
+# Date 1487863120 10800
+#      Thu Feb 23 12:18:40 2017 -0300
+# Node ID 2b15cc07a7638a28501cee8ca32b33dd63d39fbf
+# Parent  9e017f35599e424599adb913085a0bf979fd8a30
+avoid unecessary mr to convert pointer to narrow and store word
+
+diff --git a/src/cpu/ppc/vm/ppc.ad b/src/cpu/ppc/vm/ppc.ad
+--- a/src/cpu/ppc/vm/ppc.ad
++++ b/src/cpu/ppc/vm/ppc.ad
+@@ -6347,6 +6347,19 @@
+   ins_pipe(pipe_class_memory);
+ %}
+ 
++// Store Compressed OOPs with narrow_oop_shift == 0.
++// shift == 0, base == 0
++instruct storeEncodeP_narrow_oop_shift_0(memory dst, iRegPsrc src) %{
++  match(Set dst (StoreN dst (EncodeP src)));
++  ins_cost(MEMORY_REF_COST);
++  predicate(Universe::narrow_oop_shift() == 0);
++
++  format %{ "STW     $src, $dst \t// compressed oop" %}
++  size(4);
++  ins_encode( enc_stw(src, dst) );
++  ins_pipe(pipe_class_memory);
++%}
++
+ // Store Compressed Oop
+ instruct storeN(memory dst, iRegN_P2N src) %{
+   match(Set dst (StoreN dst src));
