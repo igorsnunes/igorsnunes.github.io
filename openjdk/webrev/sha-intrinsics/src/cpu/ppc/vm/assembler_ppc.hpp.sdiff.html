@@ -1,0 +1,919 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>hotspot Sdiff src/cpu/ppc/vm </title>
+</head><body id="SUNWwebrev">
+<center>&lt prev <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/cpu/ppc/vm/assembler_ppc.inline.hpp.sdiff.html' target='_top'>next &gt</a></center>
+<h2>src/cpu/ppc/vm/assembler_ppc.hpp</h2>
+<a class="print" href="javascript:print()">Print this page</a>
+<pre>rev <a href="https://bugs.openjdk.java.net/browse/JDK-12651">12651</a> : Sha2 intrinsics implementation</pre>
+
+<table><tr valign="top">
+<td><pre>
+
+</pre><hr></hr><pre>
+ 384     STB_OPCODE   = (38u &lt;&lt; OPCODE_SHIFT),
+ 385     STBX_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT | 215u &lt;&lt; 1),
+ 386     STBU_OPCODE  = (39u &lt;&lt; OPCODE_SHIFT),
+ 387 
+ 388     EXTSB_OPCODE = (31u &lt;&lt; OPCODE_SHIFT | 954u &lt;&lt; 1),
+ 389     EXTSH_OPCODE = (31u &lt;&lt; OPCODE_SHIFT | 922u &lt;&lt; 1),
+ 390     EXTSW_OPCODE = (31u &lt;&lt; OPCODE_SHIFT | 986u &lt;&lt; 1),               // X-FORM
+ 391 
+ 392     // 32 bit opcode encodings
+ 393 
+ 394     LWA_OPCODE    = (58u &lt;&lt; OPCODE_SHIFT |   2u &lt;&lt; XO_30_31_SHIFT), // DS-FORM
+ 395     LWAX_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT | 341u &lt;&lt; XO_21_30_SHIFT), // X-FORM
+ 396 
+ 397     CNTLZW_OPCODE = (31u &lt;&lt; OPCODE_SHIFT |  26u &lt;&lt; XO_21_30_SHIFT), // X-FORM
+ 398 
+ 399     // 64 bit opcode encodings
+ 400 
+ 401     LD_OPCODE     = (58u &lt;&lt; OPCODE_SHIFT |   0u &lt;&lt; XO_30_31_SHIFT), // DS-FORM
+ 402     LDU_OPCODE    = (58u &lt;&lt; OPCODE_SHIFT |   1u &lt;&lt; XO_30_31_SHIFT), // DS-FORM
+ 403     LDX_OPCODE    = (31u &lt;&lt; OPCODE_SHIFT |  21u &lt;&lt; XO_21_30_SHIFT), // X-FORM
+
+ 404 
+ 405     STD_OPCODE    = (62u &lt;&lt; OPCODE_SHIFT |   0u &lt;&lt; XO_30_31_SHIFT), // DS-FORM
+ 406     STDU_OPCODE   = (62u &lt;&lt; OPCODE_SHIFT |   1u &lt;&lt; XO_30_31_SHIFT), // DS-FORM
+ 407     STDUX_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT | 181u &lt;&lt; 1),                  // X-FORM
+ 408     STDX_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT | 149u &lt;&lt; XO_21_30_SHIFT), // X-FORM
+ 409 
+ 410     RLDICR_OPCODE = (30u &lt;&lt; OPCODE_SHIFT |   1u &lt;&lt; XO_27_29_SHIFT), // MD-FORM
+ 411     RLDICL_OPCODE = (30u &lt;&lt; OPCODE_SHIFT |   0u &lt;&lt; XO_27_29_SHIFT), // MD-FORM
+ 412     RLDIC_OPCODE  = (30u &lt;&lt; OPCODE_SHIFT |   2u &lt;&lt; XO_27_29_SHIFT), // MD-FORM
+ 413     RLDIMI_OPCODE = (30u &lt;&lt; OPCODE_SHIFT |   3u &lt;&lt; XO_27_29_SHIFT), // MD-FORM
+ 414 
+ 415     SRADI_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT | 413u &lt;&lt; XO_21_29_SHIFT), // XS-FORM
+ 416 
+ 417     SLD_OPCODE    = (31u &lt;&lt; OPCODE_SHIFT |  27u &lt;&lt; 1),              // X-FORM
+ 418     SRD_OPCODE    = (31u &lt;&lt; OPCODE_SHIFT | 539u &lt;&lt; 1),              // X-FORM
+ 419     SRAD_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT | 794u &lt;&lt; 1),              // X-FORM
+ 420 
+ 421     MULLD_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT | 233u &lt;&lt; 1),              // XO-FORM
+ 422     MULHD_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT |  73u &lt;&lt; 1),              // XO-FORM
+ 423     MULHDU_OPCODE = (31u &lt;&lt; OPCODE_SHIFT |   9u &lt;&lt; 1),              // XO-FORM
+
+</pre><hr></hr><pre>
+ 489 
+ 490     // Vector instruction support for &gt;= Power6
+ 491     // Vector Storage Access
+ 492     LVEBX_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT |    7u &lt;&lt; 1),
+ 493     LVEHX_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT |   39u &lt;&lt; 1),
+ 494     LVEWX_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT |   71u &lt;&lt; 1),
+ 495     LVX_OPCODE     = (31u &lt;&lt; OPCODE_SHIFT |  103u &lt;&lt; 1),
+ 496     LVXL_OPCODE    = (31u &lt;&lt; OPCODE_SHIFT |  359u &lt;&lt; 1),
+ 497     STVEBX_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT |  135u &lt;&lt; 1),
+ 498     STVEHX_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT |  167u &lt;&lt; 1),
+ 499     STVEWX_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT |  199u &lt;&lt; 1),
+ 500     STVX_OPCODE    = (31u &lt;&lt; OPCODE_SHIFT |  231u &lt;&lt; 1),
+ 501     STVXL_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT |  487u &lt;&lt; 1),
+ 502     LVSL_OPCODE    = (31u &lt;&lt; OPCODE_SHIFT |    6u &lt;&lt; 1),
+ 503     LVSR_OPCODE    = (31u &lt;&lt; OPCODE_SHIFT |   38u &lt;&lt; 1),
+ 504 
+ 505     // Vector-Scalar (VSX) instruction support.
+ 506     LXVD2X_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT |  844u &lt;&lt; 1),
+ 507     STXVD2X_OPCODE = (31u &lt;&lt; OPCODE_SHIFT |  972u &lt;&lt; 1),
+ 508     MTVSRD_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT |  179u &lt;&lt; 1),
+
+ 509     MFVSRD_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT |   51u &lt;&lt; 1),
+
+
+
+
+ 510 
+ 511     // Vector Permute and Formatting
+ 512     VPKPX_OPCODE   = (4u  &lt;&lt; OPCODE_SHIFT |  782u     ),
+ 513     VPKSHSS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  398u     ),
+ 514     VPKSWSS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  462u     ),
+ 515     VPKSHUS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  270u     ),
+ 516     VPKSWUS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  334u     ),
+ 517     VPKUHUM_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |   14u     ),
+ 518     VPKUWUM_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |   78u     ),
+ 519     VPKUHUS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  142u     ),
+ 520     VPKUWUS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  206u     ),
+ 521     VUPKHPX_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  846u     ),
+ 522     VUPKHSB_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  526u     ),
+ 523     VUPKHSH_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  590u     ),
+ 524     VUPKLPX_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  974u     ),
+ 525     VUPKLSB_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  654u     ),
+ 526     VUPKLSH_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  718u     ),
+ 527 
+ 528     VMRGHB_OPCODE  = (4u  &lt;&lt; OPCODE_SHIFT |   12u     ),
+ 529     VMRGHW_OPCODE  = (4u  &lt;&lt; OPCODE_SHIFT |  140u     ),
+
+</pre><hr></hr><pre>
+ 539     VSPLTISH_OPCODE= (4u  &lt;&lt; OPCODE_SHIFT |  844u     ),
+ 540     VSPLTISW_OPCODE= (4u  &lt;&lt; OPCODE_SHIFT |  908u     ),
+ 541 
+ 542     VPERM_OPCODE   = (4u  &lt;&lt; OPCODE_SHIFT |   43u     ),
+ 543     VSEL_OPCODE    = (4u  &lt;&lt; OPCODE_SHIFT |   42u     ),
+ 544 
+ 545     VSL_OPCODE     = (4u  &lt;&lt; OPCODE_SHIFT |  452u     ),
+ 546     VSLDOI_OPCODE  = (4u  &lt;&lt; OPCODE_SHIFT |   44u     ),
+ 547     VSLO_OPCODE    = (4u  &lt;&lt; OPCODE_SHIFT | 1036u     ),
+ 548     VSR_OPCODE     = (4u  &lt;&lt; OPCODE_SHIFT |  708u     ),
+ 549     VSRO_OPCODE    = (4u  &lt;&lt; OPCODE_SHIFT | 1100u     ),
+ 550 
+ 551     // Vector Integer
+ 552     VADDCUW_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  384u     ),
+ 553     VADDSHS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  832u     ),
+ 554     VADDSBS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  768u     ),
+ 555     VADDSWS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  896u     ),
+ 556     VADDUBM_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |    0u     ),
+ 557     VADDUWM_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  128u     ),
+ 558     VADDUHM_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |   64u     ),
+
+ 559     VADDUBS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  512u     ),
+ 560     VADDUWS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  640u     ),
+ 561     VADDUHS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  576u     ),
+ 562     VSUBCUW_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT | 1408u     ),
+ 563     VSUBSHS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT | 1856u     ),
+ 564     VSUBSBS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT | 1792u     ),
+ 565     VSUBSWS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT | 1920u     ),
+ 566     VSUBUBM_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT | 1024u     ),
+ 567     VSUBUWM_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT | 1152u     ),
+ 568     VSUBUHM_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT | 1088u     ),
+ 569     VSUBUBS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT | 1536u     ),
+ 570     VSUBUWS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT | 1664u     ),
+ 571     VSUBUHS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT | 1600u     ),
+ 572 
+ 573     VMULESB_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  776u     ),
+ 574     VMULEUB_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  520u     ),
+ 575     VMULESH_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  840u     ),
+ 576     VMULEUH_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  584u     ),
+ 577     VMULOSB_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  264u     ),
+ 578     VMULOUB_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |    8u     ),
+
+</pre><hr></hr><pre>
+1077   static int th(       int         x)  { return  opp_u_field(x,             10,  7); }
+1078   static int thct(     int         x)  { assert((x&amp;8) == 0, "must be valid cache specification");  return th(x); }
+1079   static int thds(     int         x)  { assert((x&amp;8) == 8, "must be valid stream specification"); return th(x); }
+1080   static int to(       int         x)  { return  opp_u_field(x,             10,  6); }
+1081   static int u(        int         x)  { return  opp_u_field(x,             19, 16); }
+1082   static int ui(       int         x)  { return  opp_u_field(x,             31, 16); }
+1083 
+1084   // Support vector instructions for &gt;= Power6.
+1085   static int vra(      int         x)  { return  opp_u_field(x,             15, 11); }
+1086   static int vrb(      int         x)  { return  opp_u_field(x,             20, 16); }
+1087   static int vrc(      int         x)  { return  opp_u_field(x,             25, 21); }
+1088   static int vrs(      int         x)  { return  opp_u_field(x,             10,  6); }
+1089   static int vrt(      int         x)  { return  opp_u_field(x,             10,  6); }
+1090 
+1091   static int vra(   VectorRegister r)  { return  vra(r-&gt;encoding());}
+1092   static int vrb(   VectorRegister r)  { return  vrb(r-&gt;encoding());}
+1093   static int vrc(   VectorRegister r)  { return  vrc(r-&gt;encoding());}
+1094   static int vrs(   VectorRegister r)  { return  vrs(r-&gt;encoding());}
+1095   static int vrt(   VectorRegister r)  { return  vrt(r-&gt;encoding());}
+1096 
+
+
+
+
+1097   // Support Vector-Scalar (VSX) instructions.
+<span class="changed">1098   static int vsra(      int         x)  { return  opp_u_field(x,            15, 11); }</span>
+<span class="changed">1099   static int vsrb(      int         x)  { return  opp_u_field(x,            20, 16); }</span>
+<span class="changed">1100   static int vsrc(      int         x)  { return  opp_u_field(x,            25, 21); }</span>
+<span class="changed">1101   static int vsrs(      int         x)  { return  opp_u_field(x,            10,  6); }</span>
+<span class="changed">1102   static int vsrt(      int         x)  { return  opp_u_field(x,            10,  6); }</span>
+1103 
+1104   static int vsra(   VectorSRegister r)  { return  vsra(r-&gt;encoding());}
+1105   static int vsrb(   VectorSRegister r)  { return  vsrb(r-&gt;encoding());}
+<span class="removed">1106   static int vsrc(   VectorSRegister r)  { return  vsrc(r-&gt;encoding());}</span>
+1107   static int vsrs(   VectorSRegister r)  { return  vsrs(r-&gt;encoding());}
+1108   static int vsrt(   VectorSRegister r)  { return  vsrt(r-&gt;encoding());}
+1109 
+1110   static int vsplt_uim( int        x)  { return  opp_u_field(x,             15, 12); } // for vsplt* instructions
+1111   static int vsplti_sim(int        x)  { return  opp_u_field(x,             15, 11); } // for vsplti* instructions
+1112   static int vsldoi_shb(int        x)  { return  opp_u_field(x,             25, 22); } // for vsldoi instruction
+1113   static int vcmp_rc(   int        x)  { return  opp_u_field(x,             21, 21); } // for vcmp* instructions
+1114 
+1115   //static int xo1(     int        x)  { return  opp_u_field(x,             29, 21); }// is contained in our opcodes
+1116   //static int xo2(     int        x)  { return  opp_u_field(x,             30, 21); }// is contained in our opcodes
+1117   //static int xo3(     int        x)  { return  opp_u_field(x,             30, 22); }// is contained in our opcodes
+1118   //static int xo4(     int        x)  { return  opp_u_field(x,             30, 26); }// is contained in our opcodes
+1119   //static int xo5(     int        x)  { return  opp_u_field(x,             29, 27); }// is contained in our opcodes
+1120   //static int xo6(     int        x)  { return  opp_u_field(x,             30, 27); }// is contained in our opcodes
+1121   //static int xo7(     int        x)  { return  opp_u_field(x,             31, 30); }// is contained in our opcodes
+1122 
+1123  protected:
+1124   // Compute relative address for branch.
+1125   static intptr_t disp(intptr_t x, intptr_t off) {
+1126     int xx = x - off;
+
+</pre><hr></hr><pre>
+1535   inline void lhzu( Register d, int si16,    Register s1);
+1536 
+1537   // 2 bytes reversed
+1538   inline void lhbrx( Register d, Register s1, Register s2);
+1539 
+1540   // 2 bytes
+1541   inline void lhax( Register d, Register s1, Register s2);
+1542   inline void lha(  Register d, int si16,    Register s1);
+1543   inline void lhau( Register d, int si16,    Register s1);
+1544 
+1545   // 1 byte
+1546   inline void lbzx( Register d, Register s1, Register s2);
+1547   inline void lbz(  Register d, int si16,    Register s1);
+1548   inline void lbzu( Register d, int si16,    Register s1);
+1549 
+1550   // 8 bytes
+1551   inline void ldx(  Register d, Register s1, Register s2);
+1552   inline void ld(   Register d, int si16,    Register s1);
+1553   inline void ldu(  Register d, int si16,    Register s1);
+1554 
+
+
+
+1555   // For convenience. Load pointer into d from b+s1.
+1556   inline void ld_ptr(Register d, int b, Register s1);
+1557   DEBUG_ONLY(inline void ld_ptr(Register d, ByteSize b, Register s1);)
+1558 
+1559   //  PPC 1, section 3.3.3 Fixed-Point Store Instructions
+1560   inline void stwx( Register d, Register s1, Register s2);
+1561   inline void stw(  Register d, int si16,    Register s1);
+1562   inline void stwu( Register d, int si16,    Register s1);
+1563 
+1564   inline void sthx( Register d, Register s1, Register s2);
+1565   inline void sth(  Register d, int si16,    Register s1);
+1566   inline void sthu( Register d, int si16,    Register s1);
+1567 
+1568   inline void stbx( Register d, Register s1, Register s2);
+1569   inline void stb(  Register d, int si16,    Register s1);
+1570   inline void stbu( Register d, int si16,    Register s1);
+1571 
+1572   inline void stdx( Register d, Register s1, Register s2);
+1573   inline void std(  Register d, int si16,    Register s1);
+1574   inline void stdu( Register d, int si16,    Register s1);
+
+</pre><hr></hr><pre>
+2010   inline void vsplt(    VectorRegister d, int ui4,          VectorRegister b);
+2011   inline void vsplth(   VectorRegister d, int ui3,          VectorRegister b);
+2012   inline void vspltw(   VectorRegister d, int ui2,          VectorRegister b);
+2013   inline void vspltisb( VectorRegister d, int si5);
+2014   inline void vspltish( VectorRegister d, int si5);
+2015   inline void vspltisw( VectorRegister d, int si5);
+2016   inline void vperm(    VectorRegister d, VectorRegister a, VectorRegister b, VectorRegister c);
+2017   inline void vsel(     VectorRegister d, VectorRegister a, VectorRegister b, VectorRegister c);
+2018   inline void vsl(      VectorRegister d, VectorRegister a, VectorRegister b);
+2019   inline void vsldoi(   VectorRegister d, VectorRegister a, VectorRegister b, int si4);
+2020   inline void vslo(     VectorRegister d, VectorRegister a, VectorRegister b);
+2021   inline void vsr(      VectorRegister d, VectorRegister a, VectorRegister b);
+2022   inline void vsro(     VectorRegister d, VectorRegister a, VectorRegister b);
+2023   inline void vaddcuw(  VectorRegister d, VectorRegister a, VectorRegister b);
+2024   inline void vaddshs(  VectorRegister d, VectorRegister a, VectorRegister b);
+2025   inline void vaddsbs(  VectorRegister d, VectorRegister a, VectorRegister b);
+2026   inline void vaddsws(  VectorRegister d, VectorRegister a, VectorRegister b);
+2027   inline void vaddubm(  VectorRegister d, VectorRegister a, VectorRegister b);
+2028   inline void vadduwm(  VectorRegister d, VectorRegister a, VectorRegister b);
+2029   inline void vadduhm(  VectorRegister d, VectorRegister a, VectorRegister b);
+
+2030   inline void vaddubs(  VectorRegister d, VectorRegister a, VectorRegister b);
+2031   inline void vadduws(  VectorRegister d, VectorRegister a, VectorRegister b);
+2032   inline void vadduhs(  VectorRegister d, VectorRegister a, VectorRegister b);
+2033   inline void vsubcuw(  VectorRegister d, VectorRegister a, VectorRegister b);
+2034   inline void vsubshs(  VectorRegister d, VectorRegister a, VectorRegister b);
+2035   inline void vsubsbs(  VectorRegister d, VectorRegister a, VectorRegister b);
+2036   inline void vsubsws(  VectorRegister d, VectorRegister a, VectorRegister b);
+2037   inline void vsububm(  VectorRegister d, VectorRegister a, VectorRegister b);
+2038   inline void vsubuwm(  VectorRegister d, VectorRegister a, VectorRegister b);
+2039   inline void vsubuhm(  VectorRegister d, VectorRegister a, VectorRegister b);
+2040   inline void vsububs(  VectorRegister d, VectorRegister a, VectorRegister b);
+2041   inline void vsubuws(  VectorRegister d, VectorRegister a, VectorRegister b);
+2042   inline void vsubuhs(  VectorRegister d, VectorRegister a, VectorRegister b);
+2043   inline void vmulesb(  VectorRegister d, VectorRegister a, VectorRegister b);
+2044   inline void vmuleub(  VectorRegister d, VectorRegister a, VectorRegister b);
+2045   inline void vmulesh(  VectorRegister d, VectorRegister a, VectorRegister b);
+2046   inline void vmuleuh(  VectorRegister d, VectorRegister a, VectorRegister b);
+2047   inline void vmulosb(  VectorRegister d, VectorRegister a, VectorRegister b);
+2048   inline void vmuloub(  VectorRegister d, VectorRegister a, VectorRegister b);
+2049   inline void vmulosh(  VectorRegister d, VectorRegister a, VectorRegister b);
+
+</pre><hr></hr><pre>
+2085   inline void vcmpequw( VectorRegister d, VectorRegister a, VectorRegister b);
+2086   inline void vcmpgtsh( VectorRegister d, VectorRegister a, VectorRegister b);
+2087   inline void vcmpgtsb( VectorRegister d, VectorRegister a, VectorRegister b);
+2088   inline void vcmpgtsw( VectorRegister d, VectorRegister a, VectorRegister b);
+2089   inline void vcmpgtub( VectorRegister d, VectorRegister a, VectorRegister b);
+2090   inline void vcmpgtuh( VectorRegister d, VectorRegister a, VectorRegister b);
+2091   inline void vcmpgtuw( VectorRegister d, VectorRegister a, VectorRegister b);
+2092   inline void vcmpequb_(VectorRegister d, VectorRegister a, VectorRegister b);
+2093   inline void vcmpequh_(VectorRegister d, VectorRegister a, VectorRegister b);
+2094   inline void vcmpequw_(VectorRegister d, VectorRegister a, VectorRegister b);
+2095   inline void vcmpgtsh_(VectorRegister d, VectorRegister a, VectorRegister b);
+2096   inline void vcmpgtsb_(VectorRegister d, VectorRegister a, VectorRegister b);
+2097   inline void vcmpgtsw_(VectorRegister d, VectorRegister a, VectorRegister b);
+2098   inline void vcmpgtub_(VectorRegister d, VectorRegister a, VectorRegister b);
+2099   inline void vcmpgtuh_(VectorRegister d, VectorRegister a, VectorRegister b);
+2100   inline void vcmpgtuw_(VectorRegister d, VectorRegister a, VectorRegister b);
+2101   inline void vand(     VectorRegister d, VectorRegister a, VectorRegister b);
+2102   inline void vandc(    VectorRegister d, VectorRegister a, VectorRegister b);
+2103   inline void vnor(     VectorRegister d, VectorRegister a, VectorRegister b);
+2104   inline void vor(      VectorRegister d, VectorRegister a, VectorRegister b);
+
+2105   inline void vxor(     VectorRegister d, VectorRegister a, VectorRegister b);
+2106   inline void vrld(     VectorRegister d, VectorRegister a, VectorRegister b);
+2107   inline void vrlb(     VectorRegister d, VectorRegister a, VectorRegister b);
+2108   inline void vrlw(     VectorRegister d, VectorRegister a, VectorRegister b);
+2109   inline void vrlh(     VectorRegister d, VectorRegister a, VectorRegister b);
+2110   inline void vslb(     VectorRegister d, VectorRegister a, VectorRegister b);
+2111   inline void vskw(     VectorRegister d, VectorRegister a, VectorRegister b);
+2112   inline void vslh(     VectorRegister d, VectorRegister a, VectorRegister b);
+2113   inline void vsrb(     VectorRegister d, VectorRegister a, VectorRegister b);
+2114   inline void vsrw(     VectorRegister d, VectorRegister a, VectorRegister b);
+2115   inline void vsrh(     VectorRegister d, VectorRegister a, VectorRegister b);
+2116   inline void vsrab(    VectorRegister d, VectorRegister a, VectorRegister b);
+2117   inline void vsraw(    VectorRegister d, VectorRegister a, VectorRegister b);
+2118   inline void vsrah(    VectorRegister d, VectorRegister a, VectorRegister b);
+2119   // Vector Floating-Point not implemented yet
+2120   inline void mtvscr(   VectorRegister b);
+2121   inline void mfvscr(   VectorRegister d);
+2122 
+2123   // Vector-Scalar (VSX) instructions.
+2124   inline void lxvd2x(   VectorSRegister d, Register a);
+2125   inline void lxvd2x(   VectorSRegister d, Register a, Register b);
+2126   inline void stxvd2x(  VectorSRegister d, Register a);
+2127   inline void stxvd2x(  VectorSRegister d, Register a, Register b);
+
+
+2128   inline void mtvrd(    VectorRegister  d, Register a);
+2129   inline void mfvrd(    Register        a, VectorRegister d);
+
+
+
+
+
+
+
+
+
+2130 
+2131   // AES (introduced with Power 8)
+2132   inline void vcipher(     VectorRegister d, VectorRegister a, VectorRegister b);
+2133   inline void vcipherlast( VectorRegister d, VectorRegister a, VectorRegister b);
+2134   inline void vncipher(    VectorRegister d, VectorRegister a, VectorRegister b);
+2135   inline void vncipherlast(VectorRegister d, VectorRegister a, VectorRegister b);
+2136   inline void vsbox(       VectorRegister d, VectorRegister a);
+2137 
+2138   // SHA (introduced with Power 8)
+<span class="changed">2139   // Not yet implemented.</span>
+
+2140 
+2141   // Vector Binary Polynomial Multiplication (introduced with Power 8)
+2142   inline void vpmsumb(  VectorRegister d, VectorRegister a, VectorRegister b);
+2143   inline void vpmsumd(  VectorRegister d, VectorRegister a, VectorRegister b);
+2144   inline void vpmsumh(  VectorRegister d, VectorRegister a, VectorRegister b);
+2145   inline void vpmsumw(  VectorRegister d, VectorRegister a, VectorRegister b);
+2146 
+2147   // Vector Permute and Xor (introduced with Power 8)
+2148   inline void vpermxor( VectorRegister d, VectorRegister a, VectorRegister b, VectorRegister c);
+2149 
+2150   // Transactional Memory instructions (introduced with Power 8)
+2151   inline void tbegin_();    // R=0
+2152   inline void tbeginrot_(); // R=1 Rollback-Only Transaction
+2153   inline void tend_();    // A=0
+2154   inline void tendall_(); // A=1
+2155   inline void tabort_();
+2156   inline void tabort_(Register a);
+2157   inline void tabortwc_(int t, Register a, Register b);
+2158   inline void tabortwci_(int t, Register a, int si);
+2159   inline void tabortdc_(int t, Register a, Register b);
+
+</pre><hr></hr><pre>
+2165   static bool is_tbegin(int x) {
+2166     return TBEGIN_OPCODE == (x &amp; (0x3f &lt;&lt; OPCODE_SHIFT | 0x3ff &lt;&lt; 1));
+2167   }
+2168 
+2169   // The following encoders use r0 as second operand. These instructions
+2170   // read r0 as '0'.
+2171   inline void lwzx( Register d, Register s2);
+2172   inline void lwz(  Register d, int si16);
+2173   inline void lwax( Register d, Register s2);
+2174   inline void lwa(  Register d, int si16);
+2175   inline void lwbrx(Register d, Register s2);
+2176   inline void lhzx( Register d, Register s2);
+2177   inline void lhz(  Register d, int si16);
+2178   inline void lhax( Register d, Register s2);
+2179   inline void lha(  Register d, int si16);
+2180   inline void lhbrx(Register d, Register s2);
+2181   inline void lbzx( Register d, Register s2);
+2182   inline void lbz(  Register d, int si16);
+2183   inline void ldx(  Register d, Register s2);
+2184   inline void ld(   Register d, int si16);
+
+2185   inline void stwx( Register d, Register s2);
+2186   inline void stw(  Register d, int si16);
+2187   inline void sthx( Register d, Register s2);
+2188   inline void sth(  Register d, int si16);
+2189   inline void stbx( Register d, Register s2);
+2190   inline void stb(  Register d, int si16);
+2191   inline void stdx( Register d, Register s2);
+2192   inline void std(  Register d, int si16);
+2193 
+2194   // PPC 2, section 3.2.1 Instruction Cache Instructions
+2195   inline void icbi(    Register s2);
+2196   // PPC 2, section 3.2.2 Data Cache Instructions
+2197   //inlinevoid dcba(   Register s2); // Instruction for embedded processor only.
+2198   inline void dcbz(    Register s2);
+2199   inline void dcbst(   Register s2);
+2200   inline void dcbf(    Register s2);
+2201   // dcache read hint
+2202   inline void dcbt(    Register s2);
+2203   inline void dcbtct(  Register s2, int ct);
+2204   inline void dcbtds(  Register s2, int ds);
+
+</pre><hr></hr>
+</pre></td><td><pre>
+
+</pre><hr></hr><pre>
+ 384     STB_OPCODE   = (38u &lt;&lt; OPCODE_SHIFT),
+ 385     STBX_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT | 215u &lt;&lt; 1),
+ 386     STBU_OPCODE  = (39u &lt;&lt; OPCODE_SHIFT),
+ 387 
+ 388     EXTSB_OPCODE = (31u &lt;&lt; OPCODE_SHIFT | 954u &lt;&lt; 1),
+ 389     EXTSH_OPCODE = (31u &lt;&lt; OPCODE_SHIFT | 922u &lt;&lt; 1),
+ 390     EXTSW_OPCODE = (31u &lt;&lt; OPCODE_SHIFT | 986u &lt;&lt; 1),               // X-FORM
+ 391 
+ 392     // 32 bit opcode encodings
+ 393 
+ 394     LWA_OPCODE    = (58u &lt;&lt; OPCODE_SHIFT |   2u &lt;&lt; XO_30_31_SHIFT), // DS-FORM
+ 395     LWAX_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT | 341u &lt;&lt; XO_21_30_SHIFT), // X-FORM
+ 396 
+ 397     CNTLZW_OPCODE = (31u &lt;&lt; OPCODE_SHIFT |  26u &lt;&lt; XO_21_30_SHIFT), // X-FORM
+ 398 
+ 399     // 64 bit opcode encodings
+ 400 
+ 401     LD_OPCODE     = (58u &lt;&lt; OPCODE_SHIFT |   0u &lt;&lt; XO_30_31_SHIFT), // DS-FORM
+ 402     LDU_OPCODE    = (58u &lt;&lt; OPCODE_SHIFT |   1u &lt;&lt; XO_30_31_SHIFT), // DS-FORM
+ 403     LDX_OPCODE    = (31u &lt;&lt; OPCODE_SHIFT |  21u &lt;&lt; XO_21_30_SHIFT), // X-FORM
+<span class="new"> 404     LDBRX_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT |  532 &lt;&lt; 1),              // X-FORM</span>
+ 405 
+ 406     STD_OPCODE    = (62u &lt;&lt; OPCODE_SHIFT |   0u &lt;&lt; XO_30_31_SHIFT), // DS-FORM
+ 407     STDU_OPCODE   = (62u &lt;&lt; OPCODE_SHIFT |   1u &lt;&lt; XO_30_31_SHIFT), // DS-FORM
+ 408     STDUX_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT | 181u &lt;&lt; 1),                  // X-FORM
+ 409     STDX_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT | 149u &lt;&lt; XO_21_30_SHIFT), // X-FORM
+ 410 
+ 411     RLDICR_OPCODE = (30u &lt;&lt; OPCODE_SHIFT |   1u &lt;&lt; XO_27_29_SHIFT), // MD-FORM
+ 412     RLDICL_OPCODE = (30u &lt;&lt; OPCODE_SHIFT |   0u &lt;&lt; XO_27_29_SHIFT), // MD-FORM
+ 413     RLDIC_OPCODE  = (30u &lt;&lt; OPCODE_SHIFT |   2u &lt;&lt; XO_27_29_SHIFT), // MD-FORM
+ 414     RLDIMI_OPCODE = (30u &lt;&lt; OPCODE_SHIFT |   3u &lt;&lt; XO_27_29_SHIFT), // MD-FORM
+ 415 
+ 416     SRADI_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT | 413u &lt;&lt; XO_21_29_SHIFT), // XS-FORM
+ 417 
+ 418     SLD_OPCODE    = (31u &lt;&lt; OPCODE_SHIFT |  27u &lt;&lt; 1),              // X-FORM
+ 419     SRD_OPCODE    = (31u &lt;&lt; OPCODE_SHIFT | 539u &lt;&lt; 1),              // X-FORM
+ 420     SRAD_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT | 794u &lt;&lt; 1),              // X-FORM
+ 421 
+ 422     MULLD_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT | 233u &lt;&lt; 1),              // XO-FORM
+ 423     MULHD_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT |  73u &lt;&lt; 1),              // XO-FORM
+ 424     MULHDU_OPCODE = (31u &lt;&lt; OPCODE_SHIFT |   9u &lt;&lt; 1),              // XO-FORM
+
+</pre><hr></hr><pre>
+ 490 
+ 491     // Vector instruction support for &gt;= Power6
+ 492     // Vector Storage Access
+ 493     LVEBX_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT |    7u &lt;&lt; 1),
+ 494     LVEHX_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT |   39u &lt;&lt; 1),
+ 495     LVEWX_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT |   71u &lt;&lt; 1),
+ 496     LVX_OPCODE     = (31u &lt;&lt; OPCODE_SHIFT |  103u &lt;&lt; 1),
+ 497     LVXL_OPCODE    = (31u &lt;&lt; OPCODE_SHIFT |  359u &lt;&lt; 1),
+ 498     STVEBX_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT |  135u &lt;&lt; 1),
+ 499     STVEHX_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT |  167u &lt;&lt; 1),
+ 500     STVEWX_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT |  199u &lt;&lt; 1),
+ 501     STVX_OPCODE    = (31u &lt;&lt; OPCODE_SHIFT |  231u &lt;&lt; 1),
+ 502     STVXL_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT |  487u &lt;&lt; 1),
+ 503     LVSL_OPCODE    = (31u &lt;&lt; OPCODE_SHIFT |    6u &lt;&lt; 1),
+ 504     LVSR_OPCODE    = (31u &lt;&lt; OPCODE_SHIFT |   38u &lt;&lt; 1),
+ 505 
+ 506     // Vector-Scalar (VSX) instruction support.
+ 507     LXVD2X_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT |  844u &lt;&lt; 1),
+ 508     STXVD2X_OPCODE = (31u &lt;&lt; OPCODE_SHIFT |  972u &lt;&lt; 1),
+ 509     MTVSRD_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT |  179u &lt;&lt; 1),
+<span class="new"> 510     MTVSRWZ_OPCODE = (31u &lt;&lt; OPCODE_SHIFT |  243u &lt;&lt; 1),</span>
+ 511     MFVSRD_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT |   51u &lt;&lt; 1),
+<span class="new"> 512     MFVSRWZ_OPCODE = (31u &lt;&lt; OPCODE_SHIFT |  115u &lt;&lt; 1),</span>
+<span class="new"> 513     XXPERMDI_OPCODE= (60u &lt;&lt; OPCODE_SHIFT |   10u &lt;&lt; 3),</span>
+<span class="new"> 514     XXMRGHW_OPCODE = (60u &lt;&lt; OPCODE_SHIFT |   18u &lt;&lt; 3),</span>
+<span class="new"> 515     XXMRGLW_OPCODE = (60u &lt;&lt; OPCODE_SHIFT |   50u &lt;&lt; 3),</span>
+ 516 
+ 517     // Vector Permute and Formatting
+ 518     VPKPX_OPCODE   = (4u  &lt;&lt; OPCODE_SHIFT |  782u     ),
+ 519     VPKSHSS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  398u     ),
+ 520     VPKSWSS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  462u     ),
+ 521     VPKSHUS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  270u     ),
+ 522     VPKSWUS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  334u     ),
+ 523     VPKUHUM_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |   14u     ),
+ 524     VPKUWUM_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |   78u     ),
+ 525     VPKUHUS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  142u     ),
+ 526     VPKUWUS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  206u     ),
+ 527     VUPKHPX_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  846u     ),
+ 528     VUPKHSB_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  526u     ),
+ 529     VUPKHSH_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  590u     ),
+ 530     VUPKLPX_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  974u     ),
+ 531     VUPKLSB_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  654u     ),
+ 532     VUPKLSH_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  718u     ),
+ 533 
+ 534     VMRGHB_OPCODE  = (4u  &lt;&lt; OPCODE_SHIFT |   12u     ),
+ 535     VMRGHW_OPCODE  = (4u  &lt;&lt; OPCODE_SHIFT |  140u     ),
+
+</pre><hr></hr><pre>
+ 545     VSPLTISH_OPCODE= (4u  &lt;&lt; OPCODE_SHIFT |  844u     ),
+ 546     VSPLTISW_OPCODE= (4u  &lt;&lt; OPCODE_SHIFT |  908u     ),
+ 547 
+ 548     VPERM_OPCODE   = (4u  &lt;&lt; OPCODE_SHIFT |   43u     ),
+ 549     VSEL_OPCODE    = (4u  &lt;&lt; OPCODE_SHIFT |   42u     ),
+ 550 
+ 551     VSL_OPCODE     = (4u  &lt;&lt; OPCODE_SHIFT |  452u     ),
+ 552     VSLDOI_OPCODE  = (4u  &lt;&lt; OPCODE_SHIFT |   44u     ),
+ 553     VSLO_OPCODE    = (4u  &lt;&lt; OPCODE_SHIFT | 1036u     ),
+ 554     VSR_OPCODE     = (4u  &lt;&lt; OPCODE_SHIFT |  708u     ),
+ 555     VSRO_OPCODE    = (4u  &lt;&lt; OPCODE_SHIFT | 1100u     ),
+ 556 
+ 557     // Vector Integer
+ 558     VADDCUW_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  384u     ),
+ 559     VADDSHS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  832u     ),
+ 560     VADDSBS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  768u     ),
+ 561     VADDSWS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  896u     ),
+ 562     VADDUBM_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |    0u     ),
+ 563     VADDUWM_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  128u     ),
+ 564     VADDUHM_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |   64u     ),
+<span class="new"> 565     VADDUDM_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  192u     ),</span>
+ 566     VADDUBS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  512u     ),
+ 567     VADDUWS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  640u     ),
+ 568     VADDUHS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  576u     ),
+ 569     VSUBCUW_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT | 1408u     ),
+ 570     VSUBSHS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT | 1856u     ),
+ 571     VSUBSBS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT | 1792u     ),
+ 572     VSUBSWS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT | 1920u     ),
+ 573     VSUBUBM_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT | 1024u     ),
+ 574     VSUBUWM_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT | 1152u     ),
+ 575     VSUBUHM_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT | 1088u     ),
+ 576     VSUBUBS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT | 1536u     ),
+ 577     VSUBUWS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT | 1664u     ),
+ 578     VSUBUHS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT | 1600u     ),
+ 579 
+ 580     VMULESB_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  776u     ),
+ 581     VMULEUB_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  520u     ),
+ 582     VMULESH_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  840u     ),
+ 583     VMULEUH_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  584u     ),
+ 584     VMULOSB_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  264u     ),
+ 585     VMULOUB_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |    8u     ),
+
+</pre><hr></hr><pre>
+1084   static int th(       int         x)  { return  opp_u_field(x,             10,  7); }
+1085   static int thct(     int         x)  { assert((x&amp;8) == 0, "must be valid cache specification");  return th(x); }
+1086   static int thds(     int         x)  { assert((x&amp;8) == 8, "must be valid stream specification"); return th(x); }
+1087   static int to(       int         x)  { return  opp_u_field(x,             10,  6); }
+1088   static int u(        int         x)  { return  opp_u_field(x,             19, 16); }
+1089   static int ui(       int         x)  { return  opp_u_field(x,             31, 16); }
+1090 
+1091   // Support vector instructions for &gt;= Power6.
+1092   static int vra(      int         x)  { return  opp_u_field(x,             15, 11); }
+1093   static int vrb(      int         x)  { return  opp_u_field(x,             20, 16); }
+1094   static int vrc(      int         x)  { return  opp_u_field(x,             25, 21); }
+1095   static int vrs(      int         x)  { return  opp_u_field(x,             10,  6); }
+1096   static int vrt(      int         x)  { return  opp_u_field(x,             10,  6); }
+1097 
+1098   static int vra(   VectorRegister r)  { return  vra(r-&gt;encoding());}
+1099   static int vrb(   VectorRegister r)  { return  vrb(r-&gt;encoding());}
+1100   static int vrc(   VectorRegister r)  { return  vrc(r-&gt;encoding());}
+1101   static int vrs(   VectorRegister r)  { return  vrs(r-&gt;encoding());}
+1102   static int vrt(   VectorRegister r)  { return  vrt(r-&gt;encoding());}
+1103 
+<span class="new">1104   // Only used on SHA sigma instructions (VX-form)</span>
+<span class="new">1105   static int vst(      int         x)  { return  opp_u_field(x,             16, 16); }</span>
+<span class="new">1106   static int vsix(     int         x)  { return  opp_u_field(x,             20, 17); }</span>
+<span class="new">1107 </span>
+1108   // Support Vector-Scalar (VSX) instructions.
+<span class="changed">1109   static int vsra(      int         x)  { return  opp_u_field(x &amp; 0x1F,     15, 11) | opp_u_field((x &amp; 0x20) &gt;&gt; 5, 29, 29); }</span>
+<span class="changed">1110   static int vsrb(      int         x)  { return  opp_u_field(x &amp; 0x1F,     20, 16) | opp_u_field((x &amp; 0x20) &gt;&gt; 5, 30, 30); }</span>
+<span class="changed">1111   static int vsrs(      int         x)  { return  opp_u_field(x &amp; 0x1F,     10,  6) | opp_u_field((x &amp; 0x20) &gt;&gt; 5, 31, 31); }</span>
+<span class="changed">1112   static int vsrt(      int         x)  { return  vsrs(x); }</span>
+<span class="changed">1113   static int vsdm(      int         x)  { return  opp_u_field(x,            23, 22); }</span>
+1114 
+1115   static int vsra(   VectorSRegister r)  { return  vsra(r-&gt;encoding());}
+1116   static int vsrb(   VectorSRegister r)  { return  vsrb(r-&gt;encoding());}
+
+1117   static int vsrs(   VectorSRegister r)  { return  vsrs(r-&gt;encoding());}
+1118   static int vsrt(   VectorSRegister r)  { return  vsrt(r-&gt;encoding());}
+1119 
+1120   static int vsplt_uim( int        x)  { return  opp_u_field(x,             15, 12); } // for vsplt* instructions
+1121   static int vsplti_sim(int        x)  { return  opp_u_field(x,             15, 11); } // for vsplti* instructions
+1122   static int vsldoi_shb(int        x)  { return  opp_u_field(x,             25, 22); } // for vsldoi instruction
+1123   static int vcmp_rc(   int        x)  { return  opp_u_field(x,             21, 21); } // for vcmp* instructions
+1124 
+1125   //static int xo1(     int        x)  { return  opp_u_field(x,             29, 21); }// is contained in our opcodes
+1126   //static int xo2(     int        x)  { return  opp_u_field(x,             30, 21); }// is contained in our opcodes
+1127   //static int xo3(     int        x)  { return  opp_u_field(x,             30, 22); }// is contained in our opcodes
+1128   //static int xo4(     int        x)  { return  opp_u_field(x,             30, 26); }// is contained in our opcodes
+1129   //static int xo5(     int        x)  { return  opp_u_field(x,             29, 27); }// is contained in our opcodes
+1130   //static int xo6(     int        x)  { return  opp_u_field(x,             30, 27); }// is contained in our opcodes
+1131   //static int xo7(     int        x)  { return  opp_u_field(x,             31, 30); }// is contained in our opcodes
+1132 
+1133  protected:
+1134   // Compute relative address for branch.
+1135   static intptr_t disp(intptr_t x, intptr_t off) {
+1136     int xx = x - off;
+
+</pre><hr></hr><pre>
+1545   inline void lhzu( Register d, int si16,    Register s1);
+1546 
+1547   // 2 bytes reversed
+1548   inline void lhbrx( Register d, Register s1, Register s2);
+1549 
+1550   // 2 bytes
+1551   inline void lhax( Register d, Register s1, Register s2);
+1552   inline void lha(  Register d, int si16,    Register s1);
+1553   inline void lhau( Register d, int si16,    Register s1);
+1554 
+1555   // 1 byte
+1556   inline void lbzx( Register d, Register s1, Register s2);
+1557   inline void lbz(  Register d, int si16,    Register s1);
+1558   inline void lbzu( Register d, int si16,    Register s1);
+1559 
+1560   // 8 bytes
+1561   inline void ldx(  Register d, Register s1, Register s2);
+1562   inline void ld(   Register d, int si16,    Register s1);
+1563   inline void ldu(  Register d, int si16,    Register s1);
+1564 
+<span class="new">1565   // 8 bytes reversed</span>
+<span class="new">1566   inline void ldbrx( Register d, Register s1, Register s2);</span>
+<span class="new">1567 </span>
+1568   // For convenience. Load pointer into d from b+s1.
+1569   inline void ld_ptr(Register d, int b, Register s1);
+1570   DEBUG_ONLY(inline void ld_ptr(Register d, ByteSize b, Register s1);)
+1571 
+1572   //  PPC 1, section 3.3.3 Fixed-Point Store Instructions
+1573   inline void stwx( Register d, Register s1, Register s2);
+1574   inline void stw(  Register d, int si16,    Register s1);
+1575   inline void stwu( Register d, int si16,    Register s1);
+1576 
+1577   inline void sthx( Register d, Register s1, Register s2);
+1578   inline void sth(  Register d, int si16,    Register s1);
+1579   inline void sthu( Register d, int si16,    Register s1);
+1580 
+1581   inline void stbx( Register d, Register s1, Register s2);
+1582   inline void stb(  Register d, int si16,    Register s1);
+1583   inline void stbu( Register d, int si16,    Register s1);
+1584 
+1585   inline void stdx( Register d, Register s1, Register s2);
+1586   inline void std(  Register d, int si16,    Register s1);
+1587   inline void stdu( Register d, int si16,    Register s1);
+
+</pre><hr></hr><pre>
+2023   inline void vsplt(    VectorRegister d, int ui4,          VectorRegister b);
+2024   inline void vsplth(   VectorRegister d, int ui3,          VectorRegister b);
+2025   inline void vspltw(   VectorRegister d, int ui2,          VectorRegister b);
+2026   inline void vspltisb( VectorRegister d, int si5);
+2027   inline void vspltish( VectorRegister d, int si5);
+2028   inline void vspltisw( VectorRegister d, int si5);
+2029   inline void vperm(    VectorRegister d, VectorRegister a, VectorRegister b, VectorRegister c);
+2030   inline void vsel(     VectorRegister d, VectorRegister a, VectorRegister b, VectorRegister c);
+2031   inline void vsl(      VectorRegister d, VectorRegister a, VectorRegister b);
+2032   inline void vsldoi(   VectorRegister d, VectorRegister a, VectorRegister b, int si4);
+2033   inline void vslo(     VectorRegister d, VectorRegister a, VectorRegister b);
+2034   inline void vsr(      VectorRegister d, VectorRegister a, VectorRegister b);
+2035   inline void vsro(     VectorRegister d, VectorRegister a, VectorRegister b);
+2036   inline void vaddcuw(  VectorRegister d, VectorRegister a, VectorRegister b);
+2037   inline void vaddshs(  VectorRegister d, VectorRegister a, VectorRegister b);
+2038   inline void vaddsbs(  VectorRegister d, VectorRegister a, VectorRegister b);
+2039   inline void vaddsws(  VectorRegister d, VectorRegister a, VectorRegister b);
+2040   inline void vaddubm(  VectorRegister d, VectorRegister a, VectorRegister b);
+2041   inline void vadduwm(  VectorRegister d, VectorRegister a, VectorRegister b);
+2042   inline void vadduhm(  VectorRegister d, VectorRegister a, VectorRegister b);
+<span class="new">2043   inline void vaddudm(  VectorRegister d, VectorRegister a, VectorRegister b);</span>
+2044   inline void vaddubs(  VectorRegister d, VectorRegister a, VectorRegister b);
+2045   inline void vadduws(  VectorRegister d, VectorRegister a, VectorRegister b);
+2046   inline void vadduhs(  VectorRegister d, VectorRegister a, VectorRegister b);
+2047   inline void vsubcuw(  VectorRegister d, VectorRegister a, VectorRegister b);
+2048   inline void vsubshs(  VectorRegister d, VectorRegister a, VectorRegister b);
+2049   inline void vsubsbs(  VectorRegister d, VectorRegister a, VectorRegister b);
+2050   inline void vsubsws(  VectorRegister d, VectorRegister a, VectorRegister b);
+2051   inline void vsububm(  VectorRegister d, VectorRegister a, VectorRegister b);
+2052   inline void vsubuwm(  VectorRegister d, VectorRegister a, VectorRegister b);
+2053   inline void vsubuhm(  VectorRegister d, VectorRegister a, VectorRegister b);
+2054   inline void vsububs(  VectorRegister d, VectorRegister a, VectorRegister b);
+2055   inline void vsubuws(  VectorRegister d, VectorRegister a, VectorRegister b);
+2056   inline void vsubuhs(  VectorRegister d, VectorRegister a, VectorRegister b);
+2057   inline void vmulesb(  VectorRegister d, VectorRegister a, VectorRegister b);
+2058   inline void vmuleub(  VectorRegister d, VectorRegister a, VectorRegister b);
+2059   inline void vmulesh(  VectorRegister d, VectorRegister a, VectorRegister b);
+2060   inline void vmuleuh(  VectorRegister d, VectorRegister a, VectorRegister b);
+2061   inline void vmulosb(  VectorRegister d, VectorRegister a, VectorRegister b);
+2062   inline void vmuloub(  VectorRegister d, VectorRegister a, VectorRegister b);
+2063   inline void vmulosh(  VectorRegister d, VectorRegister a, VectorRegister b);
+
+</pre><hr></hr><pre>
+2099   inline void vcmpequw( VectorRegister d, VectorRegister a, VectorRegister b);
+2100   inline void vcmpgtsh( VectorRegister d, VectorRegister a, VectorRegister b);
+2101   inline void vcmpgtsb( VectorRegister d, VectorRegister a, VectorRegister b);
+2102   inline void vcmpgtsw( VectorRegister d, VectorRegister a, VectorRegister b);
+2103   inline void vcmpgtub( VectorRegister d, VectorRegister a, VectorRegister b);
+2104   inline void vcmpgtuh( VectorRegister d, VectorRegister a, VectorRegister b);
+2105   inline void vcmpgtuw( VectorRegister d, VectorRegister a, VectorRegister b);
+2106   inline void vcmpequb_(VectorRegister d, VectorRegister a, VectorRegister b);
+2107   inline void vcmpequh_(VectorRegister d, VectorRegister a, VectorRegister b);
+2108   inline void vcmpequw_(VectorRegister d, VectorRegister a, VectorRegister b);
+2109   inline void vcmpgtsh_(VectorRegister d, VectorRegister a, VectorRegister b);
+2110   inline void vcmpgtsb_(VectorRegister d, VectorRegister a, VectorRegister b);
+2111   inline void vcmpgtsw_(VectorRegister d, VectorRegister a, VectorRegister b);
+2112   inline void vcmpgtub_(VectorRegister d, VectorRegister a, VectorRegister b);
+2113   inline void vcmpgtuh_(VectorRegister d, VectorRegister a, VectorRegister b);
+2114   inline void vcmpgtuw_(VectorRegister d, VectorRegister a, VectorRegister b);
+2115   inline void vand(     VectorRegister d, VectorRegister a, VectorRegister b);
+2116   inline void vandc(    VectorRegister d, VectorRegister a, VectorRegister b);
+2117   inline void vnor(     VectorRegister d, VectorRegister a, VectorRegister b);
+2118   inline void vor(      VectorRegister d, VectorRegister a, VectorRegister b);
+<span class="new">2119   inline void vmr(      VectorRegister d, VectorRegister a);</span>
+2120   inline void vxor(     VectorRegister d, VectorRegister a, VectorRegister b);
+2121   inline void vrld(     VectorRegister d, VectorRegister a, VectorRegister b);
+2122   inline void vrlb(     VectorRegister d, VectorRegister a, VectorRegister b);
+2123   inline void vrlw(     VectorRegister d, VectorRegister a, VectorRegister b);
+2124   inline void vrlh(     VectorRegister d, VectorRegister a, VectorRegister b);
+2125   inline void vslb(     VectorRegister d, VectorRegister a, VectorRegister b);
+2126   inline void vskw(     VectorRegister d, VectorRegister a, VectorRegister b);
+2127   inline void vslh(     VectorRegister d, VectorRegister a, VectorRegister b);
+2128   inline void vsrb(     VectorRegister d, VectorRegister a, VectorRegister b);
+2129   inline void vsrw(     VectorRegister d, VectorRegister a, VectorRegister b);
+2130   inline void vsrh(     VectorRegister d, VectorRegister a, VectorRegister b);
+2131   inline void vsrab(    VectorRegister d, VectorRegister a, VectorRegister b);
+2132   inline void vsraw(    VectorRegister d, VectorRegister a, VectorRegister b);
+2133   inline void vsrah(    VectorRegister d, VectorRegister a, VectorRegister b);
+2134   // Vector Floating-Point not implemented yet
+2135   inline void mtvscr(   VectorRegister b);
+2136   inline void mfvscr(   VectorRegister d);
+2137 
+2138   // Vector-Scalar (VSX) instructions.
+2139   inline void lxvd2x(   VectorSRegister d, Register a);
+2140   inline void lxvd2x(   VectorSRegister d, Register a, Register b);
+2141   inline void stxvd2x(  VectorSRegister d, Register a);
+2142   inline void stxvd2x(  VectorSRegister d, Register a, Register b);
+<span class="new">2143   inline void mtvrwz(   VectorRegister  d, Register a);</span>
+<span class="new">2144   inline void mfvrwz(   Register        a, VectorRegister d);</span>
+2145   inline void mtvrd(    VectorRegister  d, Register a);
+2146   inline void mfvrd(    Register        a, VectorRegister d);
+<span class="new">2147   inline void xxpermdi( VectorSRegister d, VectorSRegister a, VectorSRegister b, int dm);</span>
+<span class="new">2148   inline void xxmrghw(  VectorSRegister d, VectorSRegister a, VectorSRegister b);</span>
+<span class="new">2149   inline void xxmrglw(  VectorSRegister d, VectorSRegister a, VectorSRegister b);</span>
+<span class="new">2150 </span>
+<span class="new">2151   // VSX Extended Mnemonics</span>
+<span class="new">2152   inline void xxspltd(  VectorSRegister d, VectorSRegister a, int x);</span>
+<span class="new">2153   inline void xxmrghd(  VectorSRegister d, VectorSRegister a, VectorSRegister b);</span>
+<span class="new">2154   inline void xxmrgld(  VectorSRegister d, VectorSRegister a, VectorSRegister b);</span>
+<span class="new">2155   inline void xxswapd(  VectorSRegister d, VectorSRegister a);</span>
+2156 
+2157   // AES (introduced with Power 8)
+2158   inline void vcipher(     VectorRegister d, VectorRegister a, VectorRegister b);
+2159   inline void vcipherlast( VectorRegister d, VectorRegister a, VectorRegister b);
+2160   inline void vncipher(    VectorRegister d, VectorRegister a, VectorRegister b);
+2161   inline void vncipherlast(VectorRegister d, VectorRegister a, VectorRegister b);
+2162   inline void vsbox(       VectorRegister d, VectorRegister a);
+2163 
+2164   // SHA (introduced with Power 8)
+<span class="changed">2165   inline void vshasigmad(VectorRegister d, VectorRegister a, bool st, int six);</span>
+<span class="changed">2166   inline void vshasigmaw(VectorRegister d, VectorRegister a, bool st, int six);</span>
+2167 
+2168   // Vector Binary Polynomial Multiplication (introduced with Power 8)
+2169   inline void vpmsumb(  VectorRegister d, VectorRegister a, VectorRegister b);
+2170   inline void vpmsumd(  VectorRegister d, VectorRegister a, VectorRegister b);
+2171   inline void vpmsumh(  VectorRegister d, VectorRegister a, VectorRegister b);
+2172   inline void vpmsumw(  VectorRegister d, VectorRegister a, VectorRegister b);
+2173 
+2174   // Vector Permute and Xor (introduced with Power 8)
+2175   inline void vpermxor( VectorRegister d, VectorRegister a, VectorRegister b, VectorRegister c);
+2176 
+2177   // Transactional Memory instructions (introduced with Power 8)
+2178   inline void tbegin_();    // R=0
+2179   inline void tbeginrot_(); // R=1 Rollback-Only Transaction
+2180   inline void tend_();    // A=0
+2181   inline void tendall_(); // A=1
+2182   inline void tabort_();
+2183   inline void tabort_(Register a);
+2184   inline void tabortwc_(int t, Register a, Register b);
+2185   inline void tabortwci_(int t, Register a, int si);
+2186   inline void tabortdc_(int t, Register a, Register b);
+
+</pre><hr></hr><pre>
+2192   static bool is_tbegin(int x) {
+2193     return TBEGIN_OPCODE == (x &amp; (0x3f &lt;&lt; OPCODE_SHIFT | 0x3ff &lt;&lt; 1));
+2194   }
+2195 
+2196   // The following encoders use r0 as second operand. These instructions
+2197   // read r0 as '0'.
+2198   inline void lwzx( Register d, Register s2);
+2199   inline void lwz(  Register d, int si16);
+2200   inline void lwax( Register d, Register s2);
+2201   inline void lwa(  Register d, int si16);
+2202   inline void lwbrx(Register d, Register s2);
+2203   inline void lhzx( Register d, Register s2);
+2204   inline void lhz(  Register d, int si16);
+2205   inline void lhax( Register d, Register s2);
+2206   inline void lha(  Register d, int si16);
+2207   inline void lhbrx(Register d, Register s2);
+2208   inline void lbzx( Register d, Register s2);
+2209   inline void lbz(  Register d, int si16);
+2210   inline void ldx(  Register d, Register s2);
+2211   inline void ld(   Register d, int si16);
+<span class="new">2212   inline void ldbrx(Register d, Register s2);</span>
+2213   inline void stwx( Register d, Register s2);
+2214   inline void stw(  Register d, int si16);
+2215   inline void sthx( Register d, Register s2);
+2216   inline void sth(  Register d, int si16);
+2217   inline void stbx( Register d, Register s2);
+2218   inline void stb(  Register d, int si16);
+2219   inline void stdx( Register d, Register s2);
+2220   inline void std(  Register d, int si16);
+2221 
+2222   // PPC 2, section 3.2.1 Instruction Cache Instructions
+2223   inline void icbi(    Register s2);
+2224   // PPC 2, section 3.2.2 Data Cache Instructions
+2225   //inlinevoid dcba(   Register s2); // Instruction for embedded processor only.
+2226   inline void dcbz(    Register s2);
+2227   inline void dcbst(   Register s2);
+2228   inline void dcbf(    Register s2);
+2229   // dcache read hint
+2230   inline void dcbt(    Register s2);
+2231   inline void dcbtct(  Register s2, int ct);
+2232   inline void dcbtds(  Register s2, int ds);
+
+</pre><hr></hr>
+</pre></td>
+</tr></table>
+<center>&lt prev <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/cpu/ppc/vm/assembler_ppc.inline.hpp.sdiff.html' target='_top'>next &gt</a></center>
+</body></html>

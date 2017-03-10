@@ -1,0 +1,229 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>hotspot Sdiff src/cpu/ppc/vm </title>
+</head><body id="SUNWwebrev">
+<center><a href='../../../../src/cpu/ppc/vm/macroAssembler_ppc.hpp.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/cpu/ppc/vm/register_ppc.hpp.sdiff.html' target='_top'>next &gt</a></center>
+<h2>src/cpu/ppc/vm/register_ppc.cpp</h2>
+<a class="print" href="javascript:print()">Print this page</a>
+<pre>rev <a href="https://bugs.openjdk.java.net/browse/JDK-12651">12651</a> : Sha2 intrinsics implementation</pre>
+
+<table><tr valign="top">
+<td><pre>
+
+</pre><hr></hr><pre>
+  64     "SR_XER", "SR_LR", "SR_CTR", "SR_VRSAVE", "SR_SPEFSCR", "SR_PPR"
+  65   };
+  66   return is_valid() ? names[encoding()] : "snoreg";
+  67 }
+  68 
+  69 const char* VectorRegisterImpl::name() const {
+  70   const char* names[number_of_registers] = {
+  71     "VR0",  "VR1",  "VR2",  "VR3",  "VR4",  "VR5",  "VR6",  "VR7",
+  72     "VR8",  "VR9",  "VR10", "VR11", "VR12", "VR13", "VR14", "VR15",
+  73     "VR16", "VR17", "VR18", "VR19", "VR20", "VR21", "VR22", "VR23",
+  74     "VR24", "VR25", "VR26", "VR27", "VR28", "VR29", "VR30", "VR31"
+  75   };
+  76   return is_valid() ? names[encoding()] : "vnoreg";
+  77 }
+  78 
+  79 const char* VectorSRegisterImpl::name() const {
+  80   const char* names[number_of_registers] = {
+  81     "VSR0",  "VSR1",  "VSR2",  "VSR3",  "VSR4",  "VSR5",  "VSR6",  "VSR7",
+  82     "VSR8",  "VSR9",  "VSR10", "VSR11", "VSR12", "VSR13", "VSR14", "VSR15",
+  83     "VSR16", "VSR17", "VSR18", "VSR19", "VSR20", "VSR21", "VSR22", "VSR23",
+<span class="changed">  84     "VSR24", "VSR25", "VSR26", "VSR27", "VSR28", "VSR29", "VSR30", "VSR31"</span>
+
+
+
+
+  85   };
+  86   return is_valid() ? names[encoding()] : "vsnoreg";
+  87 }
+  88 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+</pre></td><td><pre>
+
+</pre><hr></hr><pre>
+  64     "SR_XER", "SR_LR", "SR_CTR", "SR_VRSAVE", "SR_SPEFSCR", "SR_PPR"
+  65   };
+  66   return is_valid() ? names[encoding()] : "snoreg";
+  67 }
+  68 
+  69 const char* VectorRegisterImpl::name() const {
+  70   const char* names[number_of_registers] = {
+  71     "VR0",  "VR1",  "VR2",  "VR3",  "VR4",  "VR5",  "VR6",  "VR7",
+  72     "VR8",  "VR9",  "VR10", "VR11", "VR12", "VR13", "VR14", "VR15",
+  73     "VR16", "VR17", "VR18", "VR19", "VR20", "VR21", "VR22", "VR23",
+  74     "VR24", "VR25", "VR26", "VR27", "VR28", "VR29", "VR30", "VR31"
+  75   };
+  76   return is_valid() ? names[encoding()] : "vnoreg";
+  77 }
+  78 
+  79 const char* VectorSRegisterImpl::name() const {
+  80   const char* names[number_of_registers] = {
+  81     "VSR0",  "VSR1",  "VSR2",  "VSR3",  "VSR4",  "VSR5",  "VSR6",  "VSR7",
+  82     "VSR8",  "VSR9",  "VSR10", "VSR11", "VSR12", "VSR13", "VSR14", "VSR15",
+  83     "VSR16", "VSR17", "VSR18", "VSR19", "VSR20", "VSR21", "VSR22", "VSR23",
+<span class="changed">  84     "VSR24", "VSR25", "VSR26", "VSR27", "VSR28", "VSR29", "VSR30", "VSR31",</span>
+<span class="changed">  85     "VSR32", "VSR33", "VSR34", "VSR35", "VSR36", "VSR37", "VSR38", "VSR39",</span>
+<span class="changed">  86     "VSR40", "VSR41", "VSR42", "VSR43", "VSR44", "VSR45", "VSR46", "VSR47",</span>
+<span class="changed">  87     "VSR48", "VSR49", "VSR50", "VSR51", "VSR52", "VSR53", "VSR54", "VSR55",</span>
+<span class="changed">  88     "VSR56", "VSR57", "VSR58", "VSR59", "VSR60", "VSR61", "VSR62", "VSR63"</span>
+  89   };
+  90   return is_valid() ? names[encoding()] : "vsnoreg";
+  91 }
+  92 
+<span class="new">  93 // Method to convert a VectorRegister to a Vector-Scalar Register (VectorSRegister)</span>
+<span class="new">  94 VectorSRegister VectorRegisterImpl::to_vsr() const {</span>
+<span class="new">  95   // Inneficient, but the list too short in order to make something more special.</span>
+<span class="new">  96   if (VR0 ==  this) return VSR32;</span>
+<span class="new">  97   if (VR1 ==  this) return VSR33;</span>
+<span class="new">  98   if (VR2 ==  this) return VSR34;</span>
+<span class="new">  99   if (VR3 ==  this) return VSR35;</span>
+<span class="new"> 100   if (VR4 ==  this) return VSR36;</span>
+<span class="new"> 101   if (VR5 ==  this) return VSR37;</span>
+<span class="new"> 102   if (VR6 ==  this) return VSR38;</span>
+<span class="new"> 103   if (VR7 ==  this) return VSR39;</span>
+<span class="new"> 104   if (VR8 ==  this) return VSR40;</span>
+<span class="new"> 105   if (VR9 ==  this) return VSR41;</span>
+<span class="new"> 106   if (VR10 == this) return VSR42;</span>
+<span class="new"> 107   if (VR11 == this) return VSR43;</span>
+<span class="new"> 108   if (VR12 == this) return VSR44;</span>
+<span class="new"> 109   if (VR13 == this) return VSR45;</span>
+<span class="new"> 110   if (VR14 == this) return VSR46;</span>
+<span class="new"> 111   if (VR15 == this) return VSR47;</span>
+<span class="new"> 112   if (VR16 == this) return VSR48;</span>
+<span class="new"> 113   if (VR17 == this) return VSR49;</span>
+<span class="new"> 114   if (VR18 == this) return VSR50;</span>
+<span class="new"> 115   if (VR19 == this) return VSR51;</span>
+<span class="new"> 116   if (VR20 == this) return VSR52;</span>
+<span class="new"> 117   if (VR21 == this) return VSR53;</span>
+<span class="new"> 118   if (VR22 == this) return VSR54;</span>
+<span class="new"> 119   if (VR23 == this) return VSR55;</span>
+<span class="new"> 120   if (VR24 == this) return VSR56;</span>
+<span class="new"> 121   if (VR25 == this) return VSR57;</span>
+<span class="new"> 122   if (VR26 == this) return VSR58;</span>
+<span class="new"> 123   if (VR27 == this) return VSR59;</span>
+<span class="new"> 124   if (VR28 == this) return VSR60;</span>
+<span class="new"> 125   if (VR29 == this) return VSR61;</span>
+<span class="new"> 126   if (VR30 == this) return VSR62;</span>
+<span class="new"> 127   if (VR31 == this) return VSR63;</span>
+<span class="new"> 128   return vsnoregi;</span>
+<span class="new"> 129 }</span>
+</pre></td>
+</tr></table>
+<center><a href='../../../../src/cpu/ppc/vm/macroAssembler_ppc.hpp.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/cpu/ppc/vm/register_ppc.hpp.sdiff.html' target='_top'>next &gt</a></center>
+</body></html>

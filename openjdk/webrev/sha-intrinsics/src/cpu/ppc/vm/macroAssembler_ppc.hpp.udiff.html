@@ -1,0 +1,148 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>hotspot Udiff src/cpu/ppc/vm/macroAssembler_ppc.hpp</title>
+
+<style type="text/css" media="screen">
+span.new {
+    color: blue;
+    font-weight: normal;
+}
+</style>
+
+</head>
+<body id="SUNWwebrev">
+<center><a href='../../../../src/cpu/ppc/vm/macroAssembler_ppc.cpp.udiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/cpu/ppc/vm/register_ppc.cpp.udiff.html' target='_top'>next &gt</a></center>
+<h2>src/cpu/ppc/vm/macroAssembler_ppc.hpp</h2>
+        <a class="print" href="javascript:print()">Print this page</a>
+<pre>rev <a href="https://bugs.openjdk.java.net/browse/JDK-12651">12651</a> : Sha2 intrinsics implementation</pre>
+        <pre>
+</pre><hr /><pre>
+<span class="newmarker">@@ -843,10 +843,47 @@</span>
+                           Register constants, Register barretConstants,
+                           Register t0, Register t1, Register t2);
+ 
+   void kernel_crc32_singleByte(Register crc, Register buf, Register len, Register table, Register tmp);
+ 
+<span class="new">+  // SHA-2 auxiliary functions and public interfaces</span>
+<span class="new">+ private:</span>
+<span class="new">+  void sha256_calc_ini_kw(const Register&amp; k, const Register&amp; j,</span>
+<span class="new">+      const VectorRegister&amp; w, const VectorRegister&amp; kw_sum);</span>
+<span class="new">+  void sha256_deque(const VectorRegister&amp; src,</span>
+<span class="new">+      const VectorRegister&amp; dst1, const VectorRegister&amp; dst2, const VectorRegister&amp; dst3);</span>
+<span class="new">+  void sha256_load_h_vec(const VectorRegister&amp; a, const VectorRegister&amp; b,</span>
+<span class="new">+      const VectorRegister&amp; c, const VectorRegister&amp; d, const VectorRegister&amp; e,</span>
+<span class="new">+      const VectorRegister&amp; f, const VectorRegister&amp; g, const VectorRegister&amp; h,</span>
+<span class="new">+      const Register&amp; hptr);</span>
+<span class="new">+  void sha256_round(const VectorRegister* hs, const int total_hs, int&amp; h_cnt, const VectorRegister&amp; kpw);</span>
+<span class="new">+  void sha256_load_w_vec(const Register&amp; buf_in, const VectorRegister* ws, const int total_ws);</span>
+<span class="new">+  void sha256_calc_4w(const VectorRegister&amp; w0, const VectorRegister&amp; w1,</span>
+<span class="new">+      const VectorRegister&amp; w2, const VectorRegister&amp; w3, const VectorRegister&amp; kpw0,</span>
+<span class="new">+      const VectorRegister&amp; kpw1, const VectorRegister&amp; kpw2, const VectorRegister&amp; kpw3,</span>
+<span class="new">+      const Register&amp; j, const VectorRegister&amp; vRb, const VectorRegister&amp; vRc,</span>
+<span class="new">+      const Register&amp; k);</span>
+<span class="new">+  void sha256_update_sha_state(const VectorRegister&amp; a, const VectorRegister&amp; b,</span>
+<span class="new">+      const VectorRegister&amp; c, const VectorRegister&amp; d, const VectorRegister&amp; e,</span>
+<span class="new">+      const VectorRegister&amp; f, const VectorRegister&amp; g, const VectorRegister&amp; h,</span>
+<span class="new">+      const Register&amp; hptr);</span>
+<span class="new">+</span>
+<span class="new">+  void sha512_load_w_vec(const Register&amp; buf_in, const VectorRegister* ws, const int total_ws);</span>
+<span class="new">+  void sha512_update_sha_state(const Register&amp; state, const VectorRegister* hs, const int total_hs);</span>
+<span class="new">+  void sha512_round(const VectorRegister* hs, const int total_hs, int&amp; h_cnt, const VectorRegister&amp; kpw);</span>
+<span class="new">+  void sha512_load_h_vec(const Register&amp; state, const VectorRegister* hs, const int total_hs);</span>
+<span class="new">+  void sha512_calc_2w(const VectorRegister&amp; w0, const VectorRegister&amp; w1,</span>
+<span class="new">+      const VectorRegister&amp; w2, const VectorRegister&amp; w3,</span>
+<span class="new">+      const VectorRegister&amp; w4, const VectorRegister&amp; w5,</span>
+<span class="new">+      const VectorRegister&amp; w6, const VectorRegister&amp; w7,</span>
+<span class="new">+      const VectorRegister&amp; kpw0, const VectorRegister&amp; kpw1, const Register&amp; j,</span>
+<span class="new">+      const VectorRegister&amp; vRb, const Register&amp; k);</span>
+<span class="new">+</span>
+<span class="new">+ public:</span>
+<span class="new">+  void sha256(bool multi_block);</span>
+<span class="new">+  void sha512(bool multi_block);</span>
+<span class="new">+</span>
+   //
+   // Debugging
+   //
+ 
+   // assert on cr0
+</pre>
+<center><a href='../../../../src/cpu/ppc/vm/macroAssembler_ppc.cpp.udiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/cpu/ppc/vm/register_ppc.cpp.udiff.html' target='_top'>next &gt</a></center>
+</body></html>
+

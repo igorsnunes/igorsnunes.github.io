@@ -1,0 +1,212 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>New src/cpu/ppc/vm/register_ppc.cpp</title>
+<body id="SUNWwebrev">
+<pre>
+   1 /*
+   2  * Copyright (c) 2000, 2013, Oracle and/or its affiliates. All rights reserved.
+   3  * Copyright (c) 2012, 2013 SAP SE. All rights reserved.
+   4  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+   5  *
+   6  * This code is free software; you can redistribute it and/or modify it
+   7  * under the terms of the GNU General Public License version 2 only, as
+   8  * published by the Free Software Foundation.
+   9  *
+  10  * This code is distributed in the hope that it will be useful, but WITHOUT
+  11  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+  12  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+  13  * version 2 for more details (a copy is included in the LICENSE file that
+  14  * accompanied this code).
+  15  *
+  16  * You should have received a copy of the GNU General Public License version
+  17  * 2 along with this work; if not, write to the Free Software Foundation,
+  18  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+  19  *
+  20  * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+  21  * or visit www.oracle.com if you need additional information or have any
+  22  * questions.
+  23  *
+  24  */
+  25 
+  26 #include "precompiled.hpp"
+  27 #include "register_ppc.hpp"
+  28 
+  29 const int ConcreteRegisterImpl::max_gpr = RegisterImpl::number_of_registers * 2;
+  30 const int ConcreteRegisterImpl::max_fpr = ConcreteRegisterImpl::max_gpr +
+  31                                           FloatRegisterImpl::number_of_registers * 2;
+  32 const int ConcreteRegisterImpl::max_cnd = ConcreteRegisterImpl::max_fpr +
+  33                                           ConditionRegisterImpl::number_of_registers;
+  34 
+  35 const char* RegisterImpl::name() const {
+  36   const char* names[number_of_registers] = {
+  37     "R0",  "R1",  "R2",  "R3",  "R4",  "R5",  "R6",  "R7",
+  38     "R8",  "R9",  "R10", "R11", "R12", "R13", "R14", "R15",
+  39     "R16", "R17", "R18", "R19", "R20", "R21", "R22", "R23",
+  40     "R24", "R25", "R26", "R27", "R28", "R29", "R30", "R31"
+  41   };
+  42   return is_valid() ? names[encoding()] : "noreg";
+  43 }
+  44 
+  45 const char* ConditionRegisterImpl::name() const {
+  46   const char* names[number_of_registers] = {
+  47     "CR0",  "CR1",  "CR2",  "CR3",  "CR4",  "CR5",  "CR6",  "CR7"
+  48   };
+  49   return is_valid() ? names[encoding()] : "cnoreg";
+  50 }
+  51 
+  52 const char* FloatRegisterImpl::name() const {
+  53   const char* names[number_of_registers] = {
+  54     "F0",  "F1",  "F2",  "F3",  "F4",  "F5",  "F6",  "F7",
+  55     "F8",  "F9",  "F10", "F11", "F12", "F13", "F14", "F15",
+  56     "F16", "F17", "F18", "F19", "F20", "F21", "F22", "F23",
+  57     "F24", "F25", "F26", "F27", "F28", "F29", "F30", "F31"
+  58   };
+  59   return is_valid() ? names[encoding()] : "fnoreg";
+  60 }
+  61 
+  62 const char* SpecialRegisterImpl::name() const {
+  63   const char* names[number_of_registers] = {
+  64     "SR_XER", "SR_LR", "SR_CTR", "SR_VRSAVE", "SR_SPEFSCR", "SR_PPR"
+  65   };
+  66   return is_valid() ? names[encoding()] : "snoreg";
+  67 }
+  68 
+  69 const char* VectorRegisterImpl::name() const {
+  70   const char* names[number_of_registers] = {
+  71     "VR0",  "VR1",  "VR2",  "VR3",  "VR4",  "VR5",  "VR6",  "VR7",
+  72     "VR8",  "VR9",  "VR10", "VR11", "VR12", "VR13", "VR14", "VR15",
+  73     "VR16", "VR17", "VR18", "VR19", "VR20", "VR21", "VR22", "VR23",
+  74     "VR24", "VR25", "VR26", "VR27", "VR28", "VR29", "VR30", "VR31"
+  75   };
+  76   return is_valid() ? names[encoding()] : "vnoreg";
+  77 }
+  78 
+  79 const char* VectorSRegisterImpl::name() const {
+  80   const char* names[number_of_registers] = {
+  81     "VSR0",  "VSR1",  "VSR2",  "VSR3",  "VSR4",  "VSR5",  "VSR6",  "VSR7",
+  82     "VSR8",  "VSR9",  "VSR10", "VSR11", "VSR12", "VSR13", "VSR14", "VSR15",
+  83     "VSR16", "VSR17", "VSR18", "VSR19", "VSR20", "VSR21", "VSR22", "VSR23",
+  84     "VSR24", "VSR25", "VSR26", "VSR27", "VSR28", "VSR29", "VSR30", "VSR31",
+  85     "VSR32", "VSR33", "VSR34", "VSR35", "VSR36", "VSR37", "VSR38", "VSR39",
+  86     "VSR40", "VSR41", "VSR42", "VSR43", "VSR44", "VSR45", "VSR46", "VSR47",
+  87     "VSR48", "VSR49", "VSR50", "VSR51", "VSR52", "VSR53", "VSR54", "VSR55",
+  88     "VSR56", "VSR57", "VSR58", "VSR59", "VSR60", "VSR61", "VSR62", "VSR63"
+  89   };
+  90   return is_valid() ? names[encoding()] : "vsnoreg";
+  91 }
+  92 
+  93 // Method to convert a VectorRegister to a Vector-Scalar Register (VectorSRegister)
+  94 VectorSRegister VectorRegisterImpl::to_vsr() const {
+  95   // Inneficient, but the list too short in order to make something more special.
+  96   if (VR0 ==  this) return VSR32;
+  97   if (VR1 ==  this) return VSR33;
+  98   if (VR2 ==  this) return VSR34;
+  99   if (VR3 ==  this) return VSR35;
+ 100   if (VR4 ==  this) return VSR36;
+ 101   if (VR5 ==  this) return VSR37;
+ 102   if (VR6 ==  this) return VSR38;
+ 103   if (VR7 ==  this) return VSR39;
+ 104   if (VR8 ==  this) return VSR40;
+ 105   if (VR9 ==  this) return VSR41;
+ 106   if (VR10 == this) return VSR42;
+ 107   if (VR11 == this) return VSR43;
+ 108   if (VR12 == this) return VSR44;
+ 109   if (VR13 == this) return VSR45;
+ 110   if (VR14 == this) return VSR46;
+ 111   if (VR15 == this) return VSR47;
+ 112   if (VR16 == this) return VSR48;
+ 113   if (VR17 == this) return VSR49;
+ 114   if (VR18 == this) return VSR50;
+ 115   if (VR19 == this) return VSR51;
+ 116   if (VR20 == this) return VSR52;
+ 117   if (VR21 == this) return VSR53;
+ 118   if (VR22 == this) return VSR54;
+ 119   if (VR23 == this) return VSR55;
+ 120   if (VR24 == this) return VSR56;
+ 121   if (VR25 == this) return VSR57;
+ 122   if (VR26 == this) return VSR58;
+ 123   if (VR27 == this) return VSR59;
+ 124   if (VR28 == this) return VSR60;
+ 125   if (VR29 == this) return VSR61;
+ 126   if (VR30 == this) return VSR62;
+ 127   if (VR31 == this) return VSR63;
+ 128   return vsnoregi;
+ 129 }
+</pre></body></html>

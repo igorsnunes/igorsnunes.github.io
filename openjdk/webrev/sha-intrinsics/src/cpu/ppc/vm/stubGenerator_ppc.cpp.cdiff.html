@@ -1,0 +1,193 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>hotspot Cdiff src/cpu/ppc/vm/stubGenerator_ppc.cpp</title>
+</head>
+<body id="SUNWwebrev">
+<center><a href='../../../../src/cpu/ppc/vm/register_ppc.hpp.cdiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/cpu/ppc/vm/vm_version_ppc.cpp.cdiff.html' target='_top'>next &gt</a></center>
+<h2>src/cpu/ppc/vm/stubGenerator_ppc.cpp</h2>
+        <a class="print" href="javascript:print()">Print this page</a>
+<pre>rev <a href="https://bugs.openjdk.java.net/browse/JDK-12651">12651</a> : Sha2 intrinsics implementation</pre>
+        <pre>
+<hr /><span class="oldmarker">*** 2726,2736 ****</span>
+      __ lvsr            (keyPerm, key);
+      __ vxor            (vTmp2, vTmp2, vTmp2);
+      __ vspltisb        (vTmp2, -16);
+      __ vrld            (keyPerm, keyPerm, vTmp2);
+      __ vrld            (keyPerm, keyPerm, vTmp2);
+<span class="changed">!     __ vsldoi          (keyPerm, keyPerm, keyPerm, -8);</span>
+  
+      // load the 1st round key to vKey1
+      __ li              (keypos, 0);
+      __ lvx             (vKey1, keypos, key);
+      __ addi            (keypos, keypos, 16);
+<span class="newmarker">--- 2726,2736 ----</span>
+      __ lvsr            (keyPerm, key);
+      __ vxor            (vTmp2, vTmp2, vTmp2);
+      __ vspltisb        (vTmp2, -16);
+      __ vrld            (keyPerm, keyPerm, vTmp2);
+      __ vrld            (keyPerm, keyPerm, vTmp2);
+<span class="changed">!     __ vsldoi          (keyPerm, keyPerm, keyPerm, 8);</span>
+  
+      // load the 1st round key to vKey1
+      __ li              (keypos, 0);
+      __ lvx             (vKey1, keypos, key);
+      __ addi            (keypos, keypos, 16);
+<hr /><span class="oldmarker">*** 2926,2936 ****</span>
+      __ lvsr            (keyPerm, key);
+      __ vxor            (vTmp2, vTmp2, vTmp2);
+      __ vspltisb        (vTmp2, -16);
+      __ vrld            (keyPerm, keyPerm, vTmp2);
+      __ vrld            (keyPerm, keyPerm, vTmp2);
+<span class="changed">!     __ vsldoi          (keyPerm, keyPerm, keyPerm, -8);</span>
+  
+      __ cmpwi           (CCR0, keylen, 44);
+      __ beq             (CCR0, L_do44);
+  
+      __ cmpwi           (CCR0, keylen, 52);
+<span class="newmarker">--- 2926,2936 ----</span>
+      __ lvsr            (keyPerm, key);
+      __ vxor            (vTmp2, vTmp2, vTmp2);
+      __ vspltisb        (vTmp2, -16);
+      __ vrld            (keyPerm, keyPerm, vTmp2);
+      __ vrld            (keyPerm, keyPerm, vTmp2);
+<span class="changed">!     __ vsldoi          (keyPerm, keyPerm, keyPerm, 8);</span>
+  
+      __ cmpwi           (CCR0, keylen, 44);
+      __ beq             (CCR0, L_do44);
+  
+      __ cmpwi           (CCR0, keylen, 52);
+<hr /><span class="oldmarker">*** 3092,3101 ****</span>
+<span class="newmarker">--- 3092,3123 ----</span>
+  
+      __ blr();
+       return start;
+    }
+  
+<span class="new">+   address generate_sha256_implCompress(bool multi_block, const char *name) {</span>
+<span class="new">+     assert(UseSHA, "need SHA instructions");</span>
+<span class="new">+     StubCodeMark mark(this, "StubRoutines", name);</span>
+<span class="new">+     address start = __ function_entry();</span>
+<span class="new">+ </span>
+<span class="new">+     __ sha256 (multi_block);</span>
+<span class="new">+ </span>
+<span class="new">+     __ blr();</span>
+<span class="new">+     return start;</span>
+<span class="new">+   }</span>
+<span class="new">+ </span>
+<span class="new">+   address generate_sha512_implCompress(bool multi_block, const char *name) {</span>
+<span class="new">+     assert(UseSHA, "need SHA instructions");</span>
+<span class="new">+     StubCodeMark mark(this, "StubRoutines", name);</span>
+<span class="new">+     address start = __ function_entry();</span>
+<span class="new">+ </span>
+<span class="new">+     __ sha512 (multi_block);</span>
+<span class="new">+ </span>
+<span class="new">+     __ blr();</span>
+<span class="new">+     return start;</span>
+<span class="new">+   }</span>
+<span class="new">+ </span>
+    void generate_arraycopy_stubs() {
+      // Note: the disjoint stubs must be generated first, some of
+      // the conjoint stubs use them.
+  
+      // non-aligned disjoint versions
+<hr /><span class="oldmarker">*** 3427,3436 ****</span>
+<span class="newmarker">--- 3449,3466 ----</span>
+      if (UseAESIntrinsics) {
+        StubRoutines::_aescrypt_encryptBlock = generate_aescrypt_encryptBlock();
+        StubRoutines::_aescrypt_decryptBlock = generate_aescrypt_decryptBlock();
+      }
+  
+<span class="new">+     if (UseSHA256Intrinsics) {</span>
+<span class="new">+       StubRoutines::_sha256_implCompress   = generate_sha256_implCompress(false, "sha256_implCompress");</span>
+<span class="new">+       StubRoutines::_sha256_implCompressMB = generate_sha256_implCompress(true,  "sha256_implCompressMB");</span>
+<span class="new">+     }</span>
+<span class="new">+     if (UseSHA512Intrinsics) {</span>
+<span class="new">+       StubRoutines::_sha512_implCompress   = generate_sha512_implCompress(false, "sha512_implCompress");</span>
+<span class="new">+       StubRoutines::_sha512_implCompressMB = generate_sha512_implCompress(true, "sha512_implCompressMB");</span>
+<span class="new">+     }</span>
+    }
+  
+   public:
+    StubGenerator(CodeBuffer* code, bool all) : StubCodeGenerator(code) {
+      // replace the standard masm with a special one:
+</pre>
+<center><a href='../../../../src/cpu/ppc/vm/register_ppc.hpp.cdiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/cpu/ppc/vm/vm_version_ppc.cpp.cdiff.html' target='_top'>next &gt</a></center>
+</body></html>
+

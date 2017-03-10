@@ -1,0 +1,567 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>hotspot Sdiff src/cpu/ppc/vm </title>
+</head><body id="SUNWwebrev">
+<center><a href='../../../../src/cpu/ppc/vm/stubGenerator_ppc.cpp.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/cpu/ppc/vm/vm_version_ppc.hpp.sdiff.html' target='_top'>next &gt</a></center>
+<h2>src/cpu/ppc/vm/vm_version_ppc.cpp</h2>
+<a class="print" href="javascript:print()">Print this page</a>
+<pre>rev <a href="https://bugs.openjdk.java.net/browse/JDK-12651">12651</a> : Sha2 intrinsics implementation</pre>
+
+<table><tr valign="top">
+<td><pre>
+
+</pre><hr></hr><pre>
+  94 
+  95 #ifdef COMPILER2
+  96   if (!UseSIGTRAP) {
+  97     MSG(TrapBasedRangeChecks);
+  98     FLAG_SET_ERGO(bool, TrapBasedRangeChecks, false);
+  99   }
+ 100 
+ 101   // On Power6 test for section size.
+ 102   if (PowerArchitecturePPC64 == 6) {
+ 103     determine_section_size();
+ 104   // TODO: PPC port } else {
+ 105   // TODO: PPC port PdScheduling::power6SectorSize = 0x20;
+ 106   }
+ 107 
+ 108   MaxVectorSize = 8;
+ 109 #endif
+ 110 
+ 111   // Create and print feature-string.
+ 112   char buf[(num_features+1) * 16]; // Max 16 chars per feature.
+ 113   jio_snprintf(buf, sizeof(buf),
+<span class="changed"> 114                "ppc64%s%s%s%s%s%s%s%s%s%s%s%s%s%s",</span>
+ 115                (has_fsqrt()   ? " fsqrt"   : ""),
+ 116                (has_isel()    ? " isel"    : ""),
+ 117                (has_lxarxeh() ? " lxarxeh" : ""),
+ 118                (has_cmpb()    ? " cmpb"    : ""),
+ 119                //(has_mftgpr()? " mftgpr"  : ""),
+ 120                (has_popcntb() ? " popcntb" : ""),
+ 121                (has_popcntw() ? " popcntw" : ""),
+ 122                (has_fcfids()  ? " fcfids"  : ""),
+ 123                (has_vand()    ? " vand"    : ""),
+ 124                (has_lqarx()   ? " lqarx"   : ""),
+
+ 125                (has_vcipher() ? " aes"     : ""),
+ 126                (has_vpmsumb() ? " vpmsumb" : ""),
+ 127                (has_tcheck()  ? " tcheck"  : ""),
+ 128                (has_mfdscr()  ? " mfdscr"  : ""),
+ 129                (has_vsx()     ? " vsx"     : "")
+ 130                // Make sure number of %s matches num_features!
+ 131               );
+ 132   _features_string = os::strdup(buf);
+ 133   if (Verbose) {
+ 134     print_features();
+ 135   }
+ 136 
+ 137   // PPC64 supports 8-byte compare-exchange operations (see
+ 138   // Atomic::cmpxchg and StubGenerator::generate_atomic_cmpxchg_ptr)
+ 139   // and 'atomic long memory ops' (see Unsafe_GetLongVolatile).
+ 140   _supports_cx8 = true;
+ 141 
+ 142   // Used by C1.
+ 143   _supports_atomic_getset4 = true;
+ 144   _supports_atomic_getadd4 = true;
+
+</pre><hr></hr><pre>
+ 217     if (!FLAG_IS_DEFAULT(UseAESIntrinsics))
+ 218       warning("AES intrinsics are not available on this CPU");
+ 219     FLAG_SET_DEFAULT(UseAESIntrinsics, false);
+ 220   }
+ 221 #endif
+ 222 
+ 223   if (UseAESCTRIntrinsics) {
+ 224     warning("AES/CTR intrinsics are not available on this CPU");
+ 225     FLAG_SET_DEFAULT(UseAESCTRIntrinsics, false);
+ 226   }
+ 227 
+ 228   if (UseGHASHIntrinsics) {
+ 229     warning("GHASH intrinsics are not available on this CPU");
+ 230     FLAG_SET_DEFAULT(UseGHASHIntrinsics, false);
+ 231   }
+ 232 
+ 233   if (FLAG_IS_DEFAULT(UseFMA)) {
+ 234     FLAG_SET_DEFAULT(UseFMA, true);
+ 235   }
+ 236 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+ 237   if (UseSHA) {
+ 238     warning("SHA instructions are not available on this CPU");
+ 239     FLAG_SET_DEFAULT(UseSHA, false);
+ 240   }
+ 241   if (UseSHA1Intrinsics || UseSHA256Intrinsics || UseSHA512Intrinsics) {
+ 242     warning("SHA intrinsics are not available on this CPU");
+ 243     FLAG_SET_DEFAULT(UseSHA1Intrinsics, false);
+ 244     FLAG_SET_DEFAULT(UseSHA256Intrinsics, false);
+ 245     FLAG_SET_DEFAULT(UseSHA512Intrinsics, false);
+ 246   }
+
+ 247 
+ 248   if (UseAdler32Intrinsics) {
+ 249     warning("Adler32Intrinsics not available on this CPU.");
+ 250     FLAG_SET_DEFAULT(UseAdler32Intrinsics, false);
+ 251   }
+ 252 
+ 253   if (FLAG_IS_DEFAULT(UseMultiplyToLenIntrinsic)) {
+ 254     UseMultiplyToLenIntrinsic = true;
+ 255   }
+ 256   if (FLAG_IS_DEFAULT(UseMontgomeryMultiplyIntrinsic)) {
+ 257     UseMontgomeryMultiplyIntrinsic = true;
+ 258   }
+ 259   if (FLAG_IS_DEFAULT(UseMontgomerySquareIntrinsic)) {
+ 260     UseMontgomerySquareIntrinsic = true;
+ 261   }
+ 262 
+ 263   if (UseVectorizedMismatchIntrinsic) {
+ 264     warning("UseVectorizedMismatchIntrinsic specified, but not available on this CPU.");
+ 265     FLAG_SET_DEFAULT(UseVectorizedMismatchIntrinsic, false);
+ 266   }
+
+</pre><hr></hr><pre>
+ 638   _features = VM_Version::all_features_m;
+ 639 
+ 640   // Emit code.
+ 641   void (*test)(address addr, uint64_t offset)=(void(*)(address addr, uint64_t offset))(void *)a-&gt;function_entry();
+ 642   uint32_t *code = (uint32_t *)a-&gt;pc();
+ 643   // Don't use R0 in ldarx.
+ 644   // Keep R3_ARG1 unmodified, it contains &amp;field (see below).
+ 645   // Keep R4_ARG2 unmodified, it contains offset = 0 (see below).
+ 646   a-&gt;fsqrt(F3, F4);                            // code[0]  -&gt; fsqrt_m
+ 647   a-&gt;fsqrts(F3, F4);                           // code[1]  -&gt; fsqrts_m
+ 648   a-&gt;isel(R7, R5, R6, 0);                      // code[2]  -&gt; isel_m
+ 649   a-&gt;ldarx_unchecked(R7, R3_ARG1, R4_ARG2, 1); // code[3]  -&gt; lxarx_m
+ 650   a-&gt;cmpb(R7, R5, R6);                         // code[4]  -&gt; cmpb
+ 651   a-&gt;popcntb(R7, R5);                          // code[5]  -&gt; popcntb
+ 652   a-&gt;popcntw(R7, R5);                          // code[6]  -&gt; popcntw
+ 653   a-&gt;fcfids(F3, F4);                           // code[7]  -&gt; fcfids
+ 654   a-&gt;vand(VR0, VR0, VR0);                      // code[8]  -&gt; vand
+ 655   // arg0 of lqarx must be an even register, (arg1 + arg2) must be a multiple of 16
+ 656   a-&gt;lqarx_unchecked(R6, R3_ARG1, R4_ARG2, 1); // code[9]  -&gt; lqarx_m
+ 657   a-&gt;vcipher(VR0, VR1, VR2);                   // code[10] -&gt; vcipher
+<span class="changed"> 658   a-&gt;vpmsumb(VR0, VR1, VR2);                   // code[11] -&gt; vpmsumb</span>
+<span class="changed"> 659   a-&gt;tcheck(0);                                // code[12] -&gt; tcheck</span>
+<span class="changed"> 660   a-&gt;mfdscr(R0);                               // code[13] -&gt; mfdscr</span>
+<span class="changed"> 661   a-&gt;lxvd2x(VSR0, R3_ARG1);                    // code[14] -&gt; vsx</span>
+
+ 662   a-&gt;blr();
+ 663 
+ 664   // Emit function to set one cache line to zero. Emit function descriptor and get pointer to it.
+ 665   void (*zero_cacheline_func_ptr)(char*) = (void(*)(char*))(void *)a-&gt;function_entry();
+ 666   a-&gt;dcbz(R3_ARG1); // R3_ARG1 = addr
+ 667   a-&gt;blr();
+ 668 
+ 669   uint32_t *code_end = (uint32_t *)a-&gt;pc();
+ 670   a-&gt;flush();
+ 671   _features = VM_Version::unknown_m;
+ 672 
+ 673   // Print the detection code.
+ 674   if (PrintAssembly) {
+ 675     ttyLocker ttyl;
+ 676     tty-&gt;print_cr("Decoding cpu-feature detection stub at " INTPTR_FORMAT " before execution:", p2i(code));
+ 677     Disassembler::decode((u_char*)code, (u_char*)code_end, tty);
+ 678   }
+ 679 
+ 680   // Measure cache line size.
+ 681   memset(test_area, 0xFF, BUFFER_SIZE); // Fill test area with 0xFF.
+
+</pre><hr></hr><pre>
+ 687 
+ 688   // Execute code. Illegal instructions will be replaced by 0 in the signal handler.
+ 689   VM_Version::_is_determine_features_test_running = true;
+ 690   // We must align the first argument to 16 bytes because of the lqarx check.
+ 691   (*test)((address)align_size_up((intptr_t)mid_of_test_area, 16), (uint64_t)0);
+ 692   VM_Version::_is_determine_features_test_running = false;
+ 693 
+ 694   // determine which instructions are legal.
+ 695   int feature_cntr = 0;
+ 696   if (code[feature_cntr++]) features |= fsqrt_m;
+ 697   if (code[feature_cntr++]) features |= fsqrts_m;
+ 698   if (code[feature_cntr++]) features |= isel_m;
+ 699   if (code[feature_cntr++]) features |= lxarxeh_m;
+ 700   if (code[feature_cntr++]) features |= cmpb_m;
+ 701   if (code[feature_cntr++]) features |= popcntb_m;
+ 702   if (code[feature_cntr++]) features |= popcntw_m;
+ 703   if (code[feature_cntr++]) features |= fcfids_m;
+ 704   if (code[feature_cntr++]) features |= vand_m;
+ 705   if (code[feature_cntr++]) features |= lqarx_m;
+ 706   if (code[feature_cntr++]) features |= vcipher_m;
+
+ 707   if (code[feature_cntr++]) features |= vpmsumb_m;
+ 708   if (code[feature_cntr++]) features |= tcheck_m;
+ 709   if (code[feature_cntr++]) features |= mfdscr_m;
+ 710   if (code[feature_cntr++]) features |= vsx_m;
+ 711 
+ 712   // Print the detection code.
+ 713   if (PrintAssembly) {
+ 714     ttyLocker ttyl;
+ 715     tty-&gt;print_cr("Decoding cpu-feature detection stub at " INTPTR_FORMAT " after execution:", p2i(code));
+ 716     Disassembler::decode((u_char*)code, (u_char*)code_end, tty);
+ 717   }
+ 718 
+ 719   _features = features;
+ 720 }
+ 721 
+ 722 // Power 8: Configure Data Stream Control Register.
+ 723 void VM_Version::config_dscr() {
+ 724   // 7 InstWords for each call (function descriptor + blr instruction).
+ 725   const int code_size = (2+2*7)*BytesPerInstWord;
+ 726 
+
+</pre><hr></hr>
+</pre></td><td><pre>
+
+</pre><hr></hr><pre>
+  94 
+  95 #ifdef COMPILER2
+  96   if (!UseSIGTRAP) {
+  97     MSG(TrapBasedRangeChecks);
+  98     FLAG_SET_ERGO(bool, TrapBasedRangeChecks, false);
+  99   }
+ 100 
+ 101   // On Power6 test for section size.
+ 102   if (PowerArchitecturePPC64 == 6) {
+ 103     determine_section_size();
+ 104   // TODO: PPC port } else {
+ 105   // TODO: PPC port PdScheduling::power6SectorSize = 0x20;
+ 106   }
+ 107 
+ 108   MaxVectorSize = 8;
+ 109 #endif
+ 110 
+ 111   // Create and print feature-string.
+ 112   char buf[(num_features+1) * 16]; // Max 16 chars per feature.
+ 113   jio_snprintf(buf, sizeof(buf),
+<span class="changed"> 114                "ppc64%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s",</span>
+ 115                (has_fsqrt()   ? " fsqrt"   : ""),
+ 116                (has_isel()    ? " isel"    : ""),
+ 117                (has_lxarxeh() ? " lxarxeh" : ""),
+ 118                (has_cmpb()    ? " cmpb"    : ""),
+ 119                //(has_mftgpr()? " mftgpr"  : ""),
+ 120                (has_popcntb() ? " popcntb" : ""),
+ 121                (has_popcntw() ? " popcntw" : ""),
+ 122                (has_fcfids()  ? " fcfids"  : ""),
+ 123                (has_vand()    ? " vand"    : ""),
+ 124                (has_lqarx()   ? " lqarx"   : ""),
+<span class="new"> 125                (has_vshasig() ? " sha"     : ""),</span>
+ 126                (has_vcipher() ? " aes"     : ""),
+ 127                (has_vpmsumb() ? " vpmsumb" : ""),
+ 128                (has_tcheck()  ? " tcheck"  : ""),
+ 129                (has_mfdscr()  ? " mfdscr"  : ""),
+ 130                (has_vsx()     ? " vsx"     : "")
+ 131                // Make sure number of %s matches num_features!
+ 132               );
+ 133   _features_string = os::strdup(buf);
+ 134   if (Verbose) {
+ 135     print_features();
+ 136   }
+ 137 
+ 138   // PPC64 supports 8-byte compare-exchange operations (see
+ 139   // Atomic::cmpxchg and StubGenerator::generate_atomic_cmpxchg_ptr)
+ 140   // and 'atomic long memory ops' (see Unsafe_GetLongVolatile).
+ 141   _supports_cx8 = true;
+ 142 
+ 143   // Used by C1.
+ 144   _supports_atomic_getset4 = true;
+ 145   _supports_atomic_getadd4 = true;
+
+</pre><hr></hr><pre>
+ 218     if (!FLAG_IS_DEFAULT(UseAESIntrinsics))
+ 219       warning("AES intrinsics are not available on this CPU");
+ 220     FLAG_SET_DEFAULT(UseAESIntrinsics, false);
+ 221   }
+ 222 #endif
+ 223 
+ 224   if (UseAESCTRIntrinsics) {
+ 225     warning("AES/CTR intrinsics are not available on this CPU");
+ 226     FLAG_SET_DEFAULT(UseAESCTRIntrinsics, false);
+ 227   }
+ 228 
+ 229   if (UseGHASHIntrinsics) {
+ 230     warning("GHASH intrinsics are not available on this CPU");
+ 231     FLAG_SET_DEFAULT(UseGHASHIntrinsics, false);
+ 232   }
+ 233 
+ 234   if (FLAG_IS_DEFAULT(UseFMA)) {
+ 235     FLAG_SET_DEFAULT(UseFMA, true);
+ 236   }
+ 237 
+<span class="new"> 238 #if defined(VM_LITTLE_ENDIAN)</span>
+<span class="new"> 239   if (has_vshasig()) {</span>
+<span class="new"> 240     if (FLAG_IS_DEFAULT(UseSHA)) {</span>
+<span class="new"> 241       UseSHA = true;</span>
+<span class="new"> 242     }</span>
+<span class="new"> 243   } else if (UseSHA) {</span>
+<span class="new"> 244     if (!FLAG_IS_DEFAULT(UseSHA))</span>
+<span class="new"> 245       warning("SHA instructions are not available on this CPU");</span>
+<span class="new"> 246     FLAG_SET_DEFAULT(UseSHA, false);</span>
+<span class="new"> 247   }</span>
+<span class="new"> 248 </span>
+<span class="new"> 249   if (UseSHA1Intrinsics) {</span>
+<span class="new"> 250     warning("Intrinsics for SHA-1 crypto hash functions not available on this CPU.");</span>
+<span class="new"> 251     FLAG_SET_DEFAULT(UseSHA1Intrinsics, false);</span>
+<span class="new"> 252   }</span>
+<span class="new"> 253 </span>
+<span class="new"> 254   if (UseSHA &amp;&amp; has_vshasig()) {</span>
+<span class="new"> 255     if (FLAG_IS_DEFAULT(UseSHA256Intrinsics)) {</span>
+<span class="new"> 256       FLAG_SET_DEFAULT(UseSHA256Intrinsics, true);</span>
+<span class="new"> 257     }</span>
+<span class="new"> 258   } else if (UseSHA256Intrinsics) {</span>
+<span class="new"> 259     warning("Intrinsics for SHA-224 and SHA-256 crypto hash functions not available on this CPU.");</span>
+<span class="new"> 260     FLAG_SET_DEFAULT(UseSHA256Intrinsics, false);</span>
+<span class="new"> 261   }</span>
+<span class="new"> 262 </span>
+<span class="new"> 263   if (UseSHA &amp;&amp; has_vshasig()) {</span>
+<span class="new"> 264     if (FLAG_IS_DEFAULT(UseSHA512Intrinsics)) {</span>
+<span class="new"> 265       FLAG_SET_DEFAULT(UseSHA512Intrinsics, true);</span>
+<span class="new"> 266     }</span>
+<span class="new"> 267   } else if (UseSHA512Intrinsics) {</span>
+<span class="new"> 268     warning("Intrinsics for SHA-384 and SHA-512 crypto hash functions not available on this CPU.");</span>
+<span class="new"> 269     FLAG_SET_DEFAULT(UseSHA512Intrinsics, false);</span>
+<span class="new"> 270   }</span>
+<span class="new"> 271 </span>
+<span class="new"> 272   if (!(UseSHA1Intrinsics || UseSHA256Intrinsics || UseSHA512Intrinsics)) {</span>
+<span class="new"> 273     FLAG_SET_DEFAULT(UseSHA, false);</span>
+<span class="new"> 274   }</span>
+<span class="new"> 275 #else</span>
+ 276   if (UseSHA) {
+ 277     warning("SHA instructions are not available on this CPU");
+ 278     FLAG_SET_DEFAULT(UseSHA, false);
+ 279   }
+ 280   if (UseSHA1Intrinsics || UseSHA256Intrinsics || UseSHA512Intrinsics) {
+ 281     warning("SHA intrinsics are not available on this CPU");
+ 282     FLAG_SET_DEFAULT(UseSHA1Intrinsics, false);
+ 283     FLAG_SET_DEFAULT(UseSHA256Intrinsics, false);
+ 284     FLAG_SET_DEFAULT(UseSHA512Intrinsics, false);
+ 285   }
+<span class="new"> 286 #endif</span>
+ 287 
+ 288   if (UseAdler32Intrinsics) {
+ 289     warning("Adler32Intrinsics not available on this CPU.");
+ 290     FLAG_SET_DEFAULT(UseAdler32Intrinsics, false);
+ 291   }
+ 292 
+ 293   if (FLAG_IS_DEFAULT(UseMultiplyToLenIntrinsic)) {
+ 294     UseMultiplyToLenIntrinsic = true;
+ 295   }
+ 296   if (FLAG_IS_DEFAULT(UseMontgomeryMultiplyIntrinsic)) {
+ 297     UseMontgomeryMultiplyIntrinsic = true;
+ 298   }
+ 299   if (FLAG_IS_DEFAULT(UseMontgomerySquareIntrinsic)) {
+ 300     UseMontgomerySquareIntrinsic = true;
+ 301   }
+ 302 
+ 303   if (UseVectorizedMismatchIntrinsic) {
+ 304     warning("UseVectorizedMismatchIntrinsic specified, but not available on this CPU.");
+ 305     FLAG_SET_DEFAULT(UseVectorizedMismatchIntrinsic, false);
+ 306   }
+
+</pre><hr></hr><pre>
+ 678   _features = VM_Version::all_features_m;
+ 679 
+ 680   // Emit code.
+ 681   void (*test)(address addr, uint64_t offset)=(void(*)(address addr, uint64_t offset))(void *)a-&gt;function_entry();
+ 682   uint32_t *code = (uint32_t *)a-&gt;pc();
+ 683   // Don't use R0 in ldarx.
+ 684   // Keep R3_ARG1 unmodified, it contains &amp;field (see below).
+ 685   // Keep R4_ARG2 unmodified, it contains offset = 0 (see below).
+ 686   a-&gt;fsqrt(F3, F4);                            // code[0]  -&gt; fsqrt_m
+ 687   a-&gt;fsqrts(F3, F4);                           // code[1]  -&gt; fsqrts_m
+ 688   a-&gt;isel(R7, R5, R6, 0);                      // code[2]  -&gt; isel_m
+ 689   a-&gt;ldarx_unchecked(R7, R3_ARG1, R4_ARG2, 1); // code[3]  -&gt; lxarx_m
+ 690   a-&gt;cmpb(R7, R5, R6);                         // code[4]  -&gt; cmpb
+ 691   a-&gt;popcntb(R7, R5);                          // code[5]  -&gt; popcntb
+ 692   a-&gt;popcntw(R7, R5);                          // code[6]  -&gt; popcntw
+ 693   a-&gt;fcfids(F3, F4);                           // code[7]  -&gt; fcfids
+ 694   a-&gt;vand(VR0, VR0, VR0);                      // code[8]  -&gt; vand
+ 695   // arg0 of lqarx must be an even register, (arg1 + arg2) must be a multiple of 16
+ 696   a-&gt;lqarx_unchecked(R6, R3_ARG1, R4_ARG2, 1); // code[9]  -&gt; lqarx_m
+ 697   a-&gt;vcipher(VR0, VR1, VR2);                   // code[10] -&gt; vcipher
+<span class="changed"> 698   a-&gt;vshasigmaw(VR0, VR1, 1, 0xF);             // code[11] -&gt; vshasig</span>
+<span class="changed"> 699   a-&gt;vpmsumb(VR0, VR1, VR2);                   // code[12] -&gt; vpmsumb</span>
+<span class="changed"> 700   a-&gt;tcheck(0);                                // code[13] -&gt; tcheck</span>
+<span class="changed"> 701   a-&gt;mfdscr(R0);                               // code[14] -&gt; mfdscr</span>
+<span class="changed"> 702   a-&gt;lxvd2x(VSR0, R3_ARG1);                    // code[15] -&gt; vsx</span>
+ 703   a-&gt;blr();
+ 704 
+ 705   // Emit function to set one cache line to zero. Emit function descriptor and get pointer to it.
+ 706   void (*zero_cacheline_func_ptr)(char*) = (void(*)(char*))(void *)a-&gt;function_entry();
+ 707   a-&gt;dcbz(R3_ARG1); // R3_ARG1 = addr
+ 708   a-&gt;blr();
+ 709 
+ 710   uint32_t *code_end = (uint32_t *)a-&gt;pc();
+ 711   a-&gt;flush();
+ 712   _features = VM_Version::unknown_m;
+ 713 
+ 714   // Print the detection code.
+ 715   if (PrintAssembly) {
+ 716     ttyLocker ttyl;
+ 717     tty-&gt;print_cr("Decoding cpu-feature detection stub at " INTPTR_FORMAT " before execution:", p2i(code));
+ 718     Disassembler::decode((u_char*)code, (u_char*)code_end, tty);
+ 719   }
+ 720 
+ 721   // Measure cache line size.
+ 722   memset(test_area, 0xFF, BUFFER_SIZE); // Fill test area with 0xFF.
+
+</pre><hr></hr><pre>
+ 728 
+ 729   // Execute code. Illegal instructions will be replaced by 0 in the signal handler.
+ 730   VM_Version::_is_determine_features_test_running = true;
+ 731   // We must align the first argument to 16 bytes because of the lqarx check.
+ 732   (*test)((address)align_size_up((intptr_t)mid_of_test_area, 16), (uint64_t)0);
+ 733   VM_Version::_is_determine_features_test_running = false;
+ 734 
+ 735   // determine which instructions are legal.
+ 736   int feature_cntr = 0;
+ 737   if (code[feature_cntr++]) features |= fsqrt_m;
+ 738   if (code[feature_cntr++]) features |= fsqrts_m;
+ 739   if (code[feature_cntr++]) features |= isel_m;
+ 740   if (code[feature_cntr++]) features |= lxarxeh_m;
+ 741   if (code[feature_cntr++]) features |= cmpb_m;
+ 742   if (code[feature_cntr++]) features |= popcntb_m;
+ 743   if (code[feature_cntr++]) features |= popcntw_m;
+ 744   if (code[feature_cntr++]) features |= fcfids_m;
+ 745   if (code[feature_cntr++]) features |= vand_m;
+ 746   if (code[feature_cntr++]) features |= lqarx_m;
+ 747   if (code[feature_cntr++]) features |= vcipher_m;
+<span class="new"> 748   if (code[feature_cntr++]) features |= vshasig_m;</span>
+ 749   if (code[feature_cntr++]) features |= vpmsumb_m;
+ 750   if (code[feature_cntr++]) features |= tcheck_m;
+ 751   if (code[feature_cntr++]) features |= mfdscr_m;
+ 752   if (code[feature_cntr++]) features |= vsx_m;
+ 753 
+ 754   // Print the detection code.
+ 755   if (PrintAssembly) {
+ 756     ttyLocker ttyl;
+ 757     tty-&gt;print_cr("Decoding cpu-feature detection stub at " INTPTR_FORMAT " after execution:", p2i(code));
+ 758     Disassembler::decode((u_char*)code, (u_char*)code_end, tty);
+ 759   }
+ 760 
+ 761   _features = features;
+ 762 }
+ 763 
+ 764 // Power 8: Configure Data Stream Control Register.
+ 765 void VM_Version::config_dscr() {
+ 766   // 7 InstWords for each call (function descriptor + blr instruction).
+ 767   const int code_size = (2+2*7)*BytesPerInstWord;
+ 768 
+
+</pre><hr></hr>
+</pre></td>
+</tr></table>
+<center><a href='../../../../src/cpu/ppc/vm/stubGenerator_ppc.cpp.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/cpu/ppc/vm/vm_version_ppc.hpp.sdiff.html' target='_top'>next &gt</a></center>
+</body></html>

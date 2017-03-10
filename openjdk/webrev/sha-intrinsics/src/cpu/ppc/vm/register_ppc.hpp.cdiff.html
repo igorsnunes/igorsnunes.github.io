@@ -1,0 +1,279 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>hotspot Cdiff src/cpu/ppc/vm/register_ppc.hpp</title>
+</head>
+<body id="SUNWwebrev">
+<center><a href='../../../../src/cpu/ppc/vm/register_ppc.cpp.cdiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/cpu/ppc/vm/stubGenerator_ppc.cpp.cdiff.html' target='_top'>next &gt</a></center>
+<h2>src/cpu/ppc/vm/register_ppc.hpp</h2>
+        <a class="print" href="javascript:print()">Print this page</a>
+<pre>rev <a href="https://bugs.openjdk.java.net/browse/JDK-12651">12651</a> : Sha2 intrinsics implementation</pre>
+        <pre>
+<hr /><span class="oldmarker">*** 396,405 ****</span>
+<span class="newmarker">--- 396,410 ----</span>
+  
+  inline VectorRegister as_VectorRegister(int encoding) {
+    return (VectorRegister)(intptr_t)encoding;
+  }
+  
+<span class="new">+ // Forward declaration</span>
+<span class="new">+ // Use VectorSRegister as a shortcut.</span>
+<span class="new">+ class VectorSRegisterImpl;</span>
+<span class="new">+ typedef VectorSRegisterImpl* VectorSRegister;</span>
+<span class="new">+ </span>
+  // The implementation of vector registers for the Power architecture
+  class VectorRegisterImpl: public AbstractRegisterImpl {
+   public:
+    enum {
+      number_of_registers = 32
+<hr /><span class="oldmarker">*** 413,422 ****</span>
+<span class="newmarker">--- 418,430 ----</span>
+  
+    // testers
+    bool is_valid()       const { return   0 &lt;=  value()       &amp;&amp;  value() &lt; number_of_registers; }
+  
+    const char* name() const;
+<span class="new">+ </span>
+<span class="new">+   // convert to VSR</span>
+<span class="new">+   VectorSRegister to_vsr() const;</span>
+  };
+  
+  // The Vector registers of the Power architecture
+  
+  CONSTANT_REGISTER_DECLARATION(VectorRegister, vnoreg, (-1));
+<hr /><span class="oldmarker">*** 489,511 ****</span>
+  #define VR30   ((VectorRegister)(  VR30_VectorRegisterEnumValue))
+  #define VR31   ((VectorRegister)(  VR31_VectorRegisterEnumValue))
+  #endif // DONT_USE_REGISTER_DEFINES
+  
+  
+<span class="removed">- // Use VectorSRegister as a shortcut.</span>
+<span class="removed">- class VectorSRegisterImpl;</span>
+<span class="removed">- typedef VectorSRegisterImpl* VectorSRegister;</span>
+<span class="removed">- </span>
+  inline VectorSRegister as_VectorSRegister(int encoding) {
+    return (VectorSRegister)(intptr_t)encoding;
+  }
+  
+  // The implementation of Vector-Scalar (VSX) registers on POWER architecture.
+  class VectorSRegisterImpl: public AbstractRegisterImpl {
+   public:
+    enum {
+<span class="changed">!     number_of_registers = 32</span>
+    };
+  
+    // construction
+    inline friend VectorSRegister as_VectorSRegister(int encoding);
+  
+<span class="newmarker">--- 497,515 ----</span>
+  #define VR30   ((VectorRegister)(  VR30_VectorRegisterEnumValue))
+  #define VR31   ((VectorRegister)(  VR31_VectorRegisterEnumValue))
+  #endif // DONT_USE_REGISTER_DEFINES
+  
+  
+  inline VectorSRegister as_VectorSRegister(int encoding) {
+    return (VectorSRegister)(intptr_t)encoding;
+  }
+  
+  // The implementation of Vector-Scalar (VSX) registers on POWER architecture.
+  class VectorSRegisterImpl: public AbstractRegisterImpl {
+   public:
+    enum {
+<span class="changed">!     number_of_registers = 64</span>
+    };
+  
+    // construction
+    inline friend VectorSRegister as_VectorSRegister(int encoding);
+  
+<hr /><span class="oldmarker">*** 552,561 ****</span>
+<span class="newmarker">--- 556,597 ----</span>
+  CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR27, (27));
+  CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR28, (28));
+  CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR29, (29));
+  CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR30, (30));
+  CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR31, (31));
+<span class="new">+ CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR32, (32));</span>
+<span class="new">+ CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR33, (33));</span>
+<span class="new">+ CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR34, (34));</span>
+<span class="new">+ CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR35, (35));</span>
+<span class="new">+ CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR36, (36));</span>
+<span class="new">+ CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR37, (37));</span>
+<span class="new">+ CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR38, (38));</span>
+<span class="new">+ CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR39, (39));</span>
+<span class="new">+ CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR40, (40));</span>
+<span class="new">+ CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR41, (41));</span>
+<span class="new">+ CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR42, (42));</span>
+<span class="new">+ CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR43, (43));</span>
+<span class="new">+ CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR44, (44));</span>
+<span class="new">+ CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR45, (45));</span>
+<span class="new">+ CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR46, (46));</span>
+<span class="new">+ CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR47, (47));</span>
+<span class="new">+ CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR48, (48));</span>
+<span class="new">+ CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR49, (49));</span>
+<span class="new">+ CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR50, (50));</span>
+<span class="new">+ CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR51, (51));</span>
+<span class="new">+ CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR52, (52));</span>
+<span class="new">+ CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR53, (53));</span>
+<span class="new">+ CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR54, (54));</span>
+<span class="new">+ CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR55, (55));</span>
+<span class="new">+ CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR56, (56));</span>
+<span class="new">+ CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR57, (57));</span>
+<span class="new">+ CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR58, (58));</span>
+<span class="new">+ CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR59, (59));</span>
+<span class="new">+ CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR60, (60));</span>
+<span class="new">+ CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR61, (61));</span>
+<span class="new">+ CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR62, (62));</span>
+<span class="new">+ CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR63, (63));</span>
+  
+  #ifndef DONT_USE_REGISTER_DEFINES
+  #define vsnoregi ((VectorSRegister)(vsnoreg_VectorSRegisterEnumValue))
+  #define VSR0    ((VectorSRegister)(   VSR0_VectorSRegisterEnumValue))
+  #define VSR1    ((VectorSRegister)(   VSR1_VectorSRegisterEnumValue))
+<hr /><span class="oldmarker">*** 587,596 ****</span>
+<span class="newmarker">--- 623,664 ----</span>
+  #define VSR27   ((VectorSRegister)(  VSR27_VectorSRegisterEnumValue))
+  #define VSR28   ((VectorSRegister)(  VSR28_VectorSRegisterEnumValue))
+  #define VSR29   ((VectorSRegister)(  VSR29_VectorSRegisterEnumValue))
+  #define VSR30   ((VectorSRegister)(  VSR30_VectorSRegisterEnumValue))
+  #define VSR31   ((VectorSRegister)(  VSR31_VectorSRegisterEnumValue))
+<span class="new">+ #define VSR32   ((VectorSRegister)(  VSR32_VectorSRegisterEnumValue))</span>
+<span class="new">+ #define VSR33   ((VectorSRegister)(  VSR33_VectorSRegisterEnumValue))</span>
+<span class="new">+ #define VSR34   ((VectorSRegister)(  VSR34_VectorSRegisterEnumValue))</span>
+<span class="new">+ #define VSR35   ((VectorSRegister)(  VSR35_VectorSRegisterEnumValue))</span>
+<span class="new">+ #define VSR36   ((VectorSRegister)(  VSR36_VectorSRegisterEnumValue))</span>
+<span class="new">+ #define VSR37   ((VectorSRegister)(  VSR37_VectorSRegisterEnumValue))</span>
+<span class="new">+ #define VSR38   ((VectorSRegister)(  VSR38_VectorSRegisterEnumValue))</span>
+<span class="new">+ #define VSR39   ((VectorSRegister)(  VSR39_VectorSRegisterEnumValue))</span>
+<span class="new">+ #define VSR40   ((VectorSRegister)(  VSR40_VectorSRegisterEnumValue))</span>
+<span class="new">+ #define VSR41   ((VectorSRegister)(  VSR41_VectorSRegisterEnumValue))</span>
+<span class="new">+ #define VSR42   ((VectorSRegister)(  VSR42_VectorSRegisterEnumValue))</span>
+<span class="new">+ #define VSR43   ((VectorSRegister)(  VSR43_VectorSRegisterEnumValue))</span>
+<span class="new">+ #define VSR44   ((VectorSRegister)(  VSR44_VectorSRegisterEnumValue))</span>
+<span class="new">+ #define VSR45   ((VectorSRegister)(  VSR45_VectorSRegisterEnumValue))</span>
+<span class="new">+ #define VSR46   ((VectorSRegister)(  VSR46_VectorSRegisterEnumValue))</span>
+<span class="new">+ #define VSR47   ((VectorSRegister)(  VSR47_VectorSRegisterEnumValue))</span>
+<span class="new">+ #define VSR48   ((VectorSRegister)(  VSR48_VectorSRegisterEnumValue))</span>
+<span class="new">+ #define VSR49   ((VectorSRegister)(  VSR49_VectorSRegisterEnumValue))</span>
+<span class="new">+ #define VSR50   ((VectorSRegister)(  VSR50_VectorSRegisterEnumValue))</span>
+<span class="new">+ #define VSR51   ((VectorSRegister)(  VSR51_VectorSRegisterEnumValue))</span>
+<span class="new">+ #define VSR52   ((VectorSRegister)(  VSR52_VectorSRegisterEnumValue))</span>
+<span class="new">+ #define VSR53   ((VectorSRegister)(  VSR53_VectorSRegisterEnumValue))</span>
+<span class="new">+ #define VSR54   ((VectorSRegister)(  VSR54_VectorSRegisterEnumValue))</span>
+<span class="new">+ #define VSR55   ((VectorSRegister)(  VSR55_VectorSRegisterEnumValue))</span>
+<span class="new">+ #define VSR56   ((VectorSRegister)(  VSR56_VectorSRegisterEnumValue))</span>
+<span class="new">+ #define VSR57   ((VectorSRegister)(  VSR57_VectorSRegisterEnumValue))</span>
+<span class="new">+ #define VSR58   ((VectorSRegister)(  VSR58_VectorSRegisterEnumValue))</span>
+<span class="new">+ #define VSR59   ((VectorSRegister)(  VSR59_VectorSRegisterEnumValue))</span>
+<span class="new">+ #define VSR60   ((VectorSRegister)(  VSR60_VectorSRegisterEnumValue))</span>
+<span class="new">+ #define VSR61   ((VectorSRegister)(  VSR61_VectorSRegisterEnumValue))</span>
+<span class="new">+ #define VSR62   ((VectorSRegister)(  VSR62_VectorSRegisterEnumValue))</span>
+<span class="new">+ #define VSR63   ((VectorSRegister)(  VSR63_VectorSRegisterEnumValue))</span>
+  #endif // DONT_USE_REGISTER_DEFINES
+  
+  // Maximum number of incoming arguments that can be passed in i registers.
+  const int PPC_ARGS_IN_REGS_NUM = 8;
+  
+<hr /><span class="oldmarker">*** 607,617 ****</span>
+        ( RegisterImpl::number_of_registers +
+          FloatRegisterImpl::number_of_registers )
+        * 2                                          // register halves
+        + ConditionRegisterImpl::number_of_registers // condition code registers
+        + SpecialRegisterImpl::number_of_registers   // special registers
+<span class="changed">!       + VectorRegisterImpl::number_of_registers    // vector registers</span>
+    };
+  
+    static const int max_gpr;
+    static const int max_fpr;
+    static const int max_cnd;
+<span class="newmarker">--- 675,685 ----</span>
+        ( RegisterImpl::number_of_registers +
+          FloatRegisterImpl::number_of_registers )
+        * 2                                          // register halves
+        + ConditionRegisterImpl::number_of_registers // condition code registers
+        + SpecialRegisterImpl::number_of_registers   // special registers
+<span class="changed">!       + VectorRegisterImpl::number_of_registers    // VSX registers</span>
+    };
+  
+    static const int max_gpr;
+    static const int max_fpr;
+    static const int max_cnd;
+</pre>
+<center><a href='../../../../src/cpu/ppc/vm/register_ppc.cpp.cdiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/cpu/ppc/vm/stubGenerator_ppc.cpp.cdiff.html' target='_top'>next &gt</a></center>
+</body></html>
+

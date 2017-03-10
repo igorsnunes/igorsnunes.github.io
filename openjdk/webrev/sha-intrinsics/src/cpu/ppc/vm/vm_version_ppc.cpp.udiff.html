@@ -1,0 +1,219 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>hotspot Udiff src/cpu/ppc/vm/vm_version_ppc.cpp</title>
+
+<style type="text/css" media="screen">
+span.new {
+    color: blue;
+    font-weight: normal;
+}
+</style>
+
+</head>
+<body id="SUNWwebrev">
+<center><a href='../../../../src/cpu/ppc/vm/stubGenerator_ppc.cpp.udiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/cpu/ppc/vm/vm_version_ppc.hpp.udiff.html' target='_top'>next &gt</a></center>
+<h2>src/cpu/ppc/vm/vm_version_ppc.cpp</h2>
+        <a class="print" href="javascript:print()">Print this page</a>
+<pre>rev <a href="https://bugs.openjdk.java.net/browse/JDK-12651">12651</a> : Sha2 intrinsics implementation</pre>
+        <pre>
+</pre><hr /><pre>
+<span class="newmarker">@@ -109,21 +109,22 @@</span>
+ #endif
+ 
+   // Create and print feature-string.
+   char buf[(num_features+1) * 16]; // Max 16 chars per feature.
+   jio_snprintf(buf, sizeof(buf),
+<span class="removed">-               "ppc64%s%s%s%s%s%s%s%s%s%s%s%s%s%s",</span>
+<span class="new">+               "ppc64%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s",</span>
+                (has_fsqrt()   ? " fsqrt"   : ""),
+                (has_isel()    ? " isel"    : ""),
+                (has_lxarxeh() ? " lxarxeh" : ""),
+                (has_cmpb()    ? " cmpb"    : ""),
+                //(has_mftgpr()? " mftgpr"  : ""),
+                (has_popcntb() ? " popcntb" : ""),
+                (has_popcntw() ? " popcntw" : ""),
+                (has_fcfids()  ? " fcfids"  : ""),
+                (has_vand()    ? " vand"    : ""),
+                (has_lqarx()   ? " lqarx"   : ""),
+<span class="new">+               (has_vshasig() ? " sha"     : ""),</span>
+                (has_vcipher() ? " aes"     : ""),
+                (has_vpmsumb() ? " vpmsumb" : ""),
+                (has_tcheck()  ? " tcheck"  : ""),
+                (has_mfdscr()  ? " mfdscr"  : ""),
+                (has_vsx()     ? " vsx"     : "")
+</pre><hr /><pre>
+<span class="newmarker">@@ -232,20 +233,59 @@</span>
+ 
+   if (FLAG_IS_DEFAULT(UseFMA)) {
+     FLAG_SET_DEFAULT(UseFMA, true);
+   }
+ 
+<span class="new">+#if defined(VM_LITTLE_ENDIAN)</span>
+<span class="new">+  if (has_vshasig()) {</span>
+<span class="new">+    if (FLAG_IS_DEFAULT(UseSHA)) {</span>
+<span class="new">+      UseSHA = true;</span>
+<span class="new">+    }</span>
+<span class="new">+  } else if (UseSHA) {</span>
+<span class="new">+    if (!FLAG_IS_DEFAULT(UseSHA))</span>
+<span class="new">+      warning("SHA instructions are not available on this CPU");</span>
+<span class="new">+    FLAG_SET_DEFAULT(UseSHA, false);</span>
+<span class="new">+  }</span>
+<span class="new">+</span>
+<span class="new">+  if (UseSHA1Intrinsics) {</span>
+<span class="new">+    warning("Intrinsics for SHA-1 crypto hash functions not available on this CPU.");</span>
+<span class="new">+    FLAG_SET_DEFAULT(UseSHA1Intrinsics, false);</span>
+<span class="new">+  }</span>
+<span class="new">+</span>
+<span class="new">+  if (UseSHA &amp;&amp; has_vshasig()) {</span>
+<span class="new">+    if (FLAG_IS_DEFAULT(UseSHA256Intrinsics)) {</span>
+<span class="new">+      FLAG_SET_DEFAULT(UseSHA256Intrinsics, true);</span>
+<span class="new">+    }</span>
+<span class="new">+  } else if (UseSHA256Intrinsics) {</span>
+<span class="new">+    warning("Intrinsics for SHA-224 and SHA-256 crypto hash functions not available on this CPU.");</span>
+<span class="new">+    FLAG_SET_DEFAULT(UseSHA256Intrinsics, false);</span>
+<span class="new">+  }</span>
+<span class="new">+</span>
+<span class="new">+  if (UseSHA &amp;&amp; has_vshasig()) {</span>
+<span class="new">+    if (FLAG_IS_DEFAULT(UseSHA512Intrinsics)) {</span>
+<span class="new">+      FLAG_SET_DEFAULT(UseSHA512Intrinsics, true);</span>
+<span class="new">+    }</span>
+<span class="new">+  } else if (UseSHA512Intrinsics) {</span>
+<span class="new">+    warning("Intrinsics for SHA-384 and SHA-512 crypto hash functions not available on this CPU.");</span>
+<span class="new">+    FLAG_SET_DEFAULT(UseSHA512Intrinsics, false);</span>
+<span class="new">+  }</span>
+<span class="new">+</span>
+<span class="new">+  if (!(UseSHA1Intrinsics || UseSHA256Intrinsics || UseSHA512Intrinsics)) {</span>
+<span class="new">+    FLAG_SET_DEFAULT(UseSHA, false);</span>
+<span class="new">+  }</span>
+<span class="new">+#else</span>
+   if (UseSHA) {
+     warning("SHA instructions are not available on this CPU");
+     FLAG_SET_DEFAULT(UseSHA, false);
+   }
+   if (UseSHA1Intrinsics || UseSHA256Intrinsics || UseSHA512Intrinsics) {
+     warning("SHA intrinsics are not available on this CPU");
+     FLAG_SET_DEFAULT(UseSHA1Intrinsics, false);
+     FLAG_SET_DEFAULT(UseSHA256Intrinsics, false);
+     FLAG_SET_DEFAULT(UseSHA512Intrinsics, false);
+   }
+<span class="new">+#endif</span>
+ 
+   if (UseAdler32Intrinsics) {
+     warning("Adler32Intrinsics not available on this CPU.");
+     FLAG_SET_DEFAULT(UseAdler32Intrinsics, false);
+   }
+</pre><hr /><pre>
+<span class="newmarker">@@ -653,14 +693,15 @@</span>
+   a-&gt;fcfids(F3, F4);                           // code[7]  -&gt; fcfids
+   a-&gt;vand(VR0, VR0, VR0);                      // code[8]  -&gt; vand
+   // arg0 of lqarx must be an even register, (arg1 + arg2) must be a multiple of 16
+   a-&gt;lqarx_unchecked(R6, R3_ARG1, R4_ARG2, 1); // code[9]  -&gt; lqarx_m
+   a-&gt;vcipher(VR0, VR1, VR2);                   // code[10] -&gt; vcipher
+<span class="removed">-  a-&gt;vpmsumb(VR0, VR1, VR2);                   // code[11] -&gt; vpmsumb</span>
+<span class="removed">-  a-&gt;tcheck(0);                                // code[12] -&gt; tcheck</span>
+<span class="removed">-  a-&gt;mfdscr(R0);                               // code[13] -&gt; mfdscr</span>
+<span class="removed">-  a-&gt;lxvd2x(VSR0, R3_ARG1);                    // code[14] -&gt; vsx</span>
+<span class="new">+  a-&gt;vshasigmaw(VR0, VR1, 1, 0xF);             // code[11] -&gt; vshasig</span>
+<span class="new">+  a-&gt;vpmsumb(VR0, VR1, VR2);                   // code[12] -&gt; vpmsumb</span>
+<span class="new">+  a-&gt;tcheck(0);                                // code[13] -&gt; tcheck</span>
+<span class="new">+  a-&gt;mfdscr(R0);                               // code[14] -&gt; mfdscr</span>
+<span class="new">+  a-&gt;lxvd2x(VSR0, R3_ARG1);                    // code[15] -&gt; vsx</span>
+   a-&gt;blr();
+ 
+   // Emit function to set one cache line to zero. Emit function descriptor and get pointer to it.
+   void (*zero_cacheline_func_ptr)(char*) = (void(*)(char*))(void *)a-&gt;function_entry();
+   a-&gt;dcbz(R3_ARG1); // R3_ARG1 = addr
+</pre><hr /><pre>
+<span class="newmarker">@@ -702,10 +743,11 @@</span>
+   if (code[feature_cntr++]) features |= popcntw_m;
+   if (code[feature_cntr++]) features |= fcfids_m;
+   if (code[feature_cntr++]) features |= vand_m;
+   if (code[feature_cntr++]) features |= lqarx_m;
+   if (code[feature_cntr++]) features |= vcipher_m;
+<span class="new">+  if (code[feature_cntr++]) features |= vshasig_m;</span>
+   if (code[feature_cntr++]) features |= vpmsumb_m;
+   if (code[feature_cntr++]) features |= tcheck_m;
+   if (code[feature_cntr++]) features |= mfdscr_m;
+   if (code[feature_cntr++]) features |= vsx_m;
+ 
+</pre>
+<center><a href='../../../../src/cpu/ppc/vm/stubGenerator_ppc.cpp.udiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/cpu/ppc/vm/vm_version_ppc.hpp.udiff.html' target='_top'>next &gt</a></center>
+</body></html>
+

@@ -1,0 +1,12 @@
+src/cpu/ppc/vm/assembler_ppc.hpp
+src/cpu/ppc/vm/assembler_ppc.inline.hpp
+src/cpu/ppc/vm/macroAssembler_ppc.cpp
+src/cpu/ppc/vm/macroAssembler_ppc.hpp
+src/cpu/ppc/vm/register_ppc.cpp
+src/cpu/ppc/vm/register_ppc.hpp
+src/cpu/ppc/vm/stubGenerator_ppc.cpp
+src/cpu/ppc/vm/vm_version_ppc.cpp
+src/cpu/ppc/vm/vm_version_ppc.hpp
+test/compiler/intrinsics/sha/cli/testcases/GenericTestCaseForOtherCPU.java
+test/compiler/testlibrary/sha/predicate/IntrinsicPredicates.java
+src/cpu/ppc/vm/macroAssembler_ppc_sha.cpp

@@ -1,0 +1,265 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>hotspot Udiff src/cpu/ppc/vm/assembler_ppc.hpp</title>
+
+<style type="text/css" media="screen">
+span.new {
+    color: blue;
+    font-weight: normal;
+}
+</style>
+
+</head>
+<body id="SUNWwebrev">
+<center>&lt prev <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/cpu/ppc/vm/assembler_ppc.inline.hpp.udiff.html' target='_top'>next &gt</a></center>
+<h2>src/cpu/ppc/vm/assembler_ppc.hpp</h2>
+        <a class="print" href="javascript:print()">Print this page</a>
+<pre>rev <a href="https://bugs.openjdk.java.net/browse/JDK-12651">12651</a> : Sha2 intrinsics implementation</pre>
+        <pre>
+</pre><hr /><pre>
+<span class="newmarker">@@ -399,10 +399,11 @@</span>
+     // 64 bit opcode encodings
+ 
+     LD_OPCODE     = (58u &lt;&lt; OPCODE_SHIFT |   0u &lt;&lt; XO_30_31_SHIFT), // DS-FORM
+     LDU_OPCODE    = (58u &lt;&lt; OPCODE_SHIFT |   1u &lt;&lt; XO_30_31_SHIFT), // DS-FORM
+     LDX_OPCODE    = (31u &lt;&lt; OPCODE_SHIFT |  21u &lt;&lt; XO_21_30_SHIFT), // X-FORM
+<span class="new">+    LDBRX_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT |  532 &lt;&lt; 1),              // X-FORM</span>
+ 
+     STD_OPCODE    = (62u &lt;&lt; OPCODE_SHIFT |   0u &lt;&lt; XO_30_31_SHIFT), // DS-FORM
+     STDU_OPCODE   = (62u &lt;&lt; OPCODE_SHIFT |   1u &lt;&lt; XO_30_31_SHIFT), // DS-FORM
+     STDUX_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT | 181u &lt;&lt; 1),                  // X-FORM
+     STDX_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT | 149u &lt;&lt; XO_21_30_SHIFT), // X-FORM
+</pre><hr /><pre>
+<span class="newmarker">@@ -504,11 +505,16 @@</span>
+ 
+     // Vector-Scalar (VSX) instruction support.
+     LXVD2X_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT |  844u &lt;&lt; 1),
+     STXVD2X_OPCODE = (31u &lt;&lt; OPCODE_SHIFT |  972u &lt;&lt; 1),
+     MTVSRD_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT |  179u &lt;&lt; 1),
+<span class="new">+    MTVSRWZ_OPCODE = (31u &lt;&lt; OPCODE_SHIFT |  243u &lt;&lt; 1),</span>
+     MFVSRD_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT |   51u &lt;&lt; 1),
+<span class="new">+    MFVSRWZ_OPCODE = (31u &lt;&lt; OPCODE_SHIFT |  115u &lt;&lt; 1),</span>
+<span class="new">+    XXPERMDI_OPCODE= (60u &lt;&lt; OPCODE_SHIFT |   10u &lt;&lt; 3),</span>
+<span class="new">+    XXMRGHW_OPCODE = (60u &lt;&lt; OPCODE_SHIFT |   18u &lt;&lt; 3),</span>
+<span class="new">+    XXMRGLW_OPCODE = (60u &lt;&lt; OPCODE_SHIFT |   50u &lt;&lt; 3),</span>
+ 
+     // Vector Permute and Formatting
+     VPKPX_OPCODE   = (4u  &lt;&lt; OPCODE_SHIFT |  782u     ),
+     VPKSHSS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  398u     ),
+     VPKSWSS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  462u     ),
+</pre><hr /><pre>
+<span class="newmarker">@@ -554,10 +560,11 @@</span>
+     VADDSBS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  768u     ),
+     VADDSWS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  896u     ),
+     VADDUBM_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |    0u     ),
+     VADDUWM_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  128u     ),
+     VADDUHM_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |   64u     ),
+<span class="new">+    VADDUDM_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  192u     ),</span>
+     VADDUBS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  512u     ),
+     VADDUWS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  640u     ),
+     VADDUHS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  576u     ),
+     VSUBCUW_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT | 1408u     ),
+     VSUBSHS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT | 1856u     ),
+</pre><hr /><pre>
+<span class="newmarker">@@ -1092,20 +1099,23 @@</span>
+   static int vrb(   VectorRegister r)  { return  vrb(r-&gt;encoding());}
+   static int vrc(   VectorRegister r)  { return  vrc(r-&gt;encoding());}
+   static int vrs(   VectorRegister r)  { return  vrs(r-&gt;encoding());}
+   static int vrt(   VectorRegister r)  { return  vrt(r-&gt;encoding());}
+ 
+<span class="new">+  // Only used on SHA sigma instructions (VX-form)</span>
+<span class="new">+  static int vst(      int         x)  { return  opp_u_field(x,             16, 16); }</span>
+<span class="new">+  static int vsix(     int         x)  { return  opp_u_field(x,             20, 17); }</span>
+<span class="new">+</span>
+   // Support Vector-Scalar (VSX) instructions.
+<span class="removed">-  static int vsra(      int         x)  { return  opp_u_field(x,            15, 11); }</span>
+<span class="removed">-  static int vsrb(      int         x)  { return  opp_u_field(x,            20, 16); }</span>
+<span class="removed">-  static int vsrc(      int         x)  { return  opp_u_field(x,            25, 21); }</span>
+<span class="removed">-  static int vsrs(      int         x)  { return  opp_u_field(x,            10,  6); }</span>
+<span class="removed">-  static int vsrt(      int         x)  { return  opp_u_field(x,            10,  6); }</span>
+<span class="new">+  static int vsra(      int         x)  { return  opp_u_field(x &amp; 0x1F,     15, 11) | opp_u_field((x &amp; 0x20) &gt;&gt; 5, 29, 29); }</span>
+<span class="new">+  static int vsrb(      int         x)  { return  opp_u_field(x &amp; 0x1F,     20, 16) | opp_u_field((x &amp; 0x20) &gt;&gt; 5, 30, 30); }</span>
+<span class="new">+  static int vsrs(      int         x)  { return  opp_u_field(x &amp; 0x1F,     10,  6) | opp_u_field((x &amp; 0x20) &gt;&gt; 5, 31, 31); }</span>
+<span class="new">+  static int vsrt(      int         x)  { return  vsrs(x); }</span>
+<span class="new">+  static int vsdm(      int         x)  { return  opp_u_field(x,            23, 22); }</span>
+ 
+   static int vsra(   VectorSRegister r)  { return  vsra(r-&gt;encoding());}
+   static int vsrb(   VectorSRegister r)  { return  vsrb(r-&gt;encoding());}
+<span class="removed">-  static int vsrc(   VectorSRegister r)  { return  vsrc(r-&gt;encoding());}</span>
+   static int vsrs(   VectorSRegister r)  { return  vsrs(r-&gt;encoding());}
+   static int vsrt(   VectorSRegister r)  { return  vsrt(r-&gt;encoding());}
+ 
+   static int vsplt_uim( int        x)  { return  opp_u_field(x,             15, 12); } // for vsplt* instructions
+   static int vsplti_sim(int        x)  { return  opp_u_field(x,             15, 11); } // for vsplti* instructions
+</pre><hr /><pre>
+<span class="newmarker">@@ -1550,10 +1560,13 @@</span>
+   // 8 bytes
+   inline void ldx(  Register d, Register s1, Register s2);
+   inline void ld(   Register d, int si16,    Register s1);
+   inline void ldu(  Register d, int si16,    Register s1);
+ 
+<span class="new">+  // 8 bytes reversed</span>
+<span class="new">+  inline void ldbrx( Register d, Register s1, Register s2);</span>
+<span class="new">+</span>
+   // For convenience. Load pointer into d from b+s1.
+   inline void ld_ptr(Register d, int b, Register s1);
+   DEBUG_ONLY(inline void ld_ptr(Register d, ByteSize b, Register s1);)
+ 
+   //  PPC 1, section 3.3.3 Fixed-Point Store Instructions
+</pre><hr /><pre>
+<span class="newmarker">@@ -2025,10 +2038,11 @@</span>
+   inline void vaddsbs(  VectorRegister d, VectorRegister a, VectorRegister b);
+   inline void vaddsws(  VectorRegister d, VectorRegister a, VectorRegister b);
+   inline void vaddubm(  VectorRegister d, VectorRegister a, VectorRegister b);
+   inline void vadduwm(  VectorRegister d, VectorRegister a, VectorRegister b);
+   inline void vadduhm(  VectorRegister d, VectorRegister a, VectorRegister b);
+<span class="new">+  inline void vaddudm(  VectorRegister d, VectorRegister a, VectorRegister b);</span>
+   inline void vaddubs(  VectorRegister d, VectorRegister a, VectorRegister b);
+   inline void vadduws(  VectorRegister d, VectorRegister a, VectorRegister b);
+   inline void vadduhs(  VectorRegister d, VectorRegister a, VectorRegister b);
+   inline void vsubcuw(  VectorRegister d, VectorRegister a, VectorRegister b);
+   inline void vsubshs(  VectorRegister d, VectorRegister a, VectorRegister b);
+</pre><hr /><pre>
+<span class="newmarker">@@ -2100,10 +2114,11 @@</span>
+   inline void vcmpgtuw_(VectorRegister d, VectorRegister a, VectorRegister b);
+   inline void vand(     VectorRegister d, VectorRegister a, VectorRegister b);
+   inline void vandc(    VectorRegister d, VectorRegister a, VectorRegister b);
+   inline void vnor(     VectorRegister d, VectorRegister a, VectorRegister b);
+   inline void vor(      VectorRegister d, VectorRegister a, VectorRegister b);
+<span class="new">+  inline void vmr(      VectorRegister d, VectorRegister a);</span>
+   inline void vxor(     VectorRegister d, VectorRegister a, VectorRegister b);
+   inline void vrld(     VectorRegister d, VectorRegister a, VectorRegister b);
+   inline void vrlb(     VectorRegister d, VectorRegister a, VectorRegister b);
+   inline void vrlw(     VectorRegister d, VectorRegister a, VectorRegister b);
+   inline void vrlh(     VectorRegister d, VectorRegister a, VectorRegister b);
+</pre><hr /><pre>
+<span class="newmarker">@@ -2123,22 +2138,34 @@</span>
+   // Vector-Scalar (VSX) instructions.
+   inline void lxvd2x(   VectorSRegister d, Register a);
+   inline void lxvd2x(   VectorSRegister d, Register a, Register b);
+   inline void stxvd2x(  VectorSRegister d, Register a);
+   inline void stxvd2x(  VectorSRegister d, Register a, Register b);
+<span class="new">+  inline void mtvrwz(   VectorRegister  d, Register a);</span>
+<span class="new">+  inline void mfvrwz(   Register        a, VectorRegister d);</span>
+   inline void mtvrd(    VectorRegister  d, Register a);
+   inline void mfvrd(    Register        a, VectorRegister d);
+<span class="new">+  inline void xxpermdi( VectorSRegister d, VectorSRegister a, VectorSRegister b, int dm);</span>
+<span class="new">+  inline void xxmrghw(  VectorSRegister d, VectorSRegister a, VectorSRegister b);</span>
+<span class="new">+  inline void xxmrglw(  VectorSRegister d, VectorSRegister a, VectorSRegister b);</span>
+<span class="new">+</span>
+<span class="new">+  // VSX Extended Mnemonics</span>
+<span class="new">+  inline void xxspltd(  VectorSRegister d, VectorSRegister a, int x);</span>
+<span class="new">+  inline void xxmrghd(  VectorSRegister d, VectorSRegister a, VectorSRegister b);</span>
+<span class="new">+  inline void xxmrgld(  VectorSRegister d, VectorSRegister a, VectorSRegister b);</span>
+<span class="new">+  inline void xxswapd(  VectorSRegister d, VectorSRegister a);</span>
+ 
+   // AES (introduced with Power 8)
+   inline void vcipher(     VectorRegister d, VectorRegister a, VectorRegister b);
+   inline void vcipherlast( VectorRegister d, VectorRegister a, VectorRegister b);
+   inline void vncipher(    VectorRegister d, VectorRegister a, VectorRegister b);
+   inline void vncipherlast(VectorRegister d, VectorRegister a, VectorRegister b);
+   inline void vsbox(       VectorRegister d, VectorRegister a);
+ 
+   // SHA (introduced with Power 8)
+<span class="removed">-  // Not yet implemented.</span>
+<span class="new">+  inline void vshasigmad(VectorRegister d, VectorRegister a, bool st, int six);</span>
+<span class="new">+  inline void vshasigmaw(VectorRegister d, VectorRegister a, bool st, int six);</span>
+ 
+   // Vector Binary Polynomial Multiplication (introduced with Power 8)
+   inline void vpmsumb(  VectorRegister d, VectorRegister a, VectorRegister b);
+   inline void vpmsumd(  VectorRegister d, VectorRegister a, VectorRegister b);
+   inline void vpmsumh(  VectorRegister d, VectorRegister a, VectorRegister b);
+</pre><hr /><pre>
+<span class="newmarker">@@ -2180,10 +2207,11 @@</span>
+   inline void lhbrx(Register d, Register s2);
+   inline void lbzx( Register d, Register s2);
+   inline void lbz(  Register d, int si16);
+   inline void ldx(  Register d, Register s2);
+   inline void ld(   Register d, int si16);
+<span class="new">+  inline void ldbrx(Register d, Register s2);</span>
+   inline void stwx( Register d, Register s2);
+   inline void stw(  Register d, int si16);
+   inline void sthx( Register d, Register s2);
+   inline void sth(  Register d, int si16);
+   inline void stbx( Register d, Register s2);
+</pre>
+<center>&lt prev <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/cpu/ppc/vm/assembler_ppc.inline.hpp.udiff.html' target='_top'>next &gt</a></center>
+</body></html>
+

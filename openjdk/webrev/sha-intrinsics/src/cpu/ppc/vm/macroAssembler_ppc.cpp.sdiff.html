@@ -1,0 +1,279 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>hotspot Sdiff src/cpu/ppc/vm </title>
+</head><body id="SUNWwebrev">
+<center><a href='../../../../src/cpu/ppc/vm/assembler_ppc.inline.hpp.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/cpu/ppc/vm/macroAssembler_ppc.hpp.sdiff.html' target='_top'>next &gt</a></center>
+<h2>src/cpu/ppc/vm/macroAssembler_ppc.cpp</h2>
+<a class="print" href="javascript:print()">Print this page</a>
+<pre>rev <a href="https://bugs.openjdk.java.net/browse/JDK-12651">12651</a> : Sha2 intrinsics implementation</pre>
+
+<table><tr valign="top">
+<td><pre>
+
+</pre><hr></hr><pre>
+4504   offsetInt -= 8; std(R28, offsetInt, R1_SP);
+4505   offsetInt -= 8; std(R29, offsetInt, R1_SP);
+4506   offsetInt -= 8; std(R30, offsetInt, R1_SP);
+4507   offsetInt -= 8; std(R31, offsetInt, R1_SP);
+4508 
+4509   // Set constants
+4510   li(off16, 16);
+4511   li(off32, 32);
+4512   li(off48, 48);
+4513   li(off64, 64);
+4514   li(off80, 80);
+4515   li(off96, 96);
+4516   li(off112, 112);
+4517 
+4518   clrldi(crc, crc, 32);
+4519 
+4520   vxor(zeroes, zeroes, zeroes);
+4521   vspltisw(VR0, -1);
+4522 
+4523   vsldoi(mask_32bit, zeroes, VR0, 4);
+<span class="changed">4524   vsldoi(mask_64bit, zeroes, VR0, -8);</span>
+4525 
+4526   // Get the initial value into v8
+4527   vxor(VR8, VR8, VR8);
+4528   mtvrd(VR8, crc);
+<span class="changed">4529   vsldoi(VR8, zeroes, VR8, -8); // shift into bottom 32 bits</span>
+4530 
+4531   li (rLoaded, 0);
+4532 
+4533   rldicr(rIdx, len, 0, 56);
+4534 
+4535   {
+4536     BIND(L_1);
+4537     // Checksum in blocks of MAX_SIZE (32768)
+4538     lis(rMax, 0);
+4539     ori(rMax, rMax, 32768);
+4540     mr(rTmp2, rMax);
+4541     cmpd(CCR0, rIdx, rMax);
+4542     bgt(CCR0, L_2);
+4543     mr(rMax, rIdx);
+4544 
+4545     BIND(L_2);
+4546     subf(rIdx, rMax, rIdx);
+4547 
+4548     // our main loop does 128 bytes at a time
+4549     srdi(rMax, rMax, 7);
+
+</pre><hr></hr><pre>
+4858 
+4859   BIND(L_first_warm_up_done);
+4860   lvx(const1, constantsPos);
+4861   addi(constantsPos, constantsPos, 16);
+4862   vpmsumd(VR8,  VR16, const1);
+4863   vpmsumd(VR9,  VR17, const1);
+4864   vpmsumd(VR10, VR18, const1);
+4865   vpmsumd(VR11, VR19, const1);
+4866   vpmsumd(VR12, VR20, const1);
+4867   vpmsumd(VR13, VR21, const1);
+4868   vpmsumd(VR14, VR22, const1);
+4869   vpmsumd(VR15, VR23, const1);
+4870   b(L_second_cool_down);
+4871 
+4872   BIND(L_barrett_reduction);
+4873 
+4874   lvx(const1, barretConstants);
+4875   addi(barretConstants, barretConstants, 16);
+4876   lvx(const2, barretConstants);
+4877 
+<span class="changed">4878   vsldoi(VR1, VR0, VR0, -8);</span>
+4879   vxor(VR0, VR0, VR1);    // xor two 64 bit results together
+4880 
+4881   // shift left one bit
+4882   vspltisb(VR1, 1);
+4883   vsl(VR0, VR0, VR1);
+4884 
+4885   vand(VR0, VR0, mask_64bit);
+4886 
+4887   /*
+4888    * The reflected version of Barrett reduction. Instead of bit
+4889    * reflecting our data (which is expensive to do), we bit reflect our
+4890    * constants and our algorithm, which means the intermediate data in
+4891    * our vector registers goes from 0-63 instead of 63-0. We can reflect
+4892    * the algorithm because we don't carry in mod 2 arithmetic.
+4893    */
+4894   vand(VR1, VR0, mask_32bit);  // bottom 32 bits of a
+4895   vpmsumd(VR1, VR1, const1);   // ma
+4896   vand(VR1, VR1, mask_32bit);  // bottom 32bits of ma
+4897   vpmsumd(VR1, VR1, const2);   // qn */
+4898   vxor(VR0, VR0, VR1);         // a - qn, subtraction is xor in GF(2)
+
+</pre><hr></hr>
+</pre></td><td><pre>
+
+</pre><hr></hr><pre>
+4504   offsetInt -= 8; std(R28, offsetInt, R1_SP);
+4505   offsetInt -= 8; std(R29, offsetInt, R1_SP);
+4506   offsetInt -= 8; std(R30, offsetInt, R1_SP);
+4507   offsetInt -= 8; std(R31, offsetInt, R1_SP);
+4508 
+4509   // Set constants
+4510   li(off16, 16);
+4511   li(off32, 32);
+4512   li(off48, 48);
+4513   li(off64, 64);
+4514   li(off80, 80);
+4515   li(off96, 96);
+4516   li(off112, 112);
+4517 
+4518   clrldi(crc, crc, 32);
+4519 
+4520   vxor(zeroes, zeroes, zeroes);
+4521   vspltisw(VR0, -1);
+4522 
+4523   vsldoi(mask_32bit, zeroes, VR0, 4);
+<span class="changed">4524   vsldoi(mask_64bit, zeroes, VR0, 8);</span>
+4525 
+4526   // Get the initial value into v8
+4527   vxor(VR8, VR8, VR8);
+4528   mtvrd(VR8, crc);
+<span class="changed">4529   vsldoi(VR8, zeroes, VR8, 8); // shift into bottom 32 bits</span>
+4530 
+4531   li (rLoaded, 0);
+4532 
+4533   rldicr(rIdx, len, 0, 56);
+4534 
+4535   {
+4536     BIND(L_1);
+4537     // Checksum in blocks of MAX_SIZE (32768)
+4538     lis(rMax, 0);
+4539     ori(rMax, rMax, 32768);
+4540     mr(rTmp2, rMax);
+4541     cmpd(CCR0, rIdx, rMax);
+4542     bgt(CCR0, L_2);
+4543     mr(rMax, rIdx);
+4544 
+4545     BIND(L_2);
+4546     subf(rIdx, rMax, rIdx);
+4547 
+4548     // our main loop does 128 bytes at a time
+4549     srdi(rMax, rMax, 7);
+
+</pre><hr></hr><pre>
+4858 
+4859   BIND(L_first_warm_up_done);
+4860   lvx(const1, constantsPos);
+4861   addi(constantsPos, constantsPos, 16);
+4862   vpmsumd(VR8,  VR16, const1);
+4863   vpmsumd(VR9,  VR17, const1);
+4864   vpmsumd(VR10, VR18, const1);
+4865   vpmsumd(VR11, VR19, const1);
+4866   vpmsumd(VR12, VR20, const1);
+4867   vpmsumd(VR13, VR21, const1);
+4868   vpmsumd(VR14, VR22, const1);
+4869   vpmsumd(VR15, VR23, const1);
+4870   b(L_second_cool_down);
+4871 
+4872   BIND(L_barrett_reduction);
+4873 
+4874   lvx(const1, barretConstants);
+4875   addi(barretConstants, barretConstants, 16);
+4876   lvx(const2, barretConstants);
+4877 
+<span class="changed">4878   vsldoi(VR1, VR0, VR0, 8);</span>
+4879   vxor(VR0, VR0, VR1);    // xor two 64 bit results together
+4880 
+4881   // shift left one bit
+4882   vspltisb(VR1, 1);
+4883   vsl(VR0, VR0, VR1);
+4884 
+4885   vand(VR0, VR0, mask_64bit);
+4886 
+4887   /*
+4888    * The reflected version of Barrett reduction. Instead of bit
+4889    * reflecting our data (which is expensive to do), we bit reflect our
+4890    * constants and our algorithm, which means the intermediate data in
+4891    * our vector registers goes from 0-63 instead of 63-0. We can reflect
+4892    * the algorithm because we don't carry in mod 2 arithmetic.
+4893    */
+4894   vand(VR1, VR0, mask_32bit);  // bottom 32 bits of a
+4895   vpmsumd(VR1, VR1, const1);   // ma
+4896   vand(VR1, VR1, mask_32bit);  // bottom 32bits of ma
+4897   vpmsumd(VR1, VR1, const2);   // qn */
+4898   vxor(VR0, VR0, VR1);         // a - qn, subtraction is xor in GF(2)
+
+</pre><hr></hr>
+</pre></td>
+</tr></table>
+<center><a href='../../../../src/cpu/ppc/vm/assembler_ppc.inline.hpp.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/cpu/ppc/vm/macroAssembler_ppc.hpp.sdiff.html' target='_top'>next &gt</a></center>
+</body></html>

@@ -1,0 +1,2400 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>Old src/cpu/ppc/vm/assembler_ppc.hpp</title>
+<body id="SUNWwebrev">
+<pre>
+   1 /*
+   2  * Copyright (c) 2002, 2016, Oracle and/or its affiliates. All rights reserved.
+   3  * Copyright (c) 2012, 2016 SAP SE. All rights reserved.
+   4  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+   5  *
+   6  * This code is free software; you can redistribute it and/or modify it
+   7  * under the terms of the GNU General Public License version 2 only, as
+   8  * published by the Free Software Foundation.
+   9  *
+  10  * This code is distributed in the hope that it will be useful, but WITHOUT
+  11  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+  12  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+  13  * version 2 for more details (a copy is included in the LICENSE file that
+  14  * accompanied this code).
+  15  *
+  16  * You should have received a copy of the GNU General Public License version
+  17  * 2 along with this work; if not, write to the Free Software Foundation,
+  18  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+  19  *
+  20  * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+  21  * or visit www.oracle.com if you need additional information or have any
+  22  * questions.
+  23  *
+  24  */
+  25 
+  26 #ifndef CPU_PPC_VM_ASSEMBLER_PPC_HPP
+  27 #define CPU_PPC_VM_ASSEMBLER_PPC_HPP
+  28 
+  29 #include "asm/register.hpp"
+  30 
+  31 // Address is an abstraction used to represent a memory location
+  32 // as used in assembler instructions.
+  33 // PPC instructions grok either baseReg + indexReg or baseReg + disp.
+  34 class Address VALUE_OBJ_CLASS_SPEC {
+  35  private:
+  36   Register _base;         // Base register.
+  37   Register _index;        // Index register.
+  38   intptr_t _disp;         // Displacement.
+  39 
+  40  public:
+  41   Address(Register b, Register i, address d = 0)
+  42     : _base(b), _index(i), _disp((intptr_t)d) {
+  43     assert(i == noreg || d == 0, "can't have both");
+  44   }
+  45 
+  46   Address(Register b, address d = 0)
+  47     : _base(b), _index(noreg), _disp((intptr_t)d) {}
+  48 
+  49   Address(Register b, intptr_t d)
+  50     : _base(b), _index(noreg), _disp(d) {}
+  51 
+  52   Address(Register b, RegisterOrConstant roc)
+  53     : _base(b), _index(noreg), _disp(0) {
+  54     if (roc.is_constant()) _disp = roc.as_constant(); else _index = roc.as_register();
+  55   }
+  56 
+  57   Address()
+  58     : _base(noreg), _index(noreg), _disp(0) {}
+  59 
+  60   // accessors
+  61   Register base()  const { return _base; }
+  62   Register index() const { return _index; }
+  63   int      disp()  const { return (int)_disp; }
+  64   bool     is_const() const { return _base == noreg &amp;&amp; _index == noreg; }
+  65 };
+  66 
+  67 class AddressLiteral VALUE_OBJ_CLASS_SPEC {
+  68  private:
+  69   address          _address;
+  70   RelocationHolder _rspec;
+  71 
+  72   RelocationHolder rspec_from_rtype(relocInfo::relocType rtype, address addr) {
+  73     switch (rtype) {
+  74     case relocInfo::external_word_type:
+  75       return external_word_Relocation::spec(addr);
+  76     case relocInfo::internal_word_type:
+  77       return internal_word_Relocation::spec(addr);
+  78     case relocInfo::opt_virtual_call_type:
+  79       return opt_virtual_call_Relocation::spec();
+  80     case relocInfo::static_call_type:
+  81       return static_call_Relocation::spec();
+  82     case relocInfo::runtime_call_type:
+  83       return runtime_call_Relocation::spec();
+  84     case relocInfo::none:
+  85       return RelocationHolder();
+  86     default:
+  87       ShouldNotReachHere();
+  88       return RelocationHolder();
+  89     }
+  90   }
+  91 
+  92  protected:
+  93   // creation
+  94   AddressLiteral() : _address(NULL), _rspec(NULL) {}
+  95 
+  96  public:
+  97   AddressLiteral(address addr, RelocationHolder const&amp; rspec)
+  98     : _address(addr),
+  99       _rspec(rspec) {}
+ 100 
+ 101   AddressLiteral(address addr, relocInfo::relocType rtype = relocInfo::none)
+ 102     : _address((address) addr),
+ 103       _rspec(rspec_from_rtype(rtype, (address) addr)) {}
+ 104 
+ 105   AddressLiteral(oop* addr, relocInfo::relocType rtype = relocInfo::none)
+ 106     : _address((address) addr),
+ 107       _rspec(rspec_from_rtype(rtype, (address) addr)) {}
+ 108 
+ 109   intptr_t value() const { return (intptr_t) _address; }
+ 110 
+ 111   const RelocationHolder&amp; rspec() const { return _rspec; }
+ 112 };
+ 113 
+ 114 // Argument is an abstraction used to represent an outgoing
+ 115 // actual argument or an incoming formal parameter, whether
+ 116 // it resides in memory or in a register, in a manner consistent
+ 117 // with the PPC Application Binary Interface, or ABI. This is
+ 118 // often referred to as the native or C calling convention.
+ 119 
+ 120 class Argument VALUE_OBJ_CLASS_SPEC {
+ 121  private:
+ 122   int _number;  // The number of the argument.
+ 123  public:
+ 124   enum {
+ 125     // Only 8 registers may contain integer parameters.
+ 126     n_register_parameters = 8,
+ 127     // Can have up to 8 floating registers.
+ 128     n_float_register_parameters = 8,
+ 129 
+ 130     // PPC C calling conventions.
+ 131     // The first eight arguments are passed in int regs if they are int.
+ 132     n_int_register_parameters_c = 8,
+ 133     // The first thirteen float arguments are passed in float regs.
+ 134     n_float_register_parameters_c = 13,
+ 135     // Only the first 8 parameters are not placed on the stack. Aix disassembly
+ 136     // shows that xlC places all float args after argument 8 on the stack AND
+ 137     // in a register. This is not documented, but we follow this convention, too.
+ 138     n_regs_not_on_stack_c = 8,
+ 139   };
+ 140   // creation
+ 141   Argument(int number) : _number(number) {}
+ 142 
+ 143   int  number() const { return _number; }
+ 144 
+ 145   // Locating register-based arguments:
+ 146   bool is_register() const { return _number &lt; n_register_parameters; }
+ 147 
+ 148   Register as_register() const {
+ 149     assert(is_register(), "must be a register argument");
+ 150     return as_Register(number() + R3_ARG1-&gt;encoding());
+ 151   }
+ 152 };
+ 153 
+ 154 #if !defined(ABI_ELFv2)
+ 155 // A ppc64 function descriptor.
+ 156 struct FunctionDescriptor VALUE_OBJ_CLASS_SPEC {
+ 157  private:
+ 158   address _entry;
+ 159   address _toc;
+ 160   address _env;
+ 161 
+ 162  public:
+ 163   inline address entry() const { return _entry; }
+ 164   inline address toc()   const { return _toc; }
+ 165   inline address env()   const { return _env; }
+ 166 
+ 167   inline void set_entry(address entry) { _entry = entry; }
+ 168   inline void set_toc(  address toc)   { _toc   = toc; }
+ 169   inline void set_env(  address env)   { _env   = env; }
+ 170 
+ 171   inline static ByteSize entry_offset() { return byte_offset_of(FunctionDescriptor, _entry); }
+ 172   inline static ByteSize toc_offset()   { return byte_offset_of(FunctionDescriptor, _toc); }
+ 173   inline static ByteSize env_offset()   { return byte_offset_of(FunctionDescriptor, _env); }
+ 174 
+ 175   // Friend functions can be called without loading toc and env.
+ 176   enum {
+ 177     friend_toc = 0xcafe,
+ 178     friend_env = 0xc0de
+ 179   };
+ 180 
+ 181   inline bool is_friend_function() const {
+ 182     return (toc() == (address) friend_toc) &amp;&amp; (env() == (address) friend_env);
+ 183   }
+ 184 
+ 185   // Constructor for stack-allocated instances.
+ 186   FunctionDescriptor() {
+ 187     _entry = (address) 0xbad;
+ 188     _toc   = (address) 0xbad;
+ 189     _env   = (address) 0xbad;
+ 190   }
+ 191 };
+ 192 #endif
+ 193 
+ 194 
+ 195 // The PPC Assembler: Pure assembler doing NO optimizations on the
+ 196 // instruction level; i.e., what you write is what you get. The
+ 197 // Assembler is generating code into a CodeBuffer.
+ 198 
+ 199 class Assembler : public AbstractAssembler {
+ 200  protected:
+ 201   // Displacement routines
+ 202   static int  patched_branch(int dest_pos, int inst, int inst_pos);
+ 203   static int  branch_destination(int inst, int pos);
+ 204 
+ 205   friend class AbstractAssembler;
+ 206 
+ 207   // Code patchers need various routines like inv_wdisp()
+ 208   friend class NativeInstruction;
+ 209   friend class NativeGeneralJump;
+ 210   friend class Relocation;
+ 211 
+ 212  public:
+ 213 
+ 214   enum shifts {
+ 215     XO_21_29_SHIFT = 2,
+ 216     XO_21_30_SHIFT = 1,
+ 217     XO_27_29_SHIFT = 2,
+ 218     XO_30_31_SHIFT = 0,
+ 219     SPR_5_9_SHIFT  = 11u, // SPR_5_9 field in bits 11 -- 15
+ 220     SPR_0_4_SHIFT  = 16u, // SPR_0_4 field in bits 16 -- 20
+ 221     RS_SHIFT       = 21u, // RS field in bits 21 -- 25
+ 222     OPCODE_SHIFT   = 26u, // opcode in bits 26 -- 31
+ 223   };
+ 224 
+ 225   enum opcdxos_masks {
+ 226     XL_FORM_OPCODE_MASK = (63u &lt;&lt; OPCODE_SHIFT) | (1023u &lt;&lt; 1),
+ 227     ADDI_OPCODE_MASK    = (63u &lt;&lt; OPCODE_SHIFT),
+ 228     ADDIS_OPCODE_MASK   = (63u &lt;&lt; OPCODE_SHIFT),
+ 229     BXX_OPCODE_MASK     = (63u &lt;&lt; OPCODE_SHIFT),
+ 230     BCXX_OPCODE_MASK    = (63u &lt;&lt; OPCODE_SHIFT),
+ 231     // trap instructions
+ 232     TDI_OPCODE_MASK     = (63u &lt;&lt; OPCODE_SHIFT),
+ 233     TWI_OPCODE_MASK     = (63u &lt;&lt; OPCODE_SHIFT),
+ 234     TD_OPCODE_MASK      = (63u &lt;&lt; OPCODE_SHIFT) | (1023u &lt;&lt; 1),
+ 235     TW_OPCODE_MASK      = (63u &lt;&lt; OPCODE_SHIFT) | (1023u &lt;&lt; 1),
+ 236     LD_OPCODE_MASK      = (63u &lt;&lt; OPCODE_SHIFT) | (3u &lt;&lt; XO_30_31_SHIFT), // DS-FORM
+ 237     STD_OPCODE_MASK     = LD_OPCODE_MASK,
+ 238     STDU_OPCODE_MASK    = STD_OPCODE_MASK,
+ 239     STDX_OPCODE_MASK    = (63u &lt;&lt; OPCODE_SHIFT) | (1023u &lt;&lt; 1),
+ 240     STDUX_OPCODE_MASK   = STDX_OPCODE_MASK,
+ 241     STW_OPCODE_MASK     = (63u &lt;&lt; OPCODE_SHIFT),
+ 242     STWU_OPCODE_MASK    = STW_OPCODE_MASK,
+ 243     STWX_OPCODE_MASK    = (63u &lt;&lt; OPCODE_SHIFT) | (1023u &lt;&lt; 1),
+ 244     STWUX_OPCODE_MASK   = STWX_OPCODE_MASK,
+ 245     MTCTR_OPCODE_MASK   = ~(31u &lt;&lt; RS_SHIFT),
+ 246     ORI_OPCODE_MASK     = (63u &lt;&lt; OPCODE_SHIFT),
+ 247     ORIS_OPCODE_MASK    = (63u &lt;&lt; OPCODE_SHIFT),
+ 248     RLDICR_OPCODE_MASK  = (63u &lt;&lt; OPCODE_SHIFT) | (7u &lt;&lt; XO_27_29_SHIFT)
+ 249   };
+ 250 
+ 251   enum opcdxos {
+ 252     ADD_OPCODE    = (31u &lt;&lt; OPCODE_SHIFT | 266u &lt;&lt; 1),
+ 253     ADDC_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT |  10u &lt;&lt; 1),
+ 254     ADDI_OPCODE   = (14u &lt;&lt; OPCODE_SHIFT),
+ 255     ADDIS_OPCODE  = (15u &lt;&lt; OPCODE_SHIFT),
+ 256     ADDIC__OPCODE = (13u &lt;&lt; OPCODE_SHIFT),
+ 257     ADDE_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT | 138u &lt;&lt; 1),
+ 258     ADDME_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT | 234u &lt;&lt; 1),
+ 259     ADDZE_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT | 202u &lt;&lt; 1),
+ 260     SUBF_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT |  40u &lt;&lt; 1),
+ 261     SUBFC_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT |   8u &lt;&lt; 1),
+ 262     SUBFE_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT | 136u &lt;&lt; 1),
+ 263     SUBFIC_OPCODE = (8u  &lt;&lt; OPCODE_SHIFT),
+ 264     SUBFME_OPCODE = (31u &lt;&lt; OPCODE_SHIFT | 232u &lt;&lt; 1),
+ 265     SUBFZE_OPCODE = (31u &lt;&lt; OPCODE_SHIFT | 200u &lt;&lt; 1),
+ 266     DIVW_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT | 491u &lt;&lt; 1),
+ 267     MULLW_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT | 235u &lt;&lt; 1),
+ 268     MULHW_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT |  75u &lt;&lt; 1),
+ 269     MULHWU_OPCODE = (31u &lt;&lt; OPCODE_SHIFT |  11u &lt;&lt; 1),
+ 270     MULLI_OPCODE  = (7u  &lt;&lt; OPCODE_SHIFT),
+ 271     AND_OPCODE    = (31u &lt;&lt; OPCODE_SHIFT |  28u &lt;&lt; 1),
+ 272     ANDI_OPCODE   = (28u &lt;&lt; OPCODE_SHIFT),
+ 273     ANDIS_OPCODE  = (29u &lt;&lt; OPCODE_SHIFT),
+ 274     ANDC_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT |  60u &lt;&lt; 1),
+ 275     ORC_OPCODE    = (31u &lt;&lt; OPCODE_SHIFT | 412u &lt;&lt; 1),
+ 276     OR_OPCODE     = (31u &lt;&lt; OPCODE_SHIFT | 444u &lt;&lt; 1),
+ 277     ORI_OPCODE    = (24u &lt;&lt; OPCODE_SHIFT),
+ 278     ORIS_OPCODE   = (25u &lt;&lt; OPCODE_SHIFT),
+ 279     XOR_OPCODE    = (31u &lt;&lt; OPCODE_SHIFT | 316u &lt;&lt; 1),
+ 280     XORI_OPCODE   = (26u &lt;&lt; OPCODE_SHIFT),
+ 281     XORIS_OPCODE  = (27u &lt;&lt; OPCODE_SHIFT),
+ 282 
+ 283     NEG_OPCODE    = (31u &lt;&lt; OPCODE_SHIFT | 104u &lt;&lt; 1),
+ 284 
+ 285     RLWINM_OPCODE = (21u &lt;&lt; OPCODE_SHIFT),
+ 286     CLRRWI_OPCODE = RLWINM_OPCODE,
+ 287     CLRLWI_OPCODE = RLWINM_OPCODE,
+ 288 
+ 289     RLWIMI_OPCODE = (20u &lt;&lt; OPCODE_SHIFT),
+ 290 
+ 291     SLW_OPCODE    = (31u &lt;&lt; OPCODE_SHIFT |  24u &lt;&lt; 1),
+ 292     SLWI_OPCODE   = RLWINM_OPCODE,
+ 293     SRW_OPCODE    = (31u &lt;&lt; OPCODE_SHIFT | 536u &lt;&lt; 1),
+ 294     SRWI_OPCODE   = RLWINM_OPCODE,
+ 295     SRAW_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT | 792u &lt;&lt; 1),
+ 296     SRAWI_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT | 824u &lt;&lt; 1),
+ 297 
+ 298     CMP_OPCODE    = (31u &lt;&lt; OPCODE_SHIFT |   0u &lt;&lt; 1),
+ 299     CMPI_OPCODE   = (11u &lt;&lt; OPCODE_SHIFT),
+ 300     CMPL_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT |  32u &lt;&lt; 1),
+ 301     CMPLI_OPCODE  = (10u &lt;&lt; OPCODE_SHIFT),
+ 302 
+ 303     ISEL_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT |  15u &lt;&lt; 1),
+ 304 
+ 305     // Special purpose registers
+ 306     MTSPR_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT | 467u &lt;&lt; 1),
+ 307     MFSPR_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT | 339u &lt;&lt; 1),
+ 308 
+ 309     MTXER_OPCODE  = (MTSPR_OPCODE | 1 &lt;&lt; SPR_0_4_SHIFT),
+ 310     MFXER_OPCODE  = (MFSPR_OPCODE | 1 &lt;&lt; SPR_0_4_SHIFT),
+ 311 
+ 312     MTDSCR_OPCODE = (MTSPR_OPCODE | 3 &lt;&lt; SPR_0_4_SHIFT),
+ 313     MFDSCR_OPCODE = (MFSPR_OPCODE | 3 &lt;&lt; SPR_0_4_SHIFT),
+ 314 
+ 315     MTLR_OPCODE   = (MTSPR_OPCODE | 8 &lt;&lt; SPR_0_4_SHIFT),
+ 316     MFLR_OPCODE   = (MFSPR_OPCODE | 8 &lt;&lt; SPR_0_4_SHIFT),
+ 317 
+ 318     MTCTR_OPCODE  = (MTSPR_OPCODE | 9 &lt;&lt; SPR_0_4_SHIFT),
+ 319     MFCTR_OPCODE  = (MFSPR_OPCODE | 9 &lt;&lt; SPR_0_4_SHIFT),
+ 320 
+ 321     // Attention: Higher and lower half are inserted in reversed order.
+ 322     MTTFHAR_OPCODE   = (MTSPR_OPCODE | 4 &lt;&lt; SPR_5_9_SHIFT | 0 &lt;&lt; SPR_0_4_SHIFT),
+ 323     MFTFHAR_OPCODE   = (MFSPR_OPCODE | 4 &lt;&lt; SPR_5_9_SHIFT | 0 &lt;&lt; SPR_0_4_SHIFT),
+ 324     MTTFIAR_OPCODE   = (MTSPR_OPCODE | 4 &lt;&lt; SPR_5_9_SHIFT | 1 &lt;&lt; SPR_0_4_SHIFT),
+ 325     MFTFIAR_OPCODE   = (MFSPR_OPCODE | 4 &lt;&lt; SPR_5_9_SHIFT | 1 &lt;&lt; SPR_0_4_SHIFT),
+ 326     MTTEXASR_OPCODE  = (MTSPR_OPCODE | 4 &lt;&lt; SPR_5_9_SHIFT | 2 &lt;&lt; SPR_0_4_SHIFT),
+ 327     MFTEXASR_OPCODE  = (MFSPR_OPCODE | 4 &lt;&lt; SPR_5_9_SHIFT | 2 &lt;&lt; SPR_0_4_SHIFT),
+ 328     MTTEXASRU_OPCODE = (MTSPR_OPCODE | 4 &lt;&lt; SPR_5_9_SHIFT | 3 &lt;&lt; SPR_0_4_SHIFT),
+ 329     MFTEXASRU_OPCODE = (MFSPR_OPCODE | 4 &lt;&lt; SPR_5_9_SHIFT | 3 &lt;&lt; SPR_0_4_SHIFT),
+ 330 
+ 331     MTVRSAVE_OPCODE  = (MTSPR_OPCODE | 8 &lt;&lt; SPR_5_9_SHIFT | 0 &lt;&lt; SPR_0_4_SHIFT),
+ 332     MFVRSAVE_OPCODE  = (MFSPR_OPCODE | 8 &lt;&lt; SPR_5_9_SHIFT | 0 &lt;&lt; SPR_0_4_SHIFT),
+ 333 
+ 334     MFTB_OPCODE   = (MFSPR_OPCODE | 8 &lt;&lt; SPR_5_9_SHIFT | 12 &lt;&lt; SPR_0_4_SHIFT),
+ 335 
+ 336     MTCRF_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT | 144u &lt;&lt; 1),
+ 337     MFCR_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT | 19u &lt;&lt; 1),
+ 338     MCRF_OPCODE   = (19u &lt;&lt; OPCODE_SHIFT | 0u &lt;&lt; 1),
+ 339 
+ 340     // condition register logic instructions
+ 341     CRAND_OPCODE  = (19u &lt;&lt; OPCODE_SHIFT | 257u &lt;&lt; 1),
+ 342     CRNAND_OPCODE = (19u &lt;&lt; OPCODE_SHIFT | 225u &lt;&lt; 1),
+ 343     CROR_OPCODE   = (19u &lt;&lt; OPCODE_SHIFT | 449u &lt;&lt; 1),
+ 344     CRXOR_OPCODE  = (19u &lt;&lt; OPCODE_SHIFT | 193u &lt;&lt; 1),
+ 345     CRNOR_OPCODE  = (19u &lt;&lt; OPCODE_SHIFT |  33u &lt;&lt; 1),
+ 346     CREQV_OPCODE  = (19u &lt;&lt; OPCODE_SHIFT | 289u &lt;&lt; 1),
+ 347     CRANDC_OPCODE = (19u &lt;&lt; OPCODE_SHIFT | 129u &lt;&lt; 1),
+ 348     CRORC_OPCODE  = (19u &lt;&lt; OPCODE_SHIFT | 417u &lt;&lt; 1),
+ 349 
+ 350     BCLR_OPCODE   = (19u &lt;&lt; OPCODE_SHIFT | 16u &lt;&lt; 1),
+ 351     BXX_OPCODE      = (18u &lt;&lt; OPCODE_SHIFT),
+ 352     BCXX_OPCODE     = (16u &lt;&lt; OPCODE_SHIFT),
+ 353 
+ 354     // CTR-related opcodes
+ 355     BCCTR_OPCODE  = (19u &lt;&lt; OPCODE_SHIFT | 528u &lt;&lt; 1),
+ 356 
+ 357     LWZ_OPCODE   = (32u &lt;&lt; OPCODE_SHIFT),
+ 358     LWZX_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT |  23u &lt;&lt; 1),
+ 359     LWZU_OPCODE  = (33u &lt;&lt; OPCODE_SHIFT),
+ 360     LWBRX_OPCODE = (31u &lt;&lt; OPCODE_SHIFT |  534 &lt;&lt; 1),
+ 361 
+ 362     LHA_OPCODE   = (42u &lt;&lt; OPCODE_SHIFT),
+ 363     LHAX_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT | 343u &lt;&lt; 1),
+ 364     LHAU_OPCODE  = (43u &lt;&lt; OPCODE_SHIFT),
+ 365 
+ 366     LHZ_OPCODE   = (40u &lt;&lt; OPCODE_SHIFT),
+ 367     LHZX_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT | 279u &lt;&lt; 1),
+ 368     LHZU_OPCODE  = (41u &lt;&lt; OPCODE_SHIFT),
+ 369     LHBRX_OPCODE = (31u &lt;&lt; OPCODE_SHIFT |  790 &lt;&lt; 1),
+ 370 
+ 371     LBZ_OPCODE   = (34u &lt;&lt; OPCODE_SHIFT),
+ 372     LBZX_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT |  87u &lt;&lt; 1),
+ 373     LBZU_OPCODE  = (35u &lt;&lt; OPCODE_SHIFT),
+ 374 
+ 375     STW_OPCODE   = (36u &lt;&lt; OPCODE_SHIFT),
+ 376     STWX_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT | 151u &lt;&lt; 1),
+ 377     STWU_OPCODE  = (37u &lt;&lt; OPCODE_SHIFT),
+ 378     STWUX_OPCODE = (31u &lt;&lt; OPCODE_SHIFT | 183u &lt;&lt; 1),
+ 379 
+ 380     STH_OPCODE   = (44u &lt;&lt; OPCODE_SHIFT),
+ 381     STHX_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT | 407u &lt;&lt; 1),
+ 382     STHU_OPCODE  = (45u &lt;&lt; OPCODE_SHIFT),
+ 383 
+ 384     STB_OPCODE   = (38u &lt;&lt; OPCODE_SHIFT),
+ 385     STBX_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT | 215u &lt;&lt; 1),
+ 386     STBU_OPCODE  = (39u &lt;&lt; OPCODE_SHIFT),
+ 387 
+ 388     EXTSB_OPCODE = (31u &lt;&lt; OPCODE_SHIFT | 954u &lt;&lt; 1),
+ 389     EXTSH_OPCODE = (31u &lt;&lt; OPCODE_SHIFT | 922u &lt;&lt; 1),
+ 390     EXTSW_OPCODE = (31u &lt;&lt; OPCODE_SHIFT | 986u &lt;&lt; 1),               // X-FORM
+ 391 
+ 392     // 32 bit opcode encodings
+ 393 
+ 394     LWA_OPCODE    = (58u &lt;&lt; OPCODE_SHIFT |   2u &lt;&lt; XO_30_31_SHIFT), // DS-FORM
+ 395     LWAX_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT | 341u &lt;&lt; XO_21_30_SHIFT), // X-FORM
+ 396 
+ 397     CNTLZW_OPCODE = (31u &lt;&lt; OPCODE_SHIFT |  26u &lt;&lt; XO_21_30_SHIFT), // X-FORM
+ 398 
+ 399     // 64 bit opcode encodings
+ 400 
+ 401     LD_OPCODE     = (58u &lt;&lt; OPCODE_SHIFT |   0u &lt;&lt; XO_30_31_SHIFT), // DS-FORM
+ 402     LDU_OPCODE    = (58u &lt;&lt; OPCODE_SHIFT |   1u &lt;&lt; XO_30_31_SHIFT), // DS-FORM
+ 403     LDX_OPCODE    = (31u &lt;&lt; OPCODE_SHIFT |  21u &lt;&lt; XO_21_30_SHIFT), // X-FORM
+ 404 
+ 405     STD_OPCODE    = (62u &lt;&lt; OPCODE_SHIFT |   0u &lt;&lt; XO_30_31_SHIFT), // DS-FORM
+ 406     STDU_OPCODE   = (62u &lt;&lt; OPCODE_SHIFT |   1u &lt;&lt; XO_30_31_SHIFT), // DS-FORM
+ 407     STDUX_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT | 181u &lt;&lt; 1),                  // X-FORM
+ 408     STDX_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT | 149u &lt;&lt; XO_21_30_SHIFT), // X-FORM
+ 409 
+ 410     RLDICR_OPCODE = (30u &lt;&lt; OPCODE_SHIFT |   1u &lt;&lt; XO_27_29_SHIFT), // MD-FORM
+ 411     RLDICL_OPCODE = (30u &lt;&lt; OPCODE_SHIFT |   0u &lt;&lt; XO_27_29_SHIFT), // MD-FORM
+ 412     RLDIC_OPCODE  = (30u &lt;&lt; OPCODE_SHIFT |   2u &lt;&lt; XO_27_29_SHIFT), // MD-FORM
+ 413     RLDIMI_OPCODE = (30u &lt;&lt; OPCODE_SHIFT |   3u &lt;&lt; XO_27_29_SHIFT), // MD-FORM
+ 414 
+ 415     SRADI_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT | 413u &lt;&lt; XO_21_29_SHIFT), // XS-FORM
+ 416 
+ 417     SLD_OPCODE    = (31u &lt;&lt; OPCODE_SHIFT |  27u &lt;&lt; 1),              // X-FORM
+ 418     SRD_OPCODE    = (31u &lt;&lt; OPCODE_SHIFT | 539u &lt;&lt; 1),              // X-FORM
+ 419     SRAD_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT | 794u &lt;&lt; 1),              // X-FORM
+ 420 
+ 421     MULLD_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT | 233u &lt;&lt; 1),              // XO-FORM
+ 422     MULHD_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT |  73u &lt;&lt; 1),              // XO-FORM
+ 423     MULHDU_OPCODE = (31u &lt;&lt; OPCODE_SHIFT |   9u &lt;&lt; 1),              // XO-FORM
+ 424     DIVD_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT | 489u &lt;&lt; 1),              // XO-FORM
+ 425 
+ 426     CNTLZD_OPCODE = (31u &lt;&lt; OPCODE_SHIFT |  58u &lt;&lt; XO_21_30_SHIFT), // X-FORM
+ 427     NAND_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT | 476u &lt;&lt; XO_21_30_SHIFT), // X-FORM
+ 428     NOR_OPCODE    = (31u &lt;&lt; OPCODE_SHIFT | 124u &lt;&lt; XO_21_30_SHIFT), // X-FORM
+ 429 
+ 430 
+ 431     // opcodes only used for floating arithmetic
+ 432     FADD_OPCODE   = (63u &lt;&lt; OPCODE_SHIFT |  21u &lt;&lt; 1),
+ 433     FADDS_OPCODE  = (59u &lt;&lt; OPCODE_SHIFT |  21u &lt;&lt; 1),
+ 434     FCMPU_OPCODE  = (63u &lt;&lt; OPCODE_SHIFT |  00u &lt;&lt; 1),
+ 435     FDIV_OPCODE   = (63u &lt;&lt; OPCODE_SHIFT |  18u &lt;&lt; 1),
+ 436     FDIVS_OPCODE  = (59u &lt;&lt; OPCODE_SHIFT |  18u &lt;&lt; 1),
+ 437     FMR_OPCODE    = (63u &lt;&lt; OPCODE_SHIFT |  72u &lt;&lt; 1),
+ 438     // These are special Power6 opcodes, reused for "lfdepx" and "stfdepx"
+ 439     // on Power7.  Do not use.
+ 440     // MFFGPR_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT | 607u &lt;&lt; 1),
+ 441     // MFTGPR_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT | 735u &lt;&lt; 1),
+ 442     CMPB_OPCODE    = (31u &lt;&lt; OPCODE_SHIFT |  508  &lt;&lt; 1),
+ 443     POPCNTB_OPCODE = (31u &lt;&lt; OPCODE_SHIFT |  122  &lt;&lt; 1),
+ 444     POPCNTW_OPCODE = (31u &lt;&lt; OPCODE_SHIFT |  378  &lt;&lt; 1),
+ 445     POPCNTD_OPCODE = (31u &lt;&lt; OPCODE_SHIFT |  506  &lt;&lt; 1),
+ 446     FABS_OPCODE    = (63u &lt;&lt; OPCODE_SHIFT |  264u &lt;&lt; 1),
+ 447     FNABS_OPCODE   = (63u &lt;&lt; OPCODE_SHIFT |  136u &lt;&lt; 1),
+ 448     FMUL_OPCODE    = (63u &lt;&lt; OPCODE_SHIFT |   25u &lt;&lt; 1),
+ 449     FMULS_OPCODE   = (59u &lt;&lt; OPCODE_SHIFT |   25u &lt;&lt; 1),
+ 450     FNEG_OPCODE    = (63u &lt;&lt; OPCODE_SHIFT |   40u &lt;&lt; 1),
+ 451     FSUB_OPCODE    = (63u &lt;&lt; OPCODE_SHIFT |   20u &lt;&lt; 1),
+ 452     FSUBS_OPCODE   = (59u &lt;&lt; OPCODE_SHIFT |   20u &lt;&lt; 1),
+ 453 
+ 454     // PPC64-internal FPU conversion opcodes
+ 455     FCFID_OPCODE   = (63u &lt;&lt; OPCODE_SHIFT |  846u &lt;&lt; 1),
+ 456     FCFIDS_OPCODE  = (59u &lt;&lt; OPCODE_SHIFT |  846u &lt;&lt; 1),
+ 457     FCTID_OPCODE   = (63u &lt;&lt; OPCODE_SHIFT |  814u &lt;&lt; 1),
+ 458     FCTIDZ_OPCODE  = (63u &lt;&lt; OPCODE_SHIFT |  815u &lt;&lt; 1),
+ 459     FCTIW_OPCODE   = (63u &lt;&lt; OPCODE_SHIFT |   14u &lt;&lt; 1),
+ 460     FCTIWZ_OPCODE  = (63u &lt;&lt; OPCODE_SHIFT |   15u &lt;&lt; 1),
+ 461     FRSP_OPCODE    = (63u &lt;&lt; OPCODE_SHIFT |   12u &lt;&lt; 1),
+ 462 
+ 463     // Fused multiply-accumulate instructions.
+ 464     FMADD_OPCODE   = (63u &lt;&lt; OPCODE_SHIFT |   29u &lt;&lt; 1),
+ 465     FMADDS_OPCODE  = (59u &lt;&lt; OPCODE_SHIFT |   29u &lt;&lt; 1),
+ 466     FMSUB_OPCODE   = (63u &lt;&lt; OPCODE_SHIFT |   28u &lt;&lt; 1),
+ 467     FMSUBS_OPCODE  = (59u &lt;&lt; OPCODE_SHIFT |   28u &lt;&lt; 1),
+ 468     FNMADD_OPCODE  = (63u &lt;&lt; OPCODE_SHIFT |   31u &lt;&lt; 1),
+ 469     FNMADDS_OPCODE = (59u &lt;&lt; OPCODE_SHIFT |   31u &lt;&lt; 1),
+ 470     FNMSUB_OPCODE  = (63u &lt;&lt; OPCODE_SHIFT |   30u &lt;&lt; 1),
+ 471     FNMSUBS_OPCODE = (59u &lt;&lt; OPCODE_SHIFT |   30u &lt;&lt; 1),
+ 472 
+ 473     LFD_OPCODE     = (50u &lt;&lt; OPCODE_SHIFT |   00u &lt;&lt; 1),
+ 474     LFDU_OPCODE    = (51u &lt;&lt; OPCODE_SHIFT |   00u &lt;&lt; 1),
+ 475     LFDX_OPCODE    = (31u &lt;&lt; OPCODE_SHIFT |  599u &lt;&lt; 1),
+ 476     LFS_OPCODE     = (48u &lt;&lt; OPCODE_SHIFT |   00u &lt;&lt; 1),
+ 477     LFSU_OPCODE    = (49u &lt;&lt; OPCODE_SHIFT |   00u &lt;&lt; 1),
+ 478     LFSX_OPCODE    = (31u &lt;&lt; OPCODE_SHIFT |  535u &lt;&lt; 1),
+ 479 
+ 480     STFD_OPCODE    = (54u &lt;&lt; OPCODE_SHIFT |   00u &lt;&lt; 1),
+ 481     STFDU_OPCODE   = (55u &lt;&lt; OPCODE_SHIFT |   00u &lt;&lt; 1),
+ 482     STFDX_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT |  727u &lt;&lt; 1),
+ 483     STFS_OPCODE    = (52u &lt;&lt; OPCODE_SHIFT |   00u &lt;&lt; 1),
+ 484     STFSU_OPCODE   = (53u &lt;&lt; OPCODE_SHIFT |   00u &lt;&lt; 1),
+ 485     STFSX_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT |  663u &lt;&lt; 1),
+ 486 
+ 487     FSQRT_OPCODE   = (63u &lt;&lt; OPCODE_SHIFT |   22u &lt;&lt; 1),            // A-FORM
+ 488     FSQRTS_OPCODE  = (59u &lt;&lt; OPCODE_SHIFT |   22u &lt;&lt; 1),            // A-FORM
+ 489 
+ 490     // Vector instruction support for &gt;= Power6
+ 491     // Vector Storage Access
+ 492     LVEBX_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT |    7u &lt;&lt; 1),
+ 493     LVEHX_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT |   39u &lt;&lt; 1),
+ 494     LVEWX_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT |   71u &lt;&lt; 1),
+ 495     LVX_OPCODE     = (31u &lt;&lt; OPCODE_SHIFT |  103u &lt;&lt; 1),
+ 496     LVXL_OPCODE    = (31u &lt;&lt; OPCODE_SHIFT |  359u &lt;&lt; 1),
+ 497     STVEBX_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT |  135u &lt;&lt; 1),
+ 498     STVEHX_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT |  167u &lt;&lt; 1),
+ 499     STVEWX_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT |  199u &lt;&lt; 1),
+ 500     STVX_OPCODE    = (31u &lt;&lt; OPCODE_SHIFT |  231u &lt;&lt; 1),
+ 501     STVXL_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT |  487u &lt;&lt; 1),
+ 502     LVSL_OPCODE    = (31u &lt;&lt; OPCODE_SHIFT |    6u &lt;&lt; 1),
+ 503     LVSR_OPCODE    = (31u &lt;&lt; OPCODE_SHIFT |   38u &lt;&lt; 1),
+ 504 
+ 505     // Vector-Scalar (VSX) instruction support.
+ 506     LXVD2X_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT |  844u &lt;&lt; 1),
+ 507     STXVD2X_OPCODE = (31u &lt;&lt; OPCODE_SHIFT |  972u &lt;&lt; 1),
+ 508     MTVSRD_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT |  179u &lt;&lt; 1),
+ 509     MFVSRD_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT |   51u &lt;&lt; 1),
+ 510 
+ 511     // Vector Permute and Formatting
+ 512     VPKPX_OPCODE   = (4u  &lt;&lt; OPCODE_SHIFT |  782u     ),
+ 513     VPKSHSS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  398u     ),
+ 514     VPKSWSS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  462u     ),
+ 515     VPKSHUS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  270u     ),
+ 516     VPKSWUS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  334u     ),
+ 517     VPKUHUM_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |   14u     ),
+ 518     VPKUWUM_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |   78u     ),
+ 519     VPKUHUS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  142u     ),
+ 520     VPKUWUS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  206u     ),
+ 521     VUPKHPX_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  846u     ),
+ 522     VUPKHSB_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  526u     ),
+ 523     VUPKHSH_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  590u     ),
+ 524     VUPKLPX_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  974u     ),
+ 525     VUPKLSB_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  654u     ),
+ 526     VUPKLSH_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  718u     ),
+ 527 
+ 528     VMRGHB_OPCODE  = (4u  &lt;&lt; OPCODE_SHIFT |   12u     ),
+ 529     VMRGHW_OPCODE  = (4u  &lt;&lt; OPCODE_SHIFT |  140u     ),
+ 530     VMRGHH_OPCODE  = (4u  &lt;&lt; OPCODE_SHIFT |   76u     ),
+ 531     VMRGLB_OPCODE  = (4u  &lt;&lt; OPCODE_SHIFT |  268u     ),
+ 532     VMRGLW_OPCODE  = (4u  &lt;&lt; OPCODE_SHIFT |  396u     ),
+ 533     VMRGLH_OPCODE  = (4u  &lt;&lt; OPCODE_SHIFT |  332u     ),
+ 534 
+ 535     VSPLT_OPCODE   = (4u  &lt;&lt; OPCODE_SHIFT |  524u     ),
+ 536     VSPLTH_OPCODE  = (4u  &lt;&lt; OPCODE_SHIFT |  588u     ),
+ 537     VSPLTW_OPCODE  = (4u  &lt;&lt; OPCODE_SHIFT |  652u     ),
+ 538     VSPLTISB_OPCODE= (4u  &lt;&lt; OPCODE_SHIFT |  780u     ),
+ 539     VSPLTISH_OPCODE= (4u  &lt;&lt; OPCODE_SHIFT |  844u     ),
+ 540     VSPLTISW_OPCODE= (4u  &lt;&lt; OPCODE_SHIFT |  908u     ),
+ 541 
+ 542     VPERM_OPCODE   = (4u  &lt;&lt; OPCODE_SHIFT |   43u     ),
+ 543     VSEL_OPCODE    = (4u  &lt;&lt; OPCODE_SHIFT |   42u     ),
+ 544 
+ 545     VSL_OPCODE     = (4u  &lt;&lt; OPCODE_SHIFT |  452u     ),
+ 546     VSLDOI_OPCODE  = (4u  &lt;&lt; OPCODE_SHIFT |   44u     ),
+ 547     VSLO_OPCODE    = (4u  &lt;&lt; OPCODE_SHIFT | 1036u     ),
+ 548     VSR_OPCODE     = (4u  &lt;&lt; OPCODE_SHIFT |  708u     ),
+ 549     VSRO_OPCODE    = (4u  &lt;&lt; OPCODE_SHIFT | 1100u     ),
+ 550 
+ 551     // Vector Integer
+ 552     VADDCUW_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  384u     ),
+ 553     VADDSHS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  832u     ),
+ 554     VADDSBS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  768u     ),
+ 555     VADDSWS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  896u     ),
+ 556     VADDUBM_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |    0u     ),
+ 557     VADDUWM_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  128u     ),
+ 558     VADDUHM_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |   64u     ),
+ 559     VADDUBS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  512u     ),
+ 560     VADDUWS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  640u     ),
+ 561     VADDUHS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  576u     ),
+ 562     VSUBCUW_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT | 1408u     ),
+ 563     VSUBSHS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT | 1856u     ),
+ 564     VSUBSBS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT | 1792u     ),
+ 565     VSUBSWS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT | 1920u     ),
+ 566     VSUBUBM_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT | 1024u     ),
+ 567     VSUBUWM_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT | 1152u     ),
+ 568     VSUBUHM_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT | 1088u     ),
+ 569     VSUBUBS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT | 1536u     ),
+ 570     VSUBUWS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT | 1664u     ),
+ 571     VSUBUHS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT | 1600u     ),
+ 572 
+ 573     VMULESB_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  776u     ),
+ 574     VMULEUB_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  520u     ),
+ 575     VMULESH_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  840u     ),
+ 576     VMULEUH_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  584u     ),
+ 577     VMULOSB_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  264u     ),
+ 578     VMULOUB_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |    8u     ),
+ 579     VMULOSH_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |  328u     ),
+ 580     VMULOUH_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT |   72u     ),
+ 581     VMHADDSHS_OPCODE=(4u  &lt;&lt; OPCODE_SHIFT |   32u     ),
+ 582     VMHRADDSHS_OPCODE=(4u &lt;&lt; OPCODE_SHIFT |   33u     ),
+ 583     VMLADDUHM_OPCODE=(4u  &lt;&lt; OPCODE_SHIFT |   34u     ),
+ 584     VMSUBUHM_OPCODE= (4u  &lt;&lt; OPCODE_SHIFT |   36u     ),
+ 585     VMSUMMBM_OPCODE= (4u  &lt;&lt; OPCODE_SHIFT |   37u     ),
+ 586     VMSUMSHM_OPCODE= (4u  &lt;&lt; OPCODE_SHIFT |   40u     ),
+ 587     VMSUMSHS_OPCODE= (4u  &lt;&lt; OPCODE_SHIFT |   41u     ),
+ 588     VMSUMUHM_OPCODE= (4u  &lt;&lt; OPCODE_SHIFT |   38u     ),
+ 589     VMSUMUHS_OPCODE= (4u  &lt;&lt; OPCODE_SHIFT |   39u     ),
+ 590 
+ 591     VSUMSWS_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT | 1928u     ),
+ 592     VSUM2SWS_OPCODE= (4u  &lt;&lt; OPCODE_SHIFT | 1672u     ),
+ 593     VSUM4SBS_OPCODE= (4u  &lt;&lt; OPCODE_SHIFT | 1800u     ),
+ 594     VSUM4UBS_OPCODE= (4u  &lt;&lt; OPCODE_SHIFT | 1544u     ),
+ 595     VSUM4SHS_OPCODE= (4u  &lt;&lt; OPCODE_SHIFT | 1608u     ),
+ 596 
+ 597     VAVGSB_OPCODE  = (4u  &lt;&lt; OPCODE_SHIFT | 1282u     ),
+ 598     VAVGSW_OPCODE  = (4u  &lt;&lt; OPCODE_SHIFT | 1410u     ),
+ 599     VAVGSH_OPCODE  = (4u  &lt;&lt; OPCODE_SHIFT | 1346u     ),
+ 600     VAVGUB_OPCODE  = (4u  &lt;&lt; OPCODE_SHIFT | 1026u     ),
+ 601     VAVGUW_OPCODE  = (4u  &lt;&lt; OPCODE_SHIFT | 1154u     ),
+ 602     VAVGUH_OPCODE  = (4u  &lt;&lt; OPCODE_SHIFT | 1090u     ),
+ 603 
+ 604     VMAXSB_OPCODE  = (4u  &lt;&lt; OPCODE_SHIFT |  258u     ),
+ 605     VMAXSW_OPCODE  = (4u  &lt;&lt; OPCODE_SHIFT |  386u     ),
+ 606     VMAXSH_OPCODE  = (4u  &lt;&lt; OPCODE_SHIFT |  322u     ),
+ 607     VMAXUB_OPCODE  = (4u  &lt;&lt; OPCODE_SHIFT |    2u     ),
+ 608     VMAXUW_OPCODE  = (4u  &lt;&lt; OPCODE_SHIFT |  130u     ),
+ 609     VMAXUH_OPCODE  = (4u  &lt;&lt; OPCODE_SHIFT |   66u     ),
+ 610     VMINSB_OPCODE  = (4u  &lt;&lt; OPCODE_SHIFT |  770u     ),
+ 611     VMINSW_OPCODE  = (4u  &lt;&lt; OPCODE_SHIFT |  898u     ),
+ 612     VMINSH_OPCODE  = (4u  &lt;&lt; OPCODE_SHIFT |  834u     ),
+ 613     VMINUB_OPCODE  = (4u  &lt;&lt; OPCODE_SHIFT |  514u     ),
+ 614     VMINUW_OPCODE  = (4u  &lt;&lt; OPCODE_SHIFT |  642u     ),
+ 615     VMINUH_OPCODE  = (4u  &lt;&lt; OPCODE_SHIFT |  578u     ),
+ 616 
+ 617     VCMPEQUB_OPCODE= (4u  &lt;&lt; OPCODE_SHIFT |    6u     ),
+ 618     VCMPEQUH_OPCODE= (4u  &lt;&lt; OPCODE_SHIFT |   70u     ),
+ 619     VCMPEQUW_OPCODE= (4u  &lt;&lt; OPCODE_SHIFT |  134u     ),
+ 620     VCMPGTSH_OPCODE= (4u  &lt;&lt; OPCODE_SHIFT |  838u     ),
+ 621     VCMPGTSB_OPCODE= (4u  &lt;&lt; OPCODE_SHIFT |  774u     ),
+ 622     VCMPGTSW_OPCODE= (4u  &lt;&lt; OPCODE_SHIFT |  902u     ),
+ 623     VCMPGTUB_OPCODE= (4u  &lt;&lt; OPCODE_SHIFT |  518u     ),
+ 624     VCMPGTUH_OPCODE= (4u  &lt;&lt; OPCODE_SHIFT |  582u     ),
+ 625     VCMPGTUW_OPCODE= (4u  &lt;&lt; OPCODE_SHIFT |  646u     ),
+ 626 
+ 627     VAND_OPCODE    = (4u  &lt;&lt; OPCODE_SHIFT | 1028u     ),
+ 628     VANDC_OPCODE   = (4u  &lt;&lt; OPCODE_SHIFT | 1092u     ),
+ 629     VNOR_OPCODE    = (4u  &lt;&lt; OPCODE_SHIFT | 1284u     ),
+ 630     VOR_OPCODE     = (4u  &lt;&lt; OPCODE_SHIFT | 1156u     ),
+ 631     VXOR_OPCODE    = (4u  &lt;&lt; OPCODE_SHIFT | 1220u     ),
+ 632     VRLD_OPCODE    = (4u  &lt;&lt; OPCODE_SHIFT |  196u     ),
+ 633     VRLB_OPCODE    = (4u  &lt;&lt; OPCODE_SHIFT |    4u     ),
+ 634     VRLW_OPCODE    = (4u  &lt;&lt; OPCODE_SHIFT |  132u     ),
+ 635     VRLH_OPCODE    = (4u  &lt;&lt; OPCODE_SHIFT |   68u     ),
+ 636     VSLB_OPCODE    = (4u  &lt;&lt; OPCODE_SHIFT |  260u     ),
+ 637     VSKW_OPCODE    = (4u  &lt;&lt; OPCODE_SHIFT |  388u     ),
+ 638     VSLH_OPCODE    = (4u  &lt;&lt; OPCODE_SHIFT |  324u     ),
+ 639     VSRB_OPCODE    = (4u  &lt;&lt; OPCODE_SHIFT |  516u     ),
+ 640     VSRW_OPCODE    = (4u  &lt;&lt; OPCODE_SHIFT |  644u     ),
+ 641     VSRH_OPCODE    = (4u  &lt;&lt; OPCODE_SHIFT |  580u     ),
+ 642     VSRAB_OPCODE   = (4u  &lt;&lt; OPCODE_SHIFT |  772u     ),
+ 643     VSRAW_OPCODE   = (4u  &lt;&lt; OPCODE_SHIFT |  900u     ),
+ 644     VSRAH_OPCODE   = (4u  &lt;&lt; OPCODE_SHIFT |  836u     ),
+ 645 
+ 646     // Vector Floating-Point
+ 647     // not implemented yet
+ 648 
+ 649     // Vector Status and Control
+ 650     MTVSCR_OPCODE  = (4u  &lt;&lt; OPCODE_SHIFT | 1604u     ),
+ 651     MFVSCR_OPCODE  = (4u  &lt;&lt; OPCODE_SHIFT | 1540u     ),
+ 652 
+ 653     // AES (introduced with Power 8)
+ 654     VCIPHER_OPCODE      = (4u  &lt;&lt; OPCODE_SHIFT | 1288u),
+ 655     VCIPHERLAST_OPCODE  = (4u  &lt;&lt; OPCODE_SHIFT | 1289u),
+ 656     VNCIPHER_OPCODE     = (4u  &lt;&lt; OPCODE_SHIFT | 1352u),
+ 657     VNCIPHERLAST_OPCODE = (4u  &lt;&lt; OPCODE_SHIFT | 1353u),
+ 658     VSBOX_OPCODE        = (4u  &lt;&lt; OPCODE_SHIFT | 1480u),
+ 659 
+ 660     // SHA (introduced with Power 8)
+ 661     VSHASIGMAD_OPCODE   = (4u  &lt;&lt; OPCODE_SHIFT | 1730u),
+ 662     VSHASIGMAW_OPCODE   = (4u  &lt;&lt; OPCODE_SHIFT | 1666u),
+ 663 
+ 664     // Vector Binary Polynomial Multiplication (introduced with Power 8)
+ 665     VPMSUMB_OPCODE      = (4u  &lt;&lt; OPCODE_SHIFT | 1032u),
+ 666     VPMSUMD_OPCODE      = (4u  &lt;&lt; OPCODE_SHIFT | 1224u),
+ 667     VPMSUMH_OPCODE      = (4u  &lt;&lt; OPCODE_SHIFT | 1096u),
+ 668     VPMSUMW_OPCODE      = (4u  &lt;&lt; OPCODE_SHIFT | 1160u),
+ 669 
+ 670     // Vector Permute and Xor (introduced with Power 8)
+ 671     VPERMXOR_OPCODE     = (4u  &lt;&lt; OPCODE_SHIFT |   45u),
+ 672 
+ 673     // Transactional Memory instructions (introduced with Power 8)
+ 674     TBEGIN_OPCODE    = (31u &lt;&lt; OPCODE_SHIFT |  654u &lt;&lt; 1),
+ 675     TEND_OPCODE      = (31u &lt;&lt; OPCODE_SHIFT |  686u &lt;&lt; 1),
+ 676     TABORT_OPCODE    = (31u &lt;&lt; OPCODE_SHIFT |  910u &lt;&lt; 1),
+ 677     TABORTWC_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT |  782u &lt;&lt; 1),
+ 678     TABORTWCI_OPCODE = (31u &lt;&lt; OPCODE_SHIFT |  846u &lt;&lt; 1),
+ 679     TABORTDC_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT |  814u &lt;&lt; 1),
+ 680     TABORTDCI_OPCODE = (31u &lt;&lt; OPCODE_SHIFT |  878u &lt;&lt; 1),
+ 681     TSR_OPCODE       = (31u &lt;&lt; OPCODE_SHIFT |  750u &lt;&lt; 1),
+ 682     TCHECK_OPCODE    = (31u &lt;&lt; OPCODE_SHIFT |  718u &lt;&lt; 1),
+ 683 
+ 684     // Icache and dcache related instructions
+ 685     DCBA_OPCODE    = (31u &lt;&lt; OPCODE_SHIFT |  758u &lt;&lt; 1),
+ 686     DCBZ_OPCODE    = (31u &lt;&lt; OPCODE_SHIFT | 1014u &lt;&lt; 1),
+ 687     DCBST_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT |   54u &lt;&lt; 1),
+ 688     DCBF_OPCODE    = (31u &lt;&lt; OPCODE_SHIFT |   86u &lt;&lt; 1),
+ 689 
+ 690     DCBT_OPCODE    = (31u &lt;&lt; OPCODE_SHIFT |  278u &lt;&lt; 1),
+ 691     DCBTST_OPCODE  = (31u &lt;&lt; OPCODE_SHIFT |  246u &lt;&lt; 1),
+ 692     ICBI_OPCODE    = (31u &lt;&lt; OPCODE_SHIFT |  982u &lt;&lt; 1),
+ 693 
+ 694     // Instruction synchronization
+ 695     ISYNC_OPCODE   = (19u &lt;&lt; OPCODE_SHIFT |  150u &lt;&lt; 1),
+ 696     // Memory barriers
+ 697     SYNC_OPCODE    = (31u &lt;&lt; OPCODE_SHIFT |  598u &lt;&lt; 1),
+ 698     EIEIO_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT |  854u &lt;&lt; 1),
+ 699 
+ 700     // Wait instructions for polling.
+ 701     WAIT_OPCODE    = (31u &lt;&lt; OPCODE_SHIFT |   62u &lt;&lt; 1),
+ 702 
+ 703     // Trap instructions
+ 704     TDI_OPCODE     = (2u  &lt;&lt; OPCODE_SHIFT),
+ 705     TWI_OPCODE     = (3u  &lt;&lt; OPCODE_SHIFT),
+ 706     TD_OPCODE      = (31u &lt;&lt; OPCODE_SHIFT |   68u &lt;&lt; 1),
+ 707     TW_OPCODE      = (31u &lt;&lt; OPCODE_SHIFT |    4u &lt;&lt; 1),
+ 708 
+ 709     // Atomics.
+ 710     LBARX_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT |   52u &lt;&lt; 1),
+ 711     LHARX_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT |  116u &lt;&lt; 1),
+ 712     LWARX_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT |   20u &lt;&lt; 1),
+ 713     LDARX_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT |   84u &lt;&lt; 1),
+ 714     LQARX_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT |  276u &lt;&lt; 1),
+ 715     STBCX_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT |  694u &lt;&lt; 1),
+ 716     STHCX_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT |  726u &lt;&lt; 1),
+ 717     STWCX_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT |  150u &lt;&lt; 1),
+ 718     STDCX_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT |  214u &lt;&lt; 1),
+ 719     STQCX_OPCODE   = (31u &lt;&lt; OPCODE_SHIFT |  182u &lt;&lt; 1)
+ 720 
+ 721   };
+ 722 
+ 723   // Trap instructions TO bits
+ 724   enum trap_to_bits {
+ 725     // single bits
+ 726     traptoLessThanSigned      = 1 &lt;&lt; 4, // 0, left end
+ 727     traptoGreaterThanSigned   = 1 &lt;&lt; 3,
+ 728     traptoEqual               = 1 &lt;&lt; 2,
+ 729     traptoLessThanUnsigned    = 1 &lt;&lt; 1,
+ 730     traptoGreaterThanUnsigned = 1 &lt;&lt; 0, // 4, right end
+ 731 
+ 732     // compound ones
+ 733     traptoUnconditional       = (traptoLessThanSigned |
+ 734                                  traptoGreaterThanSigned |
+ 735                                  traptoEqual |
+ 736                                  traptoLessThanUnsigned |
+ 737                                  traptoGreaterThanUnsigned)
+ 738   };
+ 739 
+ 740   // Branch hints BH field
+ 741   enum branch_hint_bh {
+ 742     // bclr cases:
+ 743     bhintbhBCLRisReturn            = 0,
+ 744     bhintbhBCLRisNotReturnButSame  = 1,
+ 745     bhintbhBCLRisNotPredictable    = 3,
+ 746 
+ 747     // bcctr cases:
+ 748     bhintbhBCCTRisNotReturnButSame = 0,
+ 749     bhintbhBCCTRisNotPredictable   = 3
+ 750   };
+ 751 
+ 752   // Branch prediction hints AT field
+ 753   enum branch_hint_at {
+ 754     bhintatNoHint     = 0,  // at=00
+ 755     bhintatIsNotTaken = 2,  // at=10
+ 756     bhintatIsTaken    = 3   // at=11
+ 757   };
+ 758 
+ 759   // Branch prediction hints
+ 760   enum branch_hint_concept {
+ 761     // Use the same encoding as branch_hint_at to simply code.
+ 762     bhintNoHint       = bhintatNoHint,
+ 763     bhintIsNotTaken   = bhintatIsNotTaken,
+ 764     bhintIsTaken      = bhintatIsTaken
+ 765   };
+ 766 
+ 767   // Used in BO field of branch instruction.
+ 768   enum branch_condition {
+ 769     bcondCRbiIs0      =  4, // bo=001at
+ 770     bcondCRbiIs1      = 12, // bo=011at
+ 771     bcondAlways       = 20  // bo=10100
+ 772   };
+ 773 
+ 774   // Branch condition with combined prediction hints.
+ 775   enum branch_condition_with_hint {
+ 776     bcondCRbiIs0_bhintNoHint     = bcondCRbiIs0 | bhintatNoHint,
+ 777     bcondCRbiIs0_bhintIsNotTaken = bcondCRbiIs0 | bhintatIsNotTaken,
+ 778     bcondCRbiIs0_bhintIsTaken    = bcondCRbiIs0 | bhintatIsTaken,
+ 779     bcondCRbiIs1_bhintNoHint     = bcondCRbiIs1 | bhintatNoHint,
+ 780     bcondCRbiIs1_bhintIsNotTaken = bcondCRbiIs1 | bhintatIsNotTaken,
+ 781     bcondCRbiIs1_bhintIsTaken    = bcondCRbiIs1 | bhintatIsTaken,
+ 782   };
+ 783 
+ 784   // Elemental Memory Barriers (&gt;=Power 8)
+ 785   enum Elemental_Membar_mask_bits {
+ 786     StoreStore = 1 &lt;&lt; 0,
+ 787     StoreLoad  = 1 &lt;&lt; 1,
+ 788     LoadStore  = 1 &lt;&lt; 2,
+ 789     LoadLoad   = 1 &lt;&lt; 3
+ 790   };
+ 791 
+ 792   // Branch prediction hints.
+ 793   inline static int add_bhint_to_boint(const int bhint, const int boint) {
+ 794     switch (boint) {
+ 795       case bcondCRbiIs0:
+ 796       case bcondCRbiIs1:
+ 797         // branch_hint and branch_hint_at have same encodings
+ 798         assert(   (int)bhintNoHint     == (int)bhintatNoHint
+ 799                &amp;&amp; (int)bhintIsNotTaken == (int)bhintatIsNotTaken
+ 800                &amp;&amp; (int)bhintIsTaken    == (int)bhintatIsTaken,
+ 801                "wrong encodings");
+ 802         assert((bhint &amp; 0x03) == bhint, "wrong encodings");
+ 803         return (boint &amp; ~0x03) | bhint;
+ 804       case bcondAlways:
+ 805         // no branch_hint
+ 806         return boint;
+ 807       default:
+ 808         ShouldNotReachHere();
+ 809         return 0;
+ 810     }
+ 811   }
+ 812 
+ 813   // Extract bcond from boint.
+ 814   inline static int inv_boint_bcond(const int boint) {
+ 815     int r_bcond = boint &amp; ~0x03;
+ 816     assert(r_bcond == bcondCRbiIs0 ||
+ 817            r_bcond == bcondCRbiIs1 ||
+ 818            r_bcond == bcondAlways,
+ 819            "bad branch condition");
+ 820     return r_bcond;
+ 821   }
+ 822 
+ 823   // Extract bhint from boint.
+ 824   inline static int inv_boint_bhint(const int boint) {
+ 825     int r_bhint = boint &amp; 0x03;
+ 826     assert(r_bhint == bhintatNoHint ||
+ 827            r_bhint == bhintatIsNotTaken ||
+ 828            r_bhint == bhintatIsTaken,
+ 829            "bad branch hint");
+ 830     return r_bhint;
+ 831   }
+ 832 
+ 833   // Calculate opposite of given bcond.
+ 834   inline static int opposite_bcond(const int bcond) {
+ 835     switch (bcond) {
+ 836       case bcondCRbiIs0:
+ 837         return bcondCRbiIs1;
+ 838       case bcondCRbiIs1:
+ 839         return bcondCRbiIs0;
+ 840       default:
+ 841         ShouldNotReachHere();
+ 842         return 0;
+ 843     }
+ 844   }
+ 845 
+ 846   // Calculate opposite of given bhint.
+ 847   inline static int opposite_bhint(const int bhint) {
+ 848     switch (bhint) {
+ 849       case bhintatNoHint:
+ 850         return bhintatNoHint;
+ 851       case bhintatIsNotTaken:
+ 852         return bhintatIsTaken;
+ 853       case bhintatIsTaken:
+ 854         return bhintatIsNotTaken;
+ 855       default:
+ 856         ShouldNotReachHere();
+ 857         return 0;
+ 858     }
+ 859   }
+ 860 
+ 861   // PPC branch instructions
+ 862   enum ppcops {
+ 863     b_op    = 18,
+ 864     bc_op   = 16,
+ 865     bcr_op  = 19
+ 866   };
+ 867 
+ 868   enum Condition {
+ 869     negative         = 0,
+ 870     less             = 0,
+ 871     positive         = 1,
+ 872     greater          = 1,
+ 873     zero             = 2,
+ 874     equal            = 2,
+ 875     summary_overflow = 3,
+ 876   };
+ 877 
+ 878  public:
+ 879   // Helper functions for groups of instructions
+ 880 
+ 881   enum Predict { pt = 1, pn = 0 }; // pt = predict taken
+ 882 
+ 883   // Instruction must start at passed address.
+ 884   static int instr_len(unsigned char *instr) { return BytesPerInstWord; }
+ 885 
+ 886   // longest instructions
+ 887   static int instr_maxlen() { return BytesPerInstWord; }
+ 888 
+ 889   // Test if x is within signed immediate range for nbits.
+ 890   static bool is_simm(int x, unsigned int nbits) {
+ 891     assert(0 &lt; nbits &amp;&amp; nbits &lt; 32, "out of bounds");
+ 892     const int   min      = -(((int)1) &lt;&lt; nbits-1);
+ 893     const int   maxplus1 =  (((int)1) &lt;&lt; nbits-1);
+ 894     return min &lt;= x &amp;&amp; x &lt; maxplus1;
+ 895   }
+ 896 
+ 897   static bool is_simm(jlong x, unsigned int nbits) {
+ 898     assert(0 &lt; nbits &amp;&amp; nbits &lt; 64, "out of bounds");
+ 899     const jlong min      = -(((jlong)1) &lt;&lt; nbits-1);
+ 900     const jlong maxplus1 =  (((jlong)1) &lt;&lt; nbits-1);
+ 901     return min &lt;= x &amp;&amp; x &lt; maxplus1;
+ 902   }
+ 903 
+ 904   // Test if x is within unsigned immediate range for nbits.
+ 905   static bool is_uimm(int x, unsigned int nbits) {
+ 906     assert(0 &lt; nbits &amp;&amp; nbits &lt; 32, "out of bounds");
+ 907     const unsigned int maxplus1 = (((unsigned int)1) &lt;&lt; nbits);
+ 908     return (unsigned int)x &lt; maxplus1;
+ 909   }
+ 910 
+ 911   static bool is_uimm(jlong x, unsigned int nbits) {
+ 912     assert(0 &lt; nbits &amp;&amp; nbits &lt; 64, "out of bounds");
+ 913     const julong maxplus1 = (((julong)1) &lt;&lt; nbits);
+ 914     return (julong)x &lt; maxplus1;
+ 915   }
+ 916 
+ 917  protected:
+ 918   // helpers
+ 919 
+ 920   // X is supposed to fit in a field "nbits" wide
+ 921   // and be sign-extended. Check the range.
+ 922   static void assert_signed_range(intptr_t x, int nbits) {
+ 923     assert(nbits == 32 || (-(1 &lt;&lt; nbits-1) &lt;= x &amp;&amp; x &lt; (1 &lt;&lt; nbits-1)),
+ 924            "value out of range");
+ 925   }
+ 926 
+ 927   static void assert_signed_word_disp_range(intptr_t x, int nbits) {
+ 928     assert((x &amp; 3) == 0, "not word aligned");
+ 929     assert_signed_range(x, nbits + 2);
+ 930   }
+ 931 
+ 932   static void assert_unsigned_const(int x, int nbits) {
+ 933     assert(juint(x) &lt; juint(1 &lt;&lt; nbits), "unsigned constant out of range");
+ 934   }
+ 935 
+ 936   static int fmask(juint hi_bit, juint lo_bit) {
+ 937     assert(hi_bit &gt;= lo_bit &amp;&amp; hi_bit &lt; 32, "bad bits");
+ 938     return (1 &lt;&lt; ( hi_bit-lo_bit + 1 )) - 1;
+ 939   }
+ 940 
+ 941   // inverse of u_field
+ 942   static int inv_u_field(int x, int hi_bit, int lo_bit) {
+ 943     juint r = juint(x) &gt;&gt; lo_bit;
+ 944     r &amp;= fmask(hi_bit, lo_bit);
+ 945     return int(r);
+ 946   }
+ 947 
+ 948   // signed version: extract from field and sign-extend
+ 949   static int inv_s_field_ppc(int x, int hi_bit, int lo_bit) {
+ 950     x = x &lt;&lt; (31-hi_bit);
+ 951     x = x &gt;&gt; (31-hi_bit+lo_bit);
+ 952     return x;
+ 953   }
+ 954 
+ 955   static int u_field(int x, int hi_bit, int lo_bit) {
+ 956     assert((x &amp; ~fmask(hi_bit, lo_bit)) == 0, "value out of range");
+ 957     int r = x &lt;&lt; lo_bit;
+ 958     assert(inv_u_field(r, hi_bit, lo_bit) == x, "just checking");
+ 959     return r;
+ 960   }
+ 961 
+ 962   // Same as u_field for signed values
+ 963   static int s_field(int x, int hi_bit, int lo_bit) {
+ 964     int nbits = hi_bit - lo_bit + 1;
+ 965     assert(nbits == 32 || (-(1 &lt;&lt; nbits-1) &lt;= x &amp;&amp; x &lt; (1 &lt;&lt; nbits-1)),
+ 966       "value out of range");
+ 967     x &amp;= fmask(hi_bit, lo_bit);
+ 968     int r = x &lt;&lt; lo_bit;
+ 969     return r;
+ 970   }
+ 971 
+ 972   // inv_op for ppc instructions
+ 973   static int inv_op_ppc(int x) { return inv_u_field(x, 31, 26); }
+ 974 
+ 975   // Determine target address from li, bd field of branch instruction.
+ 976   static intptr_t inv_li_field(int x) {
+ 977     intptr_t r = inv_s_field_ppc(x, 25, 2);
+ 978     r = (r &lt;&lt; 2);
+ 979     return r;
+ 980   }
+ 981   static intptr_t inv_bd_field(int x, intptr_t pos) {
+ 982     intptr_t r = inv_s_field_ppc(x, 15, 2);
+ 983     r = (r &lt;&lt; 2) + pos;
+ 984     return r;
+ 985   }
+ 986 
+ 987   #define inv_opp_u_field(x, hi_bit, lo_bit) inv_u_field(x, 31-(lo_bit), 31-(hi_bit))
+ 988   #define inv_opp_s_field(x, hi_bit, lo_bit) inv_s_field_ppc(x, 31-(lo_bit), 31-(hi_bit))
+ 989   // Extract instruction fields from instruction words.
+ 990  public:
+ 991   static int inv_ra_field(int x)  { return inv_opp_u_field(x, 15, 11); }
+ 992   static int inv_rb_field(int x)  { return inv_opp_u_field(x, 20, 16); }
+ 993   static int inv_rt_field(int x)  { return inv_opp_u_field(x, 10,  6); }
+ 994   static int inv_rta_field(int x) { return inv_opp_u_field(x, 15, 11); }
+ 995   static int inv_rs_field(int x)  { return inv_opp_u_field(x, 10,  6); }
+ 996   // Ds uses opp_s_field(x, 31, 16), but lowest 2 bits must be 0.
+ 997   // Inv_ds_field uses range (x, 29, 16) but shifts by 2 to ensure that lowest bits are 0.
+ 998   static int inv_ds_field(int x)  { return inv_opp_s_field(x, 29, 16) &lt;&lt; 2; }
+ 999   static int inv_d1_field(int x)  { return inv_opp_s_field(x, 31, 16); }
+1000   static int inv_si_field(int x)  { return inv_opp_s_field(x, 31, 16); }
+1001   static int inv_to_field(int x)  { return inv_opp_u_field(x, 10, 6);  }
+1002   static int inv_lk_field(int x)  { return inv_opp_u_field(x, 31, 31); }
+1003   static int inv_bo_field(int x)  { return inv_opp_u_field(x, 10,  6); }
+1004   static int inv_bi_field(int x)  { return inv_opp_u_field(x, 15, 11); }
+1005 
+1006   #define opp_u_field(x, hi_bit, lo_bit) u_field(x, 31-(lo_bit), 31-(hi_bit))
+1007   #define opp_s_field(x, hi_bit, lo_bit) s_field(x, 31-(lo_bit), 31-(hi_bit))
+1008 
+1009   // instruction fields
+1010   static int aa(       int         x)  { return  opp_u_field(x,             30, 30); }
+1011   static int ba(       int         x)  { return  opp_u_field(x,             15, 11); }
+1012   static int bb(       int         x)  { return  opp_u_field(x,             20, 16); }
+1013   static int bc(       int         x)  { return  opp_u_field(x,             25, 21); }
+1014   static int bd(       int         x)  { return  opp_s_field(x,             29, 16); }
+1015   static int bf( ConditionRegister cr) { return  bf(cr-&gt;encoding()); }
+1016   static int bf(       int         x)  { return  opp_u_field(x,              8,  6); }
+1017   static int bfa(ConditionRegister cr) { return  bfa(cr-&gt;encoding()); }
+1018   static int bfa(      int         x)  { return  opp_u_field(x,             13, 11); }
+1019   static int bh(       int         x)  { return  opp_u_field(x,             20, 19); }
+1020   static int bi(       int         x)  { return  opp_u_field(x,             15, 11); }
+1021   static int bi0(ConditionRegister cr, Condition c) { return (cr-&gt;encoding() &lt;&lt; 2) | c; }
+1022   static int bo(       int         x)  { return  opp_u_field(x,             10,  6); }
+1023   static int bt(       int         x)  { return  opp_u_field(x,             10,  6); }
+1024   static int d1(       int         x)  { return  opp_s_field(x,             31, 16); }
+1025   static int ds(       int         x)  { assert((x &amp; 0x3) == 0, "unaligned offset"); return opp_s_field(x, 31, 16); }
+1026   static int eh(       int         x)  { return  opp_u_field(x,             31, 31); }
+1027   static int flm(      int         x)  { return  opp_u_field(x,             14,  7); }
+1028   static int fra(    FloatRegister r)  { return  fra(r-&gt;encoding());}
+1029   static int frb(    FloatRegister r)  { return  frb(r-&gt;encoding());}
+1030   static int frc(    FloatRegister r)  { return  frc(r-&gt;encoding());}
+1031   static int frs(    FloatRegister r)  { return  frs(r-&gt;encoding());}
+1032   static int frt(    FloatRegister r)  { return  frt(r-&gt;encoding());}
+1033   static int fra(      int         x)  { return  opp_u_field(x,             15, 11); }
+1034   static int frb(      int         x)  { return  opp_u_field(x,             20, 16); }
+1035   static int frc(      int         x)  { return  opp_u_field(x,             25, 21); }
+1036   static int frs(      int         x)  { return  opp_u_field(x,             10,  6); }
+1037   static int frt(      int         x)  { return  opp_u_field(x,             10,  6); }
+1038   static int fxm(      int         x)  { return  opp_u_field(x,             19, 12); }
+1039   static int l10(      int         x)  { return  opp_u_field(x,             10, 10); }
+1040   static int l15(      int         x)  { return  opp_u_field(x,             15, 15); }
+1041   static int l910(     int         x)  { return  opp_u_field(x,             10,  9); }
+1042   static int e1215(    int         x)  { return  opp_u_field(x,             15, 12); }
+1043   static int lev(      int         x)  { return  opp_u_field(x,             26, 20); }
+1044   static int li(       int         x)  { return  opp_s_field(x,             29,  6); }
+1045   static int lk(       int         x)  { return  opp_u_field(x,             31, 31); }
+1046   static int mb2125(   int         x)  { return  opp_u_field(x,             25, 21); }
+1047   static int me2630(   int         x)  { return  opp_u_field(x,             30, 26); }
+1048   static int mb2126(   int         x)  { return  opp_u_field(((x &amp; 0x1f) &lt;&lt; 1) | ((x &amp; 0x20) &gt;&gt; 5), 26, 21); }
+1049   static int me2126(   int         x)  { return  mb2126(x); }
+1050   static int nb(       int         x)  { return  opp_u_field(x,             20, 16); }
+1051   //static int opcd(   int         x)  { return  opp_u_field(x,              5,  0); } // is contained in our opcodes
+1052   static int oe(       int         x)  { return  opp_u_field(x,             21, 21); }
+1053   static int ra(       Register    r)  { return  ra(r-&gt;encoding()); }
+1054   static int ra(       int         x)  { return  opp_u_field(x,             15, 11); }
+1055   static int rb(       Register    r)  { return  rb(r-&gt;encoding()); }
+1056   static int rb(       int         x)  { return  opp_u_field(x,             20, 16); }
+1057   static int rc(       int         x)  { return  opp_u_field(x,             31, 31); }
+1058   static int rs(       Register    r)  { return  rs(r-&gt;encoding()); }
+1059   static int rs(       int         x)  { return  opp_u_field(x,             10,  6); }
+1060   // we don't want to use R0 in memory accesses, because it has value `0' then
+1061   static int ra0mem(   Register    r)  { assert(r != R0, "cannot use register R0 in memory access"); return ra(r); }
+1062   static int ra0mem(   int         x)  { assert(x != 0,  "cannot use register 0 in memory access");  return ra(x); }
+1063 
+1064   // register r is target
+1065   static int rt(       Register    r)  { return rs(r); }
+1066   static int rt(       int         x)  { return rs(x); }
+1067   static int rta(      Register    r)  { return ra(r); }
+1068   static int rta0mem(  Register    r)  { rta(r); return ra0mem(r); }
+1069 
+1070   static int sh1620(   int         x)  { return  opp_u_field(x,             20, 16); }
+1071   static int sh30(     int         x)  { return  opp_u_field(x,             30, 30); }
+1072   static int sh162030( int         x)  { return  sh1620(x &amp; 0x1f) | sh30((x &amp; 0x20) &gt;&gt; 5); }
+1073   static int si(       int         x)  { return  opp_s_field(x,             31, 16); }
+1074   static int spr(      int         x)  { return  opp_u_field(x,             20, 11); }
+1075   static int sr(       int         x)  { return  opp_u_field(x,             15, 12); }
+1076   static int tbr(      int         x)  { return  opp_u_field(x,             20, 11); }
+1077   static int th(       int         x)  { return  opp_u_field(x,             10,  7); }
+1078   static int thct(     int         x)  { assert((x&amp;8) == 0, "must be valid cache specification");  return th(x); }
+1079   static int thds(     int         x)  { assert((x&amp;8) == 8, "must be valid stream specification"); return th(x); }
+1080   static int to(       int         x)  { return  opp_u_field(x,             10,  6); }
+1081   static int u(        int         x)  { return  opp_u_field(x,             19, 16); }
+1082   static int ui(       int         x)  { return  opp_u_field(x,             31, 16); }
+1083 
+1084   // Support vector instructions for &gt;= Power6.
+1085   static int vra(      int         x)  { return  opp_u_field(x,             15, 11); }
+1086   static int vrb(      int         x)  { return  opp_u_field(x,             20, 16); }
+1087   static int vrc(      int         x)  { return  opp_u_field(x,             25, 21); }
+1088   static int vrs(      int         x)  { return  opp_u_field(x,             10,  6); }
+1089   static int vrt(      int         x)  { return  opp_u_field(x,             10,  6); }
+1090 
+1091   static int vra(   VectorRegister r)  { return  vra(r-&gt;encoding());}
+1092   static int vrb(   VectorRegister r)  { return  vrb(r-&gt;encoding());}
+1093   static int vrc(   VectorRegister r)  { return  vrc(r-&gt;encoding());}
+1094   static int vrs(   VectorRegister r)  { return  vrs(r-&gt;encoding());}
+1095   static int vrt(   VectorRegister r)  { return  vrt(r-&gt;encoding());}
+1096 
+1097   // Support Vector-Scalar (VSX) instructions.
+1098   static int vsra(      int         x)  { return  opp_u_field(x,            15, 11); }
+1099   static int vsrb(      int         x)  { return  opp_u_field(x,            20, 16); }
+1100   static int vsrc(      int         x)  { return  opp_u_field(x,            25, 21); }
+1101   static int vsrs(      int         x)  { return  opp_u_field(x,            10,  6); }
+1102   static int vsrt(      int         x)  { return  opp_u_field(x,            10,  6); }
+1103 
+1104   static int vsra(   VectorSRegister r)  { return  vsra(r-&gt;encoding());}
+1105   static int vsrb(   VectorSRegister r)  { return  vsrb(r-&gt;encoding());}
+1106   static int vsrc(   VectorSRegister r)  { return  vsrc(r-&gt;encoding());}
+1107   static int vsrs(   VectorSRegister r)  { return  vsrs(r-&gt;encoding());}
+1108   static int vsrt(   VectorSRegister r)  { return  vsrt(r-&gt;encoding());}
+1109 
+1110   static int vsplt_uim( int        x)  { return  opp_u_field(x,             15, 12); } // for vsplt* instructions
+1111   static int vsplti_sim(int        x)  { return  opp_u_field(x,             15, 11); } // for vsplti* instructions
+1112   static int vsldoi_shb(int        x)  { return  opp_u_field(x,             25, 22); } // for vsldoi instruction
+1113   static int vcmp_rc(   int        x)  { return  opp_u_field(x,             21, 21); } // for vcmp* instructions
+1114 
+1115   //static int xo1(     int        x)  { return  opp_u_field(x,             29, 21); }// is contained in our opcodes
+1116   //static int xo2(     int        x)  { return  opp_u_field(x,             30, 21); }// is contained in our opcodes
+1117   //static int xo3(     int        x)  { return  opp_u_field(x,             30, 22); }// is contained in our opcodes
+1118   //static int xo4(     int        x)  { return  opp_u_field(x,             30, 26); }// is contained in our opcodes
+1119   //static int xo5(     int        x)  { return  opp_u_field(x,             29, 27); }// is contained in our opcodes
+1120   //static int xo6(     int        x)  { return  opp_u_field(x,             30, 27); }// is contained in our opcodes
+1121   //static int xo7(     int        x)  { return  opp_u_field(x,             31, 30); }// is contained in our opcodes
+1122 
+1123  protected:
+1124   // Compute relative address for branch.
+1125   static intptr_t disp(intptr_t x, intptr_t off) {
+1126     int xx = x - off;
+1127     xx = xx &gt;&gt; 2;
+1128     return xx;
+1129   }
+1130 
+1131  public:
+1132   // signed immediate, in low bits, nbits long
+1133   static int simm(int x, int nbits) {
+1134     assert_signed_range(x, nbits);
+1135     return x &amp; ((1 &lt;&lt; nbits) - 1);
+1136   }
+1137 
+1138   // unsigned immediate, in low bits, nbits long
+1139   static int uimm(int x, int nbits) {
+1140     assert_unsigned_const(x, nbits);
+1141     return x &amp; ((1 &lt;&lt; nbits) - 1);
+1142   }
+1143 
+1144   static void set_imm(int* instr, short s) {
+1145     // imm is always in the lower 16 bits of the instruction,
+1146     // so this is endian-neutral. Same for the get_imm below.
+1147     uint32_t w = *(uint32_t *)instr;
+1148     *instr = (int)((w &amp; ~0x0000FFFF) | (s &amp; 0x0000FFFF));
+1149   }
+1150 
+1151   static int get_imm(address a, int instruction_number) {
+1152     return (short)((int *)a)[instruction_number];
+1153   }
+1154 
+1155   static inline int hi16_signed(  int x) { return (int)(int16_t)(x &gt;&gt; 16); }
+1156   static inline int lo16_unsigned(int x) { return x &amp; 0xffff; }
+1157 
+1158  protected:
+1159 
+1160   // Extract the top 32 bits in a 64 bit word.
+1161   static int32_t hi32(int64_t x) {
+1162     int32_t r = int32_t((uint64_t)x &gt;&gt; 32);
+1163     return r;
+1164   }
+1165 
+1166  public:
+1167 
+1168   static inline unsigned int align_addr(unsigned int addr, unsigned int a) {
+1169     return ((addr + (a - 1)) &amp; ~(a - 1));
+1170   }
+1171 
+1172   static inline bool is_aligned(unsigned int addr, unsigned int a) {
+1173     return (0 == addr % a);
+1174   }
+1175 
+1176   void flush() {
+1177     AbstractAssembler::flush();
+1178   }
+1179 
+1180   inline void emit_int32(int);  // shadows AbstractAssembler::emit_int32
+1181   inline void emit_data(int);
+1182   inline void emit_data(int, RelocationHolder const&amp;);
+1183   inline void emit_data(int, relocInfo::relocType rtype);
+1184 
+1185   // Emit an address.
+1186   inline address emit_addr(const address addr = NULL);
+1187 
+1188 #if !defined(ABI_ELFv2)
+1189   // Emit a function descriptor with the specified entry point, TOC,
+1190   // and ENV. If the entry point is NULL, the descriptor will point
+1191   // just past the descriptor.
+1192   // Use values from friend functions as defaults.
+1193   inline address emit_fd(address entry = NULL,
+1194                          address toc = (address) FunctionDescriptor::friend_toc,
+1195                          address env = (address) FunctionDescriptor::friend_env);
+1196 #endif
+1197 
+1198   /////////////////////////////////////////////////////////////////////////////////////
+1199   // PPC instructions
+1200   /////////////////////////////////////////////////////////////////////////////////////
+1201 
+1202   // Memory instructions use r0 as hard coded 0, e.g. to simulate loading
+1203   // immediates. The normal instruction encoders enforce that r0 is not
+1204   // passed to them. Use either extended mnemonics encoders or the special ra0
+1205   // versions.
+1206 
+1207   // Issue an illegal instruction.
+1208   inline void illtrap();
+1209   static inline bool is_illtrap(int x);
+1210 
+1211   // PPC 1, section 3.3.8, Fixed-Point Arithmetic Instructions
+1212   inline void addi( Register d, Register a, int si16);
+1213   inline void addis(Register d, Register a, int si16);
+1214  private:
+1215   inline void addi_r0ok( Register d, Register a, int si16);
+1216   inline void addis_r0ok(Register d, Register a, int si16);
+1217  public:
+1218   inline void addic_( Register d, Register a, int si16);
+1219   inline void subfic( Register d, Register a, int si16);
+1220   inline void add(    Register d, Register a, Register b);
+1221   inline void add_(   Register d, Register a, Register b);
+1222   inline void subf(   Register d, Register a, Register b);  // d = b - a    "Sub_from", as in ppc spec.
+1223   inline void sub(    Register d, Register a, Register b);  // d = a - b    Swap operands of subf for readability.
+1224   inline void subf_(  Register d, Register a, Register b);
+1225   inline void addc(   Register d, Register a, Register b);
+1226   inline void addc_(  Register d, Register a, Register b);
+1227   inline void subfc(  Register d, Register a, Register b);
+1228   inline void subfc_( Register d, Register a, Register b);
+1229   inline void adde(   Register d, Register a, Register b);
+1230   inline void adde_(  Register d, Register a, Register b);
+1231   inline void subfe(  Register d, Register a, Register b);
+1232   inline void subfe_( Register d, Register a, Register b);
+1233   inline void addme(  Register d, Register a);
+1234   inline void addme_( Register d, Register a);
+1235   inline void subfme( Register d, Register a);
+1236   inline void subfme_(Register d, Register a);
+1237   inline void addze(  Register d, Register a);
+1238   inline void addze_( Register d, Register a);
+1239   inline void subfze( Register d, Register a);
+1240   inline void subfze_(Register d, Register a);
+1241   inline void neg(    Register d, Register a);
+1242   inline void neg_(   Register d, Register a);
+1243   inline void mulli(  Register d, Register a, int si16);
+1244   inline void mulld(  Register d, Register a, Register b);
+1245   inline void mulld_( Register d, Register a, Register b);
+1246   inline void mullw(  Register d, Register a, Register b);
+1247   inline void mullw_( Register d, Register a, Register b);
+1248   inline void mulhw(  Register d, Register a, Register b);
+1249   inline void mulhw_( Register d, Register a, Register b);
+1250   inline void mulhwu( Register d, Register a, Register b);
+1251   inline void mulhwu_(Register d, Register a, Register b);
+1252   inline void mulhd(  Register d, Register a, Register b);
+1253   inline void mulhd_( Register d, Register a, Register b);
+1254   inline void mulhdu( Register d, Register a, Register b);
+1255   inline void mulhdu_(Register d, Register a, Register b);
+1256   inline void divd(   Register d, Register a, Register b);
+1257   inline void divd_(  Register d, Register a, Register b);
+1258   inline void divw(   Register d, Register a, Register b);
+1259   inline void divw_(  Register d, Register a, Register b);
+1260 
+1261   // Fixed-Point Arithmetic Instructions with Overflow detection
+1262   inline void addo(    Register d, Register a, Register b);
+1263   inline void addo_(   Register d, Register a, Register b);
+1264   inline void subfo(   Register d, Register a, Register b);
+1265   inline void subfo_(  Register d, Register a, Register b);
+1266   inline void addco(   Register d, Register a, Register b);
+1267   inline void addco_(  Register d, Register a, Register b);
+1268   inline void subfco(  Register d, Register a, Register b);
+1269   inline void subfco_( Register d, Register a, Register b);
+1270   inline void addeo(   Register d, Register a, Register b);
+1271   inline void addeo_(  Register d, Register a, Register b);
+1272   inline void subfeo(  Register d, Register a, Register b);
+1273   inline void subfeo_( Register d, Register a, Register b);
+1274   inline void addmeo(  Register d, Register a);
+1275   inline void addmeo_( Register d, Register a);
+1276   inline void subfmeo( Register d, Register a);
+1277   inline void subfmeo_(Register d, Register a);
+1278   inline void addzeo(  Register d, Register a);
+1279   inline void addzeo_( Register d, Register a);
+1280   inline void subfzeo( Register d, Register a);
+1281   inline void subfzeo_(Register d, Register a);
+1282   inline void nego(    Register d, Register a);
+1283   inline void nego_(   Register d, Register a);
+1284   inline void mulldo(  Register d, Register a, Register b);
+1285   inline void mulldo_( Register d, Register a, Register b);
+1286   inline void mullwo(  Register d, Register a, Register b);
+1287   inline void mullwo_( Register d, Register a, Register b);
+1288   inline void divdo(   Register d, Register a, Register b);
+1289   inline void divdo_(  Register d, Register a, Register b);
+1290   inline void divwo(   Register d, Register a, Register b);
+1291   inline void divwo_(  Register d, Register a, Register b);
+1292 
+1293   // extended mnemonics
+1294   inline void li(   Register d, int si16);
+1295   inline void lis(  Register d, int si16);
+1296   inline void addir(Register d, int si16, Register a);
+1297 
+1298   static bool is_addi(int x) {
+1299      return ADDI_OPCODE == (x &amp; ADDI_OPCODE_MASK);
+1300   }
+1301   static bool is_addis(int x) {
+1302      return ADDIS_OPCODE == (x &amp; ADDIS_OPCODE_MASK);
+1303   }
+1304   static bool is_bxx(int x) {
+1305      return BXX_OPCODE == (x &amp; BXX_OPCODE_MASK);
+1306   }
+1307   static bool is_b(int x) {
+1308      return BXX_OPCODE == (x &amp; BXX_OPCODE_MASK) &amp;&amp; inv_lk_field(x) == 0;
+1309   }
+1310   static bool is_bl(int x) {
+1311      return BXX_OPCODE == (x &amp; BXX_OPCODE_MASK) &amp;&amp; inv_lk_field(x) == 1;
+1312   }
+1313   static bool is_bcxx(int x) {
+1314      return BCXX_OPCODE == (x &amp; BCXX_OPCODE_MASK);
+1315   }
+1316   static bool is_bxx_or_bcxx(int x) {
+1317      return is_bxx(x) || is_bcxx(x);
+1318   }
+1319   static bool is_bctrl(int x) {
+1320      return x == 0x4e800421;
+1321   }
+1322   static bool is_bctr(int x) {
+1323      return x == 0x4e800420;
+1324   }
+1325   static bool is_bclr(int x) {
+1326      return BCLR_OPCODE == (x &amp; XL_FORM_OPCODE_MASK);
+1327   }
+1328   static bool is_li(int x) {
+1329      return is_addi(x) &amp;&amp; inv_ra_field(x)==0;
+1330   }
+1331   static bool is_lis(int x) {
+1332      return is_addis(x) &amp;&amp; inv_ra_field(x)==0;
+1333   }
+1334   static bool is_mtctr(int x) {
+1335      return MTCTR_OPCODE == (x &amp; MTCTR_OPCODE_MASK);
+1336   }
+1337   static bool is_ld(int x) {
+1338      return LD_OPCODE == (x &amp; LD_OPCODE_MASK);
+1339   }
+1340   static bool is_std(int x) {
+1341      return STD_OPCODE == (x &amp; STD_OPCODE_MASK);
+1342   }
+1343   static bool is_stdu(int x) {
+1344      return STDU_OPCODE == (x &amp; STDU_OPCODE_MASK);
+1345   }
+1346   static bool is_stdx(int x) {
+1347      return STDX_OPCODE == (x &amp; STDX_OPCODE_MASK);
+1348   }
+1349   static bool is_stdux(int x) {
+1350      return STDUX_OPCODE == (x &amp; STDUX_OPCODE_MASK);
+1351   }
+1352   static bool is_stwx(int x) {
+1353      return STWX_OPCODE == (x &amp; STWX_OPCODE_MASK);
+1354   }
+1355   static bool is_stwux(int x) {
+1356      return STWUX_OPCODE == (x &amp; STWUX_OPCODE_MASK);
+1357   }
+1358   static bool is_stw(int x) {
+1359      return STW_OPCODE == (x &amp; STW_OPCODE_MASK);
+1360   }
+1361   static bool is_stwu(int x) {
+1362      return STWU_OPCODE == (x &amp; STWU_OPCODE_MASK);
+1363   }
+1364   static bool is_ori(int x) {
+1365      return ORI_OPCODE == (x &amp; ORI_OPCODE_MASK);
+1366   };
+1367   static bool is_oris(int x) {
+1368      return ORIS_OPCODE == (x &amp; ORIS_OPCODE_MASK);
+1369   };
+1370   static bool is_rldicr(int x) {
+1371      return (RLDICR_OPCODE == (x &amp; RLDICR_OPCODE_MASK));
+1372   };
+1373   static bool is_nop(int x) {
+1374     return x == 0x60000000;
+1375   }
+1376   // endgroup opcode for Power6
+1377   static bool is_endgroup(int x) {
+1378     return is_ori(x) &amp;&amp; inv_ra_field(x) == 1 &amp;&amp; inv_rs_field(x) == 1 &amp;&amp; inv_d1_field(x) == 0;
+1379   }
+1380 
+1381 
+1382  private:
+1383   // PPC 1, section 3.3.9, Fixed-Point Compare Instructions
+1384   inline void cmpi( ConditionRegister bf, int l, Register a, int si16);
+1385   inline void cmp(  ConditionRegister bf, int l, Register a, Register b);
+1386   inline void cmpli(ConditionRegister bf, int l, Register a, int ui16);
+1387   inline void cmpl( ConditionRegister bf, int l, Register a, Register b);
+1388 
+1389  public:
+1390   // extended mnemonics of Compare Instructions
+1391   inline void cmpwi( ConditionRegister crx, Register a, int si16);
+1392   inline void cmpdi( ConditionRegister crx, Register a, int si16);
+1393   inline void cmpw(  ConditionRegister crx, Register a, Register b);
+1394   inline void cmpd(  ConditionRegister crx, Register a, Register b);
+1395   inline void cmplwi(ConditionRegister crx, Register a, int ui16);
+1396   inline void cmpldi(ConditionRegister crx, Register a, int ui16);
+1397   inline void cmplw( ConditionRegister crx, Register a, Register b);
+1398   inline void cmpld( ConditionRegister crx, Register a, Register b);
+1399 
+1400   inline void isel(   Register d, Register a, Register b, int bc);
+1401   // Convenient version which takes: Condition register, Condition code and invert flag. Omit b to keep old value.
+1402   inline void isel(   Register d, ConditionRegister cr, Condition cc, bool inv, Register a, Register b = noreg);
+1403   // Set d = 0 if (cr.cc) equals 1, otherwise b.
+1404   inline void isel_0( Register d, ConditionRegister cr, Condition cc, Register b = noreg);
+1405 
+1406   // PPC 1, section 3.3.11, Fixed-Point Logical Instructions
+1407          void andi(   Register a, Register s, long ui16);   // optimized version
+1408   inline void andi_(  Register a, Register s, int ui16);
+1409   inline void andis_( Register a, Register s, int ui16);
+1410   inline void ori(    Register a, Register s, int ui16);
+1411   inline void oris(   Register a, Register s, int ui16);
+1412   inline void xori(   Register a, Register s, int ui16);
+1413   inline void xoris(  Register a, Register s, int ui16);
+1414   inline void andr(   Register a, Register s, Register b);  // suffixed by 'r' as 'and' is C++ keyword
+1415   inline void and_(   Register a, Register s, Register b);
+1416   // Turn or0(rx,rx,rx) into a nop and avoid that we accidently emit a
+1417   // SMT-priority change instruction (see SMT instructions below).
+1418   inline void or_unchecked(Register a, Register s, Register b);
+1419   inline void orr(    Register a, Register s, Register b);  // suffixed by 'r' as 'or' is C++ keyword
+1420   inline void or_(    Register a, Register s, Register b);
+1421   inline void xorr(   Register a, Register s, Register b);  // suffixed by 'r' as 'xor' is C++ keyword
+1422   inline void xor_(   Register a, Register s, Register b);
+1423   inline void nand(   Register a, Register s, Register b);
+1424   inline void nand_(  Register a, Register s, Register b);
+1425   inline void nor(    Register a, Register s, Register b);
+1426   inline void nor_(   Register a, Register s, Register b);
+1427   inline void andc(   Register a, Register s, Register b);
+1428   inline void andc_(  Register a, Register s, Register b);
+1429   inline void orc(    Register a, Register s, Register b);
+1430   inline void orc_(   Register a, Register s, Register b);
+1431   inline void extsb(  Register a, Register s);
+1432   inline void extsb_( Register a, Register s);
+1433   inline void extsh(  Register a, Register s);
+1434   inline void extsh_( Register a, Register s);
+1435   inline void extsw(  Register a, Register s);
+1436   inline void extsw_( Register a, Register s);
+1437 
+1438   // extended mnemonics
+1439   inline void nop();
+1440   // NOP for FP and BR units (different versions to allow them to be in one group)
+1441   inline void fpnop0();
+1442   inline void fpnop1();
+1443   inline void brnop0();
+1444   inline void brnop1();
+1445   inline void brnop2();
+1446 
+1447   inline void mr(      Register d, Register s);
+1448   inline void ori_opt( Register d, int ui16);
+1449   inline void oris_opt(Register d, int ui16);
+1450 
+1451   // endgroup opcode for Power6
+1452   inline void endgroup();
+1453 
+1454   // count instructions
+1455   inline void cntlzw(  Register a, Register s);
+1456   inline void cntlzw_( Register a, Register s);
+1457   inline void cntlzd(  Register a, Register s);
+1458   inline void cntlzd_( Register a, Register s);
+1459 
+1460   // PPC 1, section 3.3.12, Fixed-Point Rotate and Shift Instructions
+1461   inline void sld(     Register a, Register s, Register b);
+1462   inline void sld_(    Register a, Register s, Register b);
+1463   inline void slw(     Register a, Register s, Register b);
+1464   inline void slw_(    Register a, Register s, Register b);
+1465   inline void srd(     Register a, Register s, Register b);
+1466   inline void srd_(    Register a, Register s, Register b);
+1467   inline void srw(     Register a, Register s, Register b);
+1468   inline void srw_(    Register a, Register s, Register b);
+1469   inline void srad(    Register a, Register s, Register b);
+1470   inline void srad_(   Register a, Register s, Register b);
+1471   inline void sraw(    Register a, Register s, Register b);
+1472   inline void sraw_(   Register a, Register s, Register b);
+1473   inline void sradi(   Register a, Register s, int sh6);
+1474   inline void sradi_(  Register a, Register s, int sh6);
+1475   inline void srawi(   Register a, Register s, int sh5);
+1476   inline void srawi_(  Register a, Register s, int sh5);
+1477 
+1478   // extended mnemonics for Shift Instructions
+1479   inline void sldi(    Register a, Register s, int sh6);
+1480   inline void sldi_(   Register a, Register s, int sh6);
+1481   inline void slwi(    Register a, Register s, int sh5);
+1482   inline void slwi_(   Register a, Register s, int sh5);
+1483   inline void srdi(    Register a, Register s, int sh6);
+1484   inline void srdi_(   Register a, Register s, int sh6);
+1485   inline void srwi(    Register a, Register s, int sh5);
+1486   inline void srwi_(   Register a, Register s, int sh5);
+1487 
+1488   inline void clrrdi(  Register a, Register s, int ui6);
+1489   inline void clrrdi_( Register a, Register s, int ui6);
+1490   inline void clrldi(  Register a, Register s, int ui6);
+1491   inline void clrldi_( Register a, Register s, int ui6);
+1492   inline void clrlsldi(Register a, Register s, int clrl6, int shl6);
+1493   inline void clrlsldi_(Register a, Register s, int clrl6, int shl6);
+1494   inline void extrdi(  Register a, Register s, int n, int b);
+1495   // testbit with condition register
+1496   inline void testbitdi(ConditionRegister cr, Register a, Register s, int ui6);
+1497 
+1498   // rotate instructions
+1499   inline void rotldi(  Register a, Register s, int n);
+1500   inline void rotrdi(  Register a, Register s, int n);
+1501   inline void rotlwi(  Register a, Register s, int n);
+1502   inline void rotrwi(  Register a, Register s, int n);
+1503 
+1504   // Rotate Instructions
+1505   inline void rldic(   Register a, Register s, int sh6, int mb6);
+1506   inline void rldic_(  Register a, Register s, int sh6, int mb6);
+1507   inline void rldicr(  Register a, Register s, int sh6, int mb6);
+1508   inline void rldicr_( Register a, Register s, int sh6, int mb6);
+1509   inline void rldicl(  Register a, Register s, int sh6, int mb6);
+1510   inline void rldicl_( Register a, Register s, int sh6, int mb6);
+1511   inline void rlwinm(  Register a, Register s, int sh5, int mb5, int me5);
+1512   inline void rlwinm_( Register a, Register s, int sh5, int mb5, int me5);
+1513   inline void rldimi(  Register a, Register s, int sh6, int mb6);
+1514   inline void rldimi_( Register a, Register s, int sh6, int mb6);
+1515   inline void rlwimi(  Register a, Register s, int sh5, int mb5, int me5);
+1516   inline void insrdi(  Register a, Register s, int n,   int b);
+1517   inline void insrwi(  Register a, Register s, int n,   int b);
+1518 
+1519   // PPC 1, section 3.3.2 Fixed-Point Load Instructions
+1520   // 4 bytes
+1521   inline void lwzx( Register d, Register s1, Register s2);
+1522   inline void lwz(  Register d, int si16,    Register s1);
+1523   inline void lwzu( Register d, int si16,    Register s1);
+1524 
+1525   // 4 bytes
+1526   inline void lwax( Register d, Register s1, Register s2);
+1527   inline void lwa(  Register d, int si16,    Register s1);
+1528 
+1529   // 4 bytes reversed
+1530   inline void lwbrx( Register d, Register s1, Register s2);
+1531 
+1532   // 2 bytes
+1533   inline void lhzx( Register d, Register s1, Register s2);
+1534   inline void lhz(  Register d, int si16,    Register s1);
+1535   inline void lhzu( Register d, int si16,    Register s1);
+1536 
+1537   // 2 bytes reversed
+1538   inline void lhbrx( Register d, Register s1, Register s2);
+1539 
+1540   // 2 bytes
+1541   inline void lhax( Register d, Register s1, Register s2);
+1542   inline void lha(  Register d, int si16,    Register s1);
+1543   inline void lhau( Register d, int si16,    Register s1);
+1544 
+1545   // 1 byte
+1546   inline void lbzx( Register d, Register s1, Register s2);
+1547   inline void lbz(  Register d, int si16,    Register s1);
+1548   inline void lbzu( Register d, int si16,    Register s1);
+1549 
+1550   // 8 bytes
+1551   inline void ldx(  Register d, Register s1, Register s2);
+1552   inline void ld(   Register d, int si16,    Register s1);
+1553   inline void ldu(  Register d, int si16,    Register s1);
+1554 
+1555   // For convenience. Load pointer into d from b+s1.
+1556   inline void ld_ptr(Register d, int b, Register s1);
+1557   DEBUG_ONLY(inline void ld_ptr(Register d, ByteSize b, Register s1);)
+1558 
+1559   //  PPC 1, section 3.3.3 Fixed-Point Store Instructions
+1560   inline void stwx( Register d, Register s1, Register s2);
+1561   inline void stw(  Register d, int si16,    Register s1);
+1562   inline void stwu( Register d, int si16,    Register s1);
+1563 
+1564   inline void sthx( Register d, Register s1, Register s2);
+1565   inline void sth(  Register d, int si16,    Register s1);
+1566   inline void sthu( Register d, int si16,    Register s1);
+1567 
+1568   inline void stbx( Register d, Register s1, Register s2);
+1569   inline void stb(  Register d, int si16,    Register s1);
+1570   inline void stbu( Register d, int si16,    Register s1);
+1571 
+1572   inline void stdx( Register d, Register s1, Register s2);
+1573   inline void std(  Register d, int si16,    Register s1);
+1574   inline void stdu( Register d, int si16,    Register s1);
+1575   inline void stdux(Register s, Register a,  Register b);
+1576 
+1577   inline void st_ptr(Register d, int si16,    Register s1);
+1578   DEBUG_ONLY(inline void st_ptr(Register d, ByteSize b, Register s1);)
+1579 
+1580   // PPC 1, section 3.3.13 Move To/From System Register Instructions
+1581   inline void mtlr( Register s1);
+1582   inline void mflr( Register d);
+1583   inline void mtctr(Register s1);
+1584   inline void mfctr(Register d);
+1585   inline void mtcrf(int fxm, Register s);
+1586   inline void mfcr( Register d);
+1587   inline void mcrf( ConditionRegister crd, ConditionRegister cra);
+1588   inline void mtcr( Register s);
+1589 
+1590   // Special purpose registers
+1591   // Exception Register
+1592   inline void mtxer(Register s1);
+1593   inline void mfxer(Register d);
+1594   // Vector Register Save Register
+1595   inline void mtvrsave(Register s1);
+1596   inline void mfvrsave(Register d);
+1597   // Timebase
+1598   inline void mftb(Register d);
+1599   // Introduced with Power 8:
+1600   // Data Stream Control Register
+1601   inline void mtdscr(Register s1);
+1602   inline void mfdscr(Register d );
+1603   // Transactional Memory Registers
+1604   inline void mftfhar(Register d);
+1605   inline void mftfiar(Register d);
+1606   inline void mftexasr(Register d);
+1607   inline void mftexasru(Register d);
+1608 
+1609   // TEXASR bit description
+1610   enum transaction_failure_reason {
+1611     // Upper half (TEXASRU):
+1612     tm_failure_persistent =  7, // The failure is likely to recur on each execution.
+1613     tm_disallowed         =  8, // The instruction is not permitted.
+1614     tm_nesting_of         =  9, // The maximum transaction level was exceeded.
+1615     tm_footprint_of       = 10, // The tracking limit for transactional storage accesses was exceeded.
+1616     tm_self_induced_cf    = 11, // A self-induced conflict occurred in Suspended state.
+1617     tm_non_trans_cf       = 12, // A conflict occurred with a non-transactional access by another processor.
+1618     tm_trans_cf           = 13, // A conflict occurred with another transaction.
+1619     tm_translation_cf     = 14, // A conflict occurred with a TLB invalidation.
+1620     tm_inst_fetch_cf      = 16, // An instruction fetch was performed from a block that was previously written transactionally.
+1621     tm_tabort             = 31, // Termination was caused by the execution of an abort instruction.
+1622     // Lower half:
+1623     tm_suspended          = 32, // Failure was recorded in Suspended state.
+1624     tm_failure_summary    = 36, // Failure has been detected and recorded.
+1625     tm_tfiar_exact        = 37, // Value in the TFIAR is exact.
+1626     tm_rot                = 38, // Rollback-only transaction.
+1627   };
+1628 
+1629   // PPC 1, section 2.4.1 Branch Instructions
+1630   inline void b(  address a, relocInfo::relocType rt = relocInfo::none);
+1631   inline void b(  Label&amp; L);
+1632   inline void bl( address a, relocInfo::relocType rt = relocInfo::none);
+1633   inline void bl( Label&amp; L);
+1634   inline void bc( int boint, int biint, address a, relocInfo::relocType rt = relocInfo::none);
+1635   inline void bc( int boint, int biint, Label&amp; L);
+1636   inline void bcl(int boint, int biint, address a, relocInfo::relocType rt = relocInfo::none);
+1637   inline void bcl(int boint, int biint, Label&amp; L);
+1638 
+1639   inline void bclr(  int boint, int biint, int bhint, relocInfo::relocType rt = relocInfo::none);
+1640   inline void bclrl( int boint, int biint, int bhint, relocInfo::relocType rt = relocInfo::none);
+1641   inline void bcctr( int boint, int biint, int bhint = bhintbhBCCTRisNotReturnButSame,
+1642                          relocInfo::relocType rt = relocInfo::none);
+1643   inline void bcctrl(int boint, int biint, int bhint = bhintbhBCLRisReturn,
+1644                          relocInfo::relocType rt = relocInfo::none);
+1645 
+1646   // helper function for b, bcxx
+1647   inline bool is_within_range_of_b(address a, address pc);
+1648   inline bool is_within_range_of_bcxx(address a, address pc);
+1649 
+1650   // get the destination of a bxx branch (b, bl, ba, bla)
+1651   static inline address  bxx_destination(address baddr);
+1652   static inline address  bxx_destination(int instr, address pc);
+1653   static inline intptr_t bxx_destination_offset(int instr, intptr_t bxx_pos);
+1654 
+1655   // extended mnemonics for branch instructions
+1656   inline void blt(ConditionRegister crx, Label&amp; L);
+1657   inline void bgt(ConditionRegister crx, Label&amp; L);
+1658   inline void beq(ConditionRegister crx, Label&amp; L);
+1659   inline void bso(ConditionRegister crx, Label&amp; L);
+1660   inline void bge(ConditionRegister crx, Label&amp; L);
+1661   inline void ble(ConditionRegister crx, Label&amp; L);
+1662   inline void bne(ConditionRegister crx, Label&amp; L);
+1663   inline void bns(ConditionRegister crx, Label&amp; L);
+1664 
+1665   // Branch instructions with static prediction hints.
+1666   inline void blt_predict_taken(    ConditionRegister crx, Label&amp; L);
+1667   inline void bgt_predict_taken(    ConditionRegister crx, Label&amp; L);
+1668   inline void beq_predict_taken(    ConditionRegister crx, Label&amp; L);
+1669   inline void bso_predict_taken(    ConditionRegister crx, Label&amp; L);
+1670   inline void bge_predict_taken(    ConditionRegister crx, Label&amp; L);
+1671   inline void ble_predict_taken(    ConditionRegister crx, Label&amp; L);
+1672   inline void bne_predict_taken(    ConditionRegister crx, Label&amp; L);
+1673   inline void bns_predict_taken(    ConditionRegister crx, Label&amp; L);
+1674   inline void blt_predict_not_taken(ConditionRegister crx, Label&amp; L);
+1675   inline void bgt_predict_not_taken(ConditionRegister crx, Label&amp; L);
+1676   inline void beq_predict_not_taken(ConditionRegister crx, Label&amp; L);
+1677   inline void bso_predict_not_taken(ConditionRegister crx, Label&amp; L);
+1678   inline void bge_predict_not_taken(ConditionRegister crx, Label&amp; L);
+1679   inline void ble_predict_not_taken(ConditionRegister crx, Label&amp; L);
+1680   inline void bne_predict_not_taken(ConditionRegister crx, Label&amp; L);
+1681   inline void bns_predict_not_taken(ConditionRegister crx, Label&amp; L);
+1682 
+1683   // for use in conjunction with testbitdi:
+1684   inline void btrue( ConditionRegister crx, Label&amp; L);
+1685   inline void bfalse(ConditionRegister crx, Label&amp; L);
+1686 
+1687   inline void bltl(ConditionRegister crx, Label&amp; L);
+1688   inline void bgtl(ConditionRegister crx, Label&amp; L);
+1689   inline void beql(ConditionRegister crx, Label&amp; L);
+1690   inline void bsol(ConditionRegister crx, Label&amp; L);
+1691   inline void bgel(ConditionRegister crx, Label&amp; L);
+1692   inline void blel(ConditionRegister crx, Label&amp; L);
+1693   inline void bnel(ConditionRegister crx, Label&amp; L);
+1694   inline void bnsl(ConditionRegister crx, Label&amp; L);
+1695 
+1696   // extended mnemonics for Branch Instructions via LR
+1697   // We use `blr' for returns.
+1698   inline void blr(relocInfo::relocType rt = relocInfo::none);
+1699 
+1700   // extended mnemonics for Branch Instructions with CTR
+1701   // bdnz means `decrement CTR and jump to L if CTR is not zero'
+1702   inline void bdnz(Label&amp; L);
+1703   // Decrement and branch if result is zero.
+1704   inline void bdz(Label&amp; L);
+1705   // we use `bctr[l]' for jumps/calls in function descriptor glue
+1706   // code, e.g. calls to runtime functions
+1707   inline void bctr( relocInfo::relocType rt = relocInfo::none);
+1708   inline void bctrl(relocInfo::relocType rt = relocInfo::none);
+1709   // conditional jumps/branches via CTR
+1710   inline void beqctr( ConditionRegister crx, relocInfo::relocType rt = relocInfo::none);
+1711   inline void beqctrl(ConditionRegister crx, relocInfo::relocType rt = relocInfo::none);
+1712   inline void bnectr( ConditionRegister crx, relocInfo::relocType rt = relocInfo::none);
+1713   inline void bnectrl(ConditionRegister crx, relocInfo::relocType rt = relocInfo::none);
+1714 
+1715   // condition register logic instructions
+1716   // NOTE: There's a preferred form: d and s2 should point into the same condition register.
+1717   inline void crand( int d, int s1, int s2);
+1718   inline void crnand(int d, int s1, int s2);
+1719   inline void cror(  int d, int s1, int s2);
+1720   inline void crxor( int d, int s1, int s2);
+1721   inline void crnor( int d, int s1, int s2);
+1722   inline void creqv( int d, int s1, int s2);
+1723   inline void crandc(int d, int s1, int s2);
+1724   inline void crorc( int d, int s1, int s2);
+1725 
+1726   // More convenient version.
+1727   int condition_register_bit(ConditionRegister cr, Condition c) {
+1728     return 4 * (int)(intptr_t)cr + c;
+1729   }
+1730   void crand( ConditionRegister crdst, Condition cdst, ConditionRegister crsrc, Condition csrc);
+1731   void crnand(ConditionRegister crdst, Condition cdst, ConditionRegister crsrc, Condition csrc);
+1732   void cror(  ConditionRegister crdst, Condition cdst, ConditionRegister crsrc, Condition csrc);
+1733   void crxor( ConditionRegister crdst, Condition cdst, ConditionRegister crsrc, Condition csrc);
+1734   void crnor( ConditionRegister crdst, Condition cdst, ConditionRegister crsrc, Condition csrc);
+1735   void creqv( ConditionRegister crdst, Condition cdst, ConditionRegister crsrc, Condition csrc);
+1736   void crandc(ConditionRegister crdst, Condition cdst, ConditionRegister crsrc, Condition csrc);
+1737   void crorc( ConditionRegister crdst, Condition cdst, ConditionRegister crsrc, Condition csrc);
+1738 
+1739   // icache and dcache related instructions
+1740   inline void icbi(  Register s1, Register s2);
+1741   //inline void dcba(Register s1, Register s2); // Instruction for embedded processor only.
+1742   inline void dcbz(  Register s1, Register s2);
+1743   inline void dcbst( Register s1, Register s2);
+1744   inline void dcbf(  Register s1, Register s2);
+1745 
+1746   enum ct_cache_specification {
+1747     ct_primary_cache   = 0,
+1748     ct_secondary_cache = 2
+1749   };
+1750   // dcache read hint
+1751   inline void dcbt(    Register s1, Register s2);
+1752   inline void dcbtct(  Register s1, Register s2, int ct);
+1753   inline void dcbtds(  Register s1, Register s2, int ds);
+1754   // dcache write hint
+1755   inline void dcbtst(  Register s1, Register s2);
+1756   inline void dcbtstct(Register s1, Register s2, int ct);
+1757 
+1758   //  machine barrier instructions:
+1759   //
+1760   //  - sync    two-way memory barrier, aka fence
+1761   //  - lwsync  orders  Store|Store,
+1762   //                     Load|Store,
+1763   //                     Load|Load,
+1764   //            but not Store|Load
+1765   //  - eieio   orders memory accesses for device memory (only)
+1766   //  - isync   invalidates speculatively executed instructions
+1767   //            From the Power ISA 2.06 documentation:
+1768   //             "[...] an isync instruction prevents the execution of
+1769   //            instructions following the isync until instructions
+1770   //            preceding the isync have completed, [...]"
+1771   //            From IBM's AIX assembler reference:
+1772   //             "The isync [...] instructions causes the processor to
+1773   //            refetch any instructions that might have been fetched
+1774   //            prior to the isync instruction. The instruction isync
+1775   //            causes the processor to wait for all previous instructions
+1776   //            to complete. Then any instructions already fetched are
+1777   //            discarded and instruction processing continues in the
+1778   //            environment established by the previous instructions."
+1779   //
+1780   //  semantic barrier instructions:
+1781   //  (as defined in orderAccess.hpp)
+1782   //
+1783   //  - release  orders Store|Store,       (maps to lwsync)
+1784   //                     Load|Store
+1785   //  - acquire  orders  Load|Store,       (maps to lwsync)
+1786   //                     Load|Load
+1787   //  - fence    orders Store|Store,       (maps to sync)
+1788   //                     Load|Store,
+1789   //                     Load|Load,
+1790   //                    Store|Load
+1791   //
+1792  private:
+1793   inline void sync(int l);
+1794  public:
+1795   inline void sync();
+1796   inline void lwsync();
+1797   inline void ptesync();
+1798   inline void eieio();
+1799   inline void isync();
+1800   inline void elemental_membar(int e); // Elemental Memory Barriers (&gt;=Power 8)
+1801 
+1802   // Wait instructions for polling. Attention: May result in SIGILL.
+1803   inline void wait();
+1804   inline void waitrsv(); // &gt;=Power7
+1805 
+1806   // atomics
+1807   inline void lbarx_unchecked(Register d, Register a, Register b, int eh1 = 0); // &gt;=Power 8
+1808   inline void lharx_unchecked(Register d, Register a, Register b, int eh1 = 0); // &gt;=Power 8
+1809   inline void lwarx_unchecked(Register d, Register a, Register b, int eh1 = 0);
+1810   inline void ldarx_unchecked(Register d, Register a, Register b, int eh1 = 0);
+1811   inline void lqarx_unchecked(Register d, Register a, Register b, int eh1 = 0); // &gt;=Power 8
+1812   inline bool lxarx_hint_exclusive_access();
+1813   inline void lbarx(  Register d, Register a, Register b, bool hint_exclusive_access = false);
+1814   inline void lharx(  Register d, Register a, Register b, bool hint_exclusive_access = false);
+1815   inline void lwarx(  Register d, Register a, Register b, bool hint_exclusive_access = false);
+1816   inline void ldarx(  Register d, Register a, Register b, bool hint_exclusive_access = false);
+1817   inline void lqarx(  Register d, Register a, Register b, bool hint_exclusive_access = false);
+1818   inline void stbcx_( Register s, Register a, Register b);
+1819   inline void sthcx_( Register s, Register a, Register b);
+1820   inline void stwcx_( Register s, Register a, Register b);
+1821   inline void stdcx_( Register s, Register a, Register b);
+1822   inline void stqcx_( Register s, Register a, Register b);
+1823 
+1824   // Instructions for adjusting thread priority for simultaneous
+1825   // multithreading (SMT) on Power5.
+1826  private:
+1827   inline void smt_prio_very_low();
+1828   inline void smt_prio_medium_high();
+1829   inline void smt_prio_high();
+1830 
+1831  public:
+1832   inline void smt_prio_low();
+1833   inline void smt_prio_medium_low();
+1834   inline void smt_prio_medium();
+1835   // &gt;= Power7
+1836   inline void smt_yield();
+1837   inline void smt_mdoio();
+1838   inline void smt_mdoom();
+1839   // &gt;= Power8
+1840   inline void smt_miso();
+1841 
+1842   // trap instructions
+1843   inline void twi_0(Register a); // for load with acquire semantics use load+twi_0+isync (trap can't occur)
+1844   // NOT FOR DIRECT USE!!
+1845  protected:
+1846   inline void tdi_unchecked(int tobits, Register a, int si16);
+1847   inline void twi_unchecked(int tobits, Register a, int si16);
+1848   inline void tdi(          int tobits, Register a, int si16);   // asserts UseSIGTRAP
+1849   inline void twi(          int tobits, Register a, int si16);   // asserts UseSIGTRAP
+1850   inline void td(           int tobits, Register a, Register b); // asserts UseSIGTRAP
+1851   inline void tw(           int tobits, Register a, Register b); // asserts UseSIGTRAP
+1852 
+1853   static bool is_tdi(int x, int tobits, int ra, int si16) {
+1854      return (TDI_OPCODE == (x &amp; TDI_OPCODE_MASK))
+1855          &amp;&amp; (tobits == inv_to_field(x))
+1856          &amp;&amp; (ra == -1/*any reg*/ || ra == inv_ra_field(x))
+1857          &amp;&amp; (si16 == inv_si_field(x));
+1858   }
+1859 
+1860   static bool is_twi(int x, int tobits, int ra, int si16) {
+1861      return (TWI_OPCODE == (x &amp; TWI_OPCODE_MASK))
+1862          &amp;&amp; (tobits == inv_to_field(x))
+1863          &amp;&amp; (ra == -1/*any reg*/ || ra == inv_ra_field(x))
+1864          &amp;&amp; (si16 == inv_si_field(x));
+1865   }
+1866 
+1867   static bool is_twi(int x, int tobits, int ra) {
+1868      return (TWI_OPCODE == (x &amp; TWI_OPCODE_MASK))
+1869          &amp;&amp; (tobits == inv_to_field(x))
+1870          &amp;&amp; (ra == -1/*any reg*/ || ra == inv_ra_field(x));
+1871   }
+1872 
+1873   static bool is_td(int x, int tobits, int ra, int rb) {
+1874      return (TD_OPCODE == (x &amp; TD_OPCODE_MASK))
+1875          &amp;&amp; (tobits == inv_to_field(x))
+1876          &amp;&amp; (ra == -1/*any reg*/ || ra == inv_ra_field(x))
+1877          &amp;&amp; (rb == -1/*any reg*/ || rb == inv_rb_field(x));
+1878   }
+1879 
+1880   static bool is_tw(int x, int tobits, int ra, int rb) {
+1881      return (TW_OPCODE == (x &amp; TW_OPCODE_MASK))
+1882          &amp;&amp; (tobits == inv_to_field(x))
+1883          &amp;&amp; (ra == -1/*any reg*/ || ra == inv_ra_field(x))
+1884          &amp;&amp; (rb == -1/*any reg*/ || rb == inv_rb_field(x));
+1885   }
+1886 
+1887  public:
+1888   // PPC floating point instructions
+1889   // PPC 1, section 4.6.2 Floating-Point Load Instructions
+1890   inline void lfs(  FloatRegister d, int si16,   Register a);
+1891   inline void lfsu( FloatRegister d, int si16,   Register a);
+1892   inline void lfsx( FloatRegister d, Register a, Register b);
+1893   inline void lfd(  FloatRegister d, int si16,   Register a);
+1894   inline void lfdu( FloatRegister d, int si16,   Register a);
+1895   inline void lfdx( FloatRegister d, Register a, Register b);
+1896 
+1897   // PPC 1, section 4.6.3 Floating-Point Store Instructions
+1898   inline void stfs(  FloatRegister s, int si16,   Register a);
+1899   inline void stfsu( FloatRegister s, int si16,   Register a);
+1900   inline void stfsx( FloatRegister s, Register a, Register b);
+1901   inline void stfd(  FloatRegister s, int si16,   Register a);
+1902   inline void stfdu( FloatRegister s, int si16,   Register a);
+1903   inline void stfdx( FloatRegister s, Register a, Register b);
+1904 
+1905   // PPC 1, section 4.6.4 Floating-Point Move Instructions
+1906   inline void fmr(  FloatRegister d, FloatRegister b);
+1907   inline void fmr_( FloatRegister d, FloatRegister b);
+1908 
+1909   //  inline void mffgpr( FloatRegister d, Register b);
+1910   //  inline void mftgpr( Register d, FloatRegister b);
+1911   inline void cmpb(   Register a, Register s, Register b);
+1912   inline void popcntb(Register a, Register s);
+1913   inline void popcntw(Register a, Register s);
+1914   inline void popcntd(Register a, Register s);
+1915 
+1916   inline void fneg(  FloatRegister d, FloatRegister b);
+1917   inline void fneg_( FloatRegister d, FloatRegister b);
+1918   inline void fabs(  FloatRegister d, FloatRegister b);
+1919   inline void fabs_( FloatRegister d, FloatRegister b);
+1920   inline void fnabs( FloatRegister d, FloatRegister b);
+1921   inline void fnabs_(FloatRegister d, FloatRegister b);
+1922 
+1923   // PPC 1, section 4.6.5.1 Floating-Point Elementary Arithmetic Instructions
+1924   inline void fadd(  FloatRegister d, FloatRegister a, FloatRegister b);
+1925   inline void fadd_( FloatRegister d, FloatRegister a, FloatRegister b);
+1926   inline void fadds( FloatRegister d, FloatRegister a, FloatRegister b);
+1927   inline void fadds_(FloatRegister d, FloatRegister a, FloatRegister b);
+1928   inline void fsub(  FloatRegister d, FloatRegister a, FloatRegister b);
+1929   inline void fsub_( FloatRegister d, FloatRegister a, FloatRegister b);
+1930   inline void fsubs( FloatRegister d, FloatRegister a, FloatRegister b);
+1931   inline void fsubs_(FloatRegister d, FloatRegister a, FloatRegister b);
+1932   inline void fmul(  FloatRegister d, FloatRegister a, FloatRegister c);
+1933   inline void fmul_( FloatRegister d, FloatRegister a, FloatRegister c);
+1934   inline void fmuls( FloatRegister d, FloatRegister a, FloatRegister c);
+1935   inline void fmuls_(FloatRegister d, FloatRegister a, FloatRegister c);
+1936   inline void fdiv(  FloatRegister d, FloatRegister a, FloatRegister b);
+1937   inline void fdiv_( FloatRegister d, FloatRegister a, FloatRegister b);
+1938   inline void fdivs( FloatRegister d, FloatRegister a, FloatRegister b);
+1939   inline void fdivs_(FloatRegister d, FloatRegister a, FloatRegister b);
+1940 
+1941   // Fused multiply-accumulate instructions.
+1942   // WARNING: Use only when rounding between the 2 parts is not desired.
+1943   // Some floating point tck tests will fail if used incorrectly.
+1944   inline void fmadd(   FloatRegister d, FloatRegister a, FloatRegister c, FloatRegister b);
+1945   inline void fmadd_(  FloatRegister d, FloatRegister a, FloatRegister c, FloatRegister b);
+1946   inline void fmadds(  FloatRegister d, FloatRegister a, FloatRegister c, FloatRegister b);
+1947   inline void fmadds_( FloatRegister d, FloatRegister a, FloatRegister c, FloatRegister b);
+1948   inline void fmsub(   FloatRegister d, FloatRegister a, FloatRegister c, FloatRegister b);
+1949   inline void fmsub_(  FloatRegister d, FloatRegister a, FloatRegister c, FloatRegister b);
+1950   inline void fmsubs(  FloatRegister d, FloatRegister a, FloatRegister c, FloatRegister b);
+1951   inline void fmsubs_( FloatRegister d, FloatRegister a, FloatRegister c, FloatRegister b);
+1952   inline void fnmadd(  FloatRegister d, FloatRegister a, FloatRegister c, FloatRegister b);
+1953   inline void fnmadd_( FloatRegister d, FloatRegister a, FloatRegister c, FloatRegister b);
+1954   inline void fnmadds( FloatRegister d, FloatRegister a, FloatRegister c, FloatRegister b);
+1955   inline void fnmadds_(FloatRegister d, FloatRegister a, FloatRegister c, FloatRegister b);
+1956   inline void fnmsub(  FloatRegister d, FloatRegister a, FloatRegister c, FloatRegister b);
+1957   inline void fnmsub_( FloatRegister d, FloatRegister a, FloatRegister c, FloatRegister b);
+1958   inline void fnmsubs( FloatRegister d, FloatRegister a, FloatRegister c, FloatRegister b);
+1959   inline void fnmsubs_(FloatRegister d, FloatRegister a, FloatRegister c, FloatRegister b);
+1960 
+1961   // PPC 1, section 4.6.6 Floating-Point Rounding and Conversion Instructions
+1962   inline void frsp(  FloatRegister d, FloatRegister b);
+1963   inline void fctid( FloatRegister d, FloatRegister b);
+1964   inline void fctidz(FloatRegister d, FloatRegister b);
+1965   inline void fctiw( FloatRegister d, FloatRegister b);
+1966   inline void fctiwz(FloatRegister d, FloatRegister b);
+1967   inline void fcfid( FloatRegister d, FloatRegister b);
+1968   inline void fcfids(FloatRegister d, FloatRegister b);
+1969 
+1970   // PPC 1, section 4.6.7 Floating-Point Compare Instructions
+1971   inline void fcmpu( ConditionRegister crx, FloatRegister a, FloatRegister b);
+1972 
+1973   inline void fsqrt( FloatRegister d, FloatRegister b);
+1974   inline void fsqrts(FloatRegister d, FloatRegister b);
+1975 
+1976   // Vector instructions for &gt;= Power6.
+1977   inline void lvebx(    VectorRegister d, Register s1, Register s2);
+1978   inline void lvehx(    VectorRegister d, Register s1, Register s2);
+1979   inline void lvewx(    VectorRegister d, Register s1, Register s2);
+1980   inline void lvx(      VectorRegister d, Register s1, Register s2);
+1981   inline void lvxl(     VectorRegister d, Register s1, Register s2);
+1982   inline void stvebx(   VectorRegister d, Register s1, Register s2);
+1983   inline void stvehx(   VectorRegister d, Register s1, Register s2);
+1984   inline void stvewx(   VectorRegister d, Register s1, Register s2);
+1985   inline void stvx(     VectorRegister d, Register s1, Register s2);
+1986   inline void stvxl(    VectorRegister d, Register s1, Register s2);
+1987   inline void lvsl(     VectorRegister d, Register s1, Register s2);
+1988   inline void lvsr(     VectorRegister d, Register s1, Register s2);
+1989   inline void vpkpx(    VectorRegister d, VectorRegister a, VectorRegister b);
+1990   inline void vpkshss(  VectorRegister d, VectorRegister a, VectorRegister b);
+1991   inline void vpkswss(  VectorRegister d, VectorRegister a, VectorRegister b);
+1992   inline void vpkshus(  VectorRegister d, VectorRegister a, VectorRegister b);
+1993   inline void vpkswus(  VectorRegister d, VectorRegister a, VectorRegister b);
+1994   inline void vpkuhum(  VectorRegister d, VectorRegister a, VectorRegister b);
+1995   inline void vpkuwum(  VectorRegister d, VectorRegister a, VectorRegister b);
+1996   inline void vpkuhus(  VectorRegister d, VectorRegister a, VectorRegister b);
+1997   inline void vpkuwus(  VectorRegister d, VectorRegister a, VectorRegister b);
+1998   inline void vupkhpx(  VectorRegister d, VectorRegister b);
+1999   inline void vupkhsb(  VectorRegister d, VectorRegister b);
+2000   inline void vupkhsh(  VectorRegister d, VectorRegister b);
+2001   inline void vupklpx(  VectorRegister d, VectorRegister b);
+2002   inline void vupklsb(  VectorRegister d, VectorRegister b);
+2003   inline void vupklsh(  VectorRegister d, VectorRegister b);
+2004   inline void vmrghb(   VectorRegister d, VectorRegister a, VectorRegister b);
+2005   inline void vmrghw(   VectorRegister d, VectorRegister a, VectorRegister b);
+2006   inline void vmrghh(   VectorRegister d, VectorRegister a, VectorRegister b);
+2007   inline void vmrglb(   VectorRegister d, VectorRegister a, VectorRegister b);
+2008   inline void vmrglw(   VectorRegister d, VectorRegister a, VectorRegister b);
+2009   inline void vmrglh(   VectorRegister d, VectorRegister a, VectorRegister b);
+2010   inline void vsplt(    VectorRegister d, int ui4,          VectorRegister b);
+2011   inline void vsplth(   VectorRegister d, int ui3,          VectorRegister b);
+2012   inline void vspltw(   VectorRegister d, int ui2,          VectorRegister b);
+2013   inline void vspltisb( VectorRegister d, int si5);
+2014   inline void vspltish( VectorRegister d, int si5);
+2015   inline void vspltisw( VectorRegister d, int si5);
+2016   inline void vperm(    VectorRegister d, VectorRegister a, VectorRegister b, VectorRegister c);
+2017   inline void vsel(     VectorRegister d, VectorRegister a, VectorRegister b, VectorRegister c);
+2018   inline void vsl(      VectorRegister d, VectorRegister a, VectorRegister b);
+2019   inline void vsldoi(   VectorRegister d, VectorRegister a, VectorRegister b, int si4);
+2020   inline void vslo(     VectorRegister d, VectorRegister a, VectorRegister b);
+2021   inline void vsr(      VectorRegister d, VectorRegister a, VectorRegister b);
+2022   inline void vsro(     VectorRegister d, VectorRegister a, VectorRegister b);
+2023   inline void vaddcuw(  VectorRegister d, VectorRegister a, VectorRegister b);
+2024   inline void vaddshs(  VectorRegister d, VectorRegister a, VectorRegister b);
+2025   inline void vaddsbs(  VectorRegister d, VectorRegister a, VectorRegister b);
+2026   inline void vaddsws(  VectorRegister d, VectorRegister a, VectorRegister b);
+2027   inline void vaddubm(  VectorRegister d, VectorRegister a, VectorRegister b);
+2028   inline void vadduwm(  VectorRegister d, VectorRegister a, VectorRegister b);
+2029   inline void vadduhm(  VectorRegister d, VectorRegister a, VectorRegister b);
+2030   inline void vaddubs(  VectorRegister d, VectorRegister a, VectorRegister b);
+2031   inline void vadduws(  VectorRegister d, VectorRegister a, VectorRegister b);
+2032   inline void vadduhs(  VectorRegister d, VectorRegister a, VectorRegister b);
+2033   inline void vsubcuw(  VectorRegister d, VectorRegister a, VectorRegister b);
+2034   inline void vsubshs(  VectorRegister d, VectorRegister a, VectorRegister b);
+2035   inline void vsubsbs(  VectorRegister d, VectorRegister a, VectorRegister b);
+2036   inline void vsubsws(  VectorRegister d, VectorRegister a, VectorRegister b);
+2037   inline void vsububm(  VectorRegister d, VectorRegister a, VectorRegister b);
+2038   inline void vsubuwm(  VectorRegister d, VectorRegister a, VectorRegister b);
+2039   inline void vsubuhm(  VectorRegister d, VectorRegister a, VectorRegister b);
+2040   inline void vsububs(  VectorRegister d, VectorRegister a, VectorRegister b);
+2041   inline void vsubuws(  VectorRegister d, VectorRegister a, VectorRegister b);
+2042   inline void vsubuhs(  VectorRegister d, VectorRegister a, VectorRegister b);
+2043   inline void vmulesb(  VectorRegister d, VectorRegister a, VectorRegister b);
+2044   inline void vmuleub(  VectorRegister d, VectorRegister a, VectorRegister b);
+2045   inline void vmulesh(  VectorRegister d, VectorRegister a, VectorRegister b);
+2046   inline void vmuleuh(  VectorRegister d, VectorRegister a, VectorRegister b);
+2047   inline void vmulosb(  VectorRegister d, VectorRegister a, VectorRegister b);
+2048   inline void vmuloub(  VectorRegister d, VectorRegister a, VectorRegister b);
+2049   inline void vmulosh(  VectorRegister d, VectorRegister a, VectorRegister b);
+2050   inline void vmulouh(  VectorRegister d, VectorRegister a, VectorRegister b);
+2051   inline void vmhaddshs(VectorRegister d, VectorRegister a, VectorRegister b, VectorRegister c);
+2052   inline void vmhraddshs(VectorRegister d,VectorRegister a, VectorRegister b, VectorRegister c);
+2053   inline void vmladduhm(VectorRegister d, VectorRegister a, VectorRegister b, VectorRegister c);
+2054   inline void vmsubuhm( VectorRegister d, VectorRegister a, VectorRegister b, VectorRegister c);
+2055   inline void vmsummbm( VectorRegister d, VectorRegister a, VectorRegister b, VectorRegister c);
+2056   inline void vmsumshm( VectorRegister d, VectorRegister a, VectorRegister b, VectorRegister c);
+2057   inline void vmsumshs( VectorRegister d, VectorRegister a, VectorRegister b, VectorRegister c);
+2058   inline void vmsumuhm( VectorRegister d, VectorRegister a, VectorRegister b, VectorRegister c);
+2059   inline void vmsumuhs( VectorRegister d, VectorRegister a, VectorRegister b, VectorRegister c);
+2060   inline void vsumsws(  VectorRegister d, VectorRegister a, VectorRegister b);
+2061   inline void vsum2sws( VectorRegister d, VectorRegister a, VectorRegister b);
+2062   inline void vsum4sbs( VectorRegister d, VectorRegister a, VectorRegister b);
+2063   inline void vsum4ubs( VectorRegister d, VectorRegister a, VectorRegister b);
+2064   inline void vsum4shs( VectorRegister d, VectorRegister a, VectorRegister b);
+2065   inline void vavgsb(   VectorRegister d, VectorRegister a, VectorRegister b);
+2066   inline void vavgsw(   VectorRegister d, VectorRegister a, VectorRegister b);
+2067   inline void vavgsh(   VectorRegister d, VectorRegister a, VectorRegister b);
+2068   inline void vavgub(   VectorRegister d, VectorRegister a, VectorRegister b);
+2069   inline void vavguw(   VectorRegister d, VectorRegister a, VectorRegister b);
+2070   inline void vavguh(   VectorRegister d, VectorRegister a, VectorRegister b);
+2071   inline void vmaxsb(   VectorRegister d, VectorRegister a, VectorRegister b);
+2072   inline void vmaxsw(   VectorRegister d, VectorRegister a, VectorRegister b);
+2073   inline void vmaxsh(   VectorRegister d, VectorRegister a, VectorRegister b);
+2074   inline void vmaxub(   VectorRegister d, VectorRegister a, VectorRegister b);
+2075   inline void vmaxuw(   VectorRegister d, VectorRegister a, VectorRegister b);
+2076   inline void vmaxuh(   VectorRegister d, VectorRegister a, VectorRegister b);
+2077   inline void vminsb(   VectorRegister d, VectorRegister a, VectorRegister b);
+2078   inline void vminsw(   VectorRegister d, VectorRegister a, VectorRegister b);
+2079   inline void vminsh(   VectorRegister d, VectorRegister a, VectorRegister b);
+2080   inline void vminub(   VectorRegister d, VectorRegister a, VectorRegister b);
+2081   inline void vminuw(   VectorRegister d, VectorRegister a, VectorRegister b);
+2082   inline void vminuh(   VectorRegister d, VectorRegister a, VectorRegister b);
+2083   inline void vcmpequb( VectorRegister d, VectorRegister a, VectorRegister b);
+2084   inline void vcmpequh( VectorRegister d, VectorRegister a, VectorRegister b);
+2085   inline void vcmpequw( VectorRegister d, VectorRegister a, VectorRegister b);
+2086   inline void vcmpgtsh( VectorRegister d, VectorRegister a, VectorRegister b);
+2087   inline void vcmpgtsb( VectorRegister d, VectorRegister a, VectorRegister b);
+2088   inline void vcmpgtsw( VectorRegister d, VectorRegister a, VectorRegister b);
+2089   inline void vcmpgtub( VectorRegister d, VectorRegister a, VectorRegister b);
+2090   inline void vcmpgtuh( VectorRegister d, VectorRegister a, VectorRegister b);
+2091   inline void vcmpgtuw( VectorRegister d, VectorRegister a, VectorRegister b);
+2092   inline void vcmpequb_(VectorRegister d, VectorRegister a, VectorRegister b);
+2093   inline void vcmpequh_(VectorRegister d, VectorRegister a, VectorRegister b);
+2094   inline void vcmpequw_(VectorRegister d, VectorRegister a, VectorRegister b);
+2095   inline void vcmpgtsh_(VectorRegister d, VectorRegister a, VectorRegister b);
+2096   inline void vcmpgtsb_(VectorRegister d, VectorRegister a, VectorRegister b);
+2097   inline void vcmpgtsw_(VectorRegister d, VectorRegister a, VectorRegister b);
+2098   inline void vcmpgtub_(VectorRegister d, VectorRegister a, VectorRegister b);
+2099   inline void vcmpgtuh_(VectorRegister d, VectorRegister a, VectorRegister b);
+2100   inline void vcmpgtuw_(VectorRegister d, VectorRegister a, VectorRegister b);
+2101   inline void vand(     VectorRegister d, VectorRegister a, VectorRegister b);
+2102   inline void vandc(    VectorRegister d, VectorRegister a, VectorRegister b);
+2103   inline void vnor(     VectorRegister d, VectorRegister a, VectorRegister b);
+2104   inline void vor(      VectorRegister d, VectorRegister a, VectorRegister b);
+2105   inline void vxor(     VectorRegister d, VectorRegister a, VectorRegister b);
+2106   inline void vrld(     VectorRegister d, VectorRegister a, VectorRegister b);
+2107   inline void vrlb(     VectorRegister d, VectorRegister a, VectorRegister b);
+2108   inline void vrlw(     VectorRegister d, VectorRegister a, VectorRegister b);
+2109   inline void vrlh(     VectorRegister d, VectorRegister a, VectorRegister b);
+2110   inline void vslb(     VectorRegister d, VectorRegister a, VectorRegister b);
+2111   inline void vskw(     VectorRegister d, VectorRegister a, VectorRegister b);
+2112   inline void vslh(     VectorRegister d, VectorRegister a, VectorRegister b);
+2113   inline void vsrb(     VectorRegister d, VectorRegister a, VectorRegister b);
+2114   inline void vsrw(     VectorRegister d, VectorRegister a, VectorRegister b);
+2115   inline void vsrh(     VectorRegister d, VectorRegister a, VectorRegister b);
+2116   inline void vsrab(    VectorRegister d, VectorRegister a, VectorRegister b);
+2117   inline void vsraw(    VectorRegister d, VectorRegister a, VectorRegister b);
+2118   inline void vsrah(    VectorRegister d, VectorRegister a, VectorRegister b);
+2119   // Vector Floating-Point not implemented yet
+2120   inline void mtvscr(   VectorRegister b);
+2121   inline void mfvscr(   VectorRegister d);
+2122 
+2123   // Vector-Scalar (VSX) instructions.
+2124   inline void lxvd2x(   VectorSRegister d, Register a);
+2125   inline void lxvd2x(   VectorSRegister d, Register a, Register b);
+2126   inline void stxvd2x(  VectorSRegister d, Register a);
+2127   inline void stxvd2x(  VectorSRegister d, Register a, Register b);
+2128   inline void mtvrd(    VectorRegister  d, Register a);
+2129   inline void mfvrd(    Register        a, VectorRegister d);
+2130 
+2131   // AES (introduced with Power 8)
+2132   inline void vcipher(     VectorRegister d, VectorRegister a, VectorRegister b);
+2133   inline void vcipherlast( VectorRegister d, VectorRegister a, VectorRegister b);
+2134   inline void vncipher(    VectorRegister d, VectorRegister a, VectorRegister b);
+2135   inline void vncipherlast(VectorRegister d, VectorRegister a, VectorRegister b);
+2136   inline void vsbox(       VectorRegister d, VectorRegister a);
+2137 
+2138   // SHA (introduced with Power 8)
+2139   // Not yet implemented.
+2140 
+2141   // Vector Binary Polynomial Multiplication (introduced with Power 8)
+2142   inline void vpmsumb(  VectorRegister d, VectorRegister a, VectorRegister b);
+2143   inline void vpmsumd(  VectorRegister d, VectorRegister a, VectorRegister b);
+2144   inline void vpmsumh(  VectorRegister d, VectorRegister a, VectorRegister b);
+2145   inline void vpmsumw(  VectorRegister d, VectorRegister a, VectorRegister b);
+2146 
+2147   // Vector Permute and Xor (introduced with Power 8)
+2148   inline void vpermxor( VectorRegister d, VectorRegister a, VectorRegister b, VectorRegister c);
+2149 
+2150   // Transactional Memory instructions (introduced with Power 8)
+2151   inline void tbegin_();    // R=0
+2152   inline void tbeginrot_(); // R=1 Rollback-Only Transaction
+2153   inline void tend_();    // A=0
+2154   inline void tendall_(); // A=1
+2155   inline void tabort_();
+2156   inline void tabort_(Register a);
+2157   inline void tabortwc_(int t, Register a, Register b);
+2158   inline void tabortwci_(int t, Register a, int si);
+2159   inline void tabortdc_(int t, Register a, Register b);
+2160   inline void tabortdci_(int t, Register a, int si);
+2161   inline void tsuspend_(); // tsr with L=0
+2162   inline void tresume_();  // tsr with L=1
+2163   inline void tcheck(int f);
+2164 
+2165   static bool is_tbegin(int x) {
+2166     return TBEGIN_OPCODE == (x &amp; (0x3f &lt;&lt; OPCODE_SHIFT | 0x3ff &lt;&lt; 1));
+2167   }
+2168 
+2169   // The following encoders use r0 as second operand. These instructions
+2170   // read r0 as '0'.
+2171   inline void lwzx( Register d, Register s2);
+2172   inline void lwz(  Register d, int si16);
+2173   inline void lwax( Register d, Register s2);
+2174   inline void lwa(  Register d, int si16);
+2175   inline void lwbrx(Register d, Register s2);
+2176   inline void lhzx( Register d, Register s2);
+2177   inline void lhz(  Register d, int si16);
+2178   inline void lhax( Register d, Register s2);
+2179   inline void lha(  Register d, int si16);
+2180   inline void lhbrx(Register d, Register s2);
+2181   inline void lbzx( Register d, Register s2);
+2182   inline void lbz(  Register d, int si16);
+2183   inline void ldx(  Register d, Register s2);
+2184   inline void ld(   Register d, int si16);
+2185   inline void stwx( Register d, Register s2);
+2186   inline void stw(  Register d, int si16);
+2187   inline void sthx( Register d, Register s2);
+2188   inline void sth(  Register d, int si16);
+2189   inline void stbx( Register d, Register s2);
+2190   inline void stb(  Register d, int si16);
+2191   inline void stdx( Register d, Register s2);
+2192   inline void std(  Register d, int si16);
+2193 
+2194   // PPC 2, section 3.2.1 Instruction Cache Instructions
+2195   inline void icbi(    Register s2);
+2196   // PPC 2, section 3.2.2 Data Cache Instructions
+2197   //inlinevoid dcba(   Register s2); // Instruction for embedded processor only.
+2198   inline void dcbz(    Register s2);
+2199   inline void dcbst(   Register s2);
+2200   inline void dcbf(    Register s2);
+2201   // dcache read hint
+2202   inline void dcbt(    Register s2);
+2203   inline void dcbtct(  Register s2, int ct);
+2204   inline void dcbtds(  Register s2, int ds);
+2205   // dcache write hint
+2206   inline void dcbtst(  Register s2);
+2207   inline void dcbtstct(Register s2, int ct);
+2208 
+2209   // Atomics: use ra0mem to disallow R0 as base.
+2210   inline void lbarx_unchecked(Register d, Register b, int eh1);
+2211   inline void lharx_unchecked(Register d, Register b, int eh1);
+2212   inline void lwarx_unchecked(Register d, Register b, int eh1);
+2213   inline void ldarx_unchecked(Register d, Register b, int eh1);
+2214   inline void lqarx_unchecked(Register d, Register b, int eh1);
+2215   inline void lbarx( Register d, Register b, bool hint_exclusive_access);
+2216   inline void lharx( Register d, Register b, bool hint_exclusive_access);
+2217   inline void lwarx( Register d, Register b, bool hint_exclusive_access);
+2218   inline void ldarx( Register d, Register b, bool hint_exclusive_access);
+2219   inline void lqarx( Register d, Register b, bool hint_exclusive_access);
+2220   inline void stbcx_(Register s, Register b);
+2221   inline void sthcx_(Register s, Register b);
+2222   inline void stwcx_(Register s, Register b);
+2223   inline void stdcx_(Register s, Register b);
+2224   inline void stqcx_(Register s, Register b);
+2225   inline void lfs(   FloatRegister d, int si16);
+2226   inline void lfsx(  FloatRegister d, Register b);
+2227   inline void lfd(   FloatRegister d, int si16);
+2228   inline void lfdx(  FloatRegister d, Register b);
+2229   inline void stfs(  FloatRegister s, int si16);
+2230   inline void stfsx( FloatRegister s, Register b);
+2231   inline void stfd(  FloatRegister s, int si16);
+2232   inline void stfdx( FloatRegister s, Register b);
+2233   inline void lvebx( VectorRegister d, Register s2);
+2234   inline void lvehx( VectorRegister d, Register s2);
+2235   inline void lvewx( VectorRegister d, Register s2);
+2236   inline void lvx(   VectorRegister d, Register s2);
+2237   inline void lvxl(  VectorRegister d, Register s2);
+2238   inline void stvebx(VectorRegister d, Register s2);
+2239   inline void stvehx(VectorRegister d, Register s2);
+2240   inline void stvewx(VectorRegister d, Register s2);
+2241   inline void stvx(  VectorRegister d, Register s2);
+2242   inline void stvxl( VectorRegister d, Register s2);
+2243   inline void lvsl(  VectorRegister d, Register s2);
+2244   inline void lvsr(  VectorRegister d, Register s2);
+2245 
+2246   // RegisterOrConstant versions.
+2247   // These emitters choose between the versions using two registers and
+2248   // those with register and immediate, depending on the content of roc.
+2249   // If the constant is not encodable as immediate, instructions to
+2250   // load the constant are emitted beforehand. Store instructions need a
+2251   // tmp reg if the constant is not encodable as immediate.
+2252   // Size unpredictable.
+2253   void ld(  Register d, RegisterOrConstant roc, Register s1 = noreg);
+2254   void lwa( Register d, RegisterOrConstant roc, Register s1 = noreg);
+2255   void lwz( Register d, RegisterOrConstant roc, Register s1 = noreg);
+2256   void lha( Register d, RegisterOrConstant roc, Register s1 = noreg);
+2257   void lhz( Register d, RegisterOrConstant roc, Register s1 = noreg);
+2258   void lbz( Register d, RegisterOrConstant roc, Register s1 = noreg);
+2259   void std( Register d, RegisterOrConstant roc, Register s1 = noreg, Register tmp = noreg);
+2260   void stw( Register d, RegisterOrConstant roc, Register s1 = noreg, Register tmp = noreg);
+2261   void sth( Register d, RegisterOrConstant roc, Register s1 = noreg, Register tmp = noreg);
+2262   void stb( Register d, RegisterOrConstant roc, Register s1 = noreg, Register tmp = noreg);
+2263   void add( Register d, RegisterOrConstant roc, Register s1);
+2264   void subf(Register d, RegisterOrConstant roc, Register s1);
+2265   void cmpd(ConditionRegister d, RegisterOrConstant roc, Register s1);
+2266   // Load pointer d from s1+roc.
+2267   void ld_ptr(Register d, RegisterOrConstant roc, Register s1 = noreg) { ld(d, roc, s1); }
+2268 
+2269   // Emit several instructions to load a 64 bit constant. This issues a fixed
+2270   // instruction pattern so that the constant can be patched later on.
+2271   enum {
+2272     load_const_size = 5 * BytesPerInstWord
+2273   };
+2274          void load_const(Register d, long a,            Register tmp = noreg);
+2275   inline void load_const(Register d, void* a,           Register tmp = noreg);
+2276   inline void load_const(Register d, Label&amp; L,          Register tmp = noreg);
+2277   inline void load_const(Register d, AddressLiteral&amp; a, Register tmp = noreg);
+2278   inline void load_const32(Register d, int i); // load signed int (patchable)
+2279 
+2280   // Load a 64 bit constant, optimized, not identifyable.
+2281   // Tmp can be used to increase ILP. Set return_simm16_rest = true to get a
+2282   // 16 bit immediate offset. This is useful if the offset can be encoded in
+2283   // a succeeding instruction.
+2284          int load_const_optimized(Register d, long a,  Register tmp = noreg, bool return_simm16_rest = false);
+2285   inline int load_const_optimized(Register d, void* a, Register tmp = noreg, bool return_simm16_rest = false) {
+2286     return load_const_optimized(d, (long)(unsigned long)a, tmp, return_simm16_rest);
+2287   }
+2288 
+2289   // If return_simm16_rest, the return value needs to get added afterwards.
+2290          int add_const_optimized(Register d, Register s, long x, Register tmp = R0, bool return_simm16_rest = false);
+2291   inline int add_const_optimized(Register d, Register s, void* a, Register tmp = R0, bool return_simm16_rest = false) {
+2292     return add_const_optimized(d, s, (long)(unsigned long)a, tmp, return_simm16_rest);
+2293   }
+2294 
+2295   // If return_simm16_rest, the return value needs to get added afterwards.
+2296   inline int sub_const_optimized(Register d, Register s, long x, Register tmp = R0, bool return_simm16_rest = false) {
+2297     return add_const_optimized(d, s, -x, tmp, return_simm16_rest);
+2298   }
+2299   inline int sub_const_optimized(Register d, Register s, void* a, Register tmp = R0, bool return_simm16_rest = false) {
+2300     return sub_const_optimized(d, s, (long)(unsigned long)a, tmp, return_simm16_rest);
+2301   }
+2302 
+2303   // Creation
+2304   Assembler(CodeBuffer* code) : AbstractAssembler(code) {
+2305 #ifdef CHECK_DELAY
+2306     delay_state = no_delay;
+2307 #endif
+2308   }
+2309 
+2310   // Testing
+2311 #ifndef PRODUCT
+2312   void test_asm();
+2313 #endif
+2314 };
+2315 
+2316 
+2317 #endif // CPU_PPC_VM_ASSEMBLER_PPC_HPP
+</pre></body></html>

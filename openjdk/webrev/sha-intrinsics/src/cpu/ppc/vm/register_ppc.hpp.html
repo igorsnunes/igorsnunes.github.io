@@ -1,0 +1,903 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>New src/cpu/ppc/vm/register_ppc.hpp</title>
+<body id="SUNWwebrev">
+<pre>
+   1 /*
+   2  * Copyright (c) 2000, 2016, Oracle and/or its affiliates. All rights reserved.
+   3  * Copyright (c) 2012, 2016 SAP SE. All rights reserved.
+   4  * DO NOT ALTER OR REMOVE COPYRIGHT NOTICES OR THIS FILE HEADER.
+   5  *
+   6  * This code is free software; you can redistribute it and/or modify it
+   7  * under the terms of the GNU General Public License version 2 only, as
+   8  * published by the Free Software Foundation.
+   9  *
+  10  * This code is distributed in the hope that it will be useful, but WITHOUT
+  11  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+  12  * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+  13  * version 2 for more details (a copy is included in the LICENSE file that
+  14  * accompanied this code).
+  15  *
+  16  * You should have received a copy of the GNU General Public License version
+  17  * 2 along with this work; if not, write to the Free Software Foundation,
+  18  * Inc., 51 Franklin St, Fifth Floor, Boston, MA 02110-1301 USA.
+  19  *
+  20  * Please contact Oracle, 500 Oracle Parkway, Redwood Shores, CA 94065 USA
+  21  * or visit www.oracle.com if you need additional information or have any
+  22  * questions.
+  23  *
+  24  */
+  25 
+  26 #ifndef CPU_PPC_VM_REGISTER_PPC_HPP
+  27 #define CPU_PPC_VM_REGISTER_PPC_HPP
+  28 
+  29 #include "asm/register.hpp"
+  30 
+  31 // forward declaration
+  32 class Address;
+  33 class VMRegImpl;
+  34 typedef VMRegImpl* VMReg;
+  35 
+  36 //  PPC64 registers
+  37 //
+  38 //  See "64-bit PowerPC ELF ABI Supplement 1.7", IBM Corp. (2003-10-29).
+  39 //  (http://math-atlas.sourceforge.net/devel/assembly/PPC-elf64abi-1.7.pdf)
+  40 //
+  41 //  r0        Register used in function prologs (volatile)
+  42 //  r1        Stack pointer (nonvolatile)
+  43 //  r2        TOC pointer (volatile)
+  44 //  r3        Parameter and return value (volatile)
+  45 //  r4-r10    Function parameters (volatile)
+  46 //  r11       Register used in calls by pointer and as an environment pointer for languages which require one (volatile)
+  47 //  r12       Register used for exception handling and glink code (volatile)
+  48 //  r13       Reserved for use as system thread ID
+  49 //  r14-r31   Local variables (nonvolatile)
+  50 //
+  51 //  f0        Scratch register (volatile)
+  52 //  f1-f4     Floating point parameters and return value (volatile)
+  53 //  f5-f13    Floating point parameters (volatile)
+  54 //  f14-f31   Floating point values (nonvolatile)
+  55 //
+  56 //  LR        Link register for return address (volatile)
+  57 //  CTR       Loop counter (volatile)
+  58 //  XER       Fixed point exception register (volatile)
+  59 //  FPSCR     Floating point status and control register (volatile)
+  60 //
+  61 //  CR0-CR1   Condition code fields (volatile)
+  62 //  CR2-CR4   Condition code fields (nonvolatile)
+  63 //  CR5-CR7   Condition code fields (volatile)
+  64 //
+  65 //  ----------------------------------------------
+  66 //  On processors with the VMX feature:
+  67 //  v0-v1     Volatile scratch registers
+  68 //  v2-v13    Volatile vector parameters registers
+  69 //  v14-v19   Volatile scratch registers
+  70 //  v20-v31   Non-volatile registers
+  71 //  vrsave    Non-volatile 32-bit register
+  72 
+  73 
+  74 // Use Register as shortcut
+  75 class RegisterImpl;
+  76 typedef RegisterImpl* Register;
+  77 
+  78 inline Register as_Register(int encoding) {
+  79   assert(encoding &gt;= -1 &amp;&amp; encoding &lt; 32, "bad register encoding");
+  80   return (Register)(intptr_t)encoding;
+  81 }
+  82 
+  83 // The implementation of integer registers for the Power architecture
+  84 class RegisterImpl: public AbstractRegisterImpl {
+  85  public:
+  86   enum {
+  87     number_of_registers = 32
+  88   };
+  89 
+  90   // general construction
+  91   inline friend Register as_Register(int encoding);
+  92 
+  93   // accessors
+  94   int encoding() const { assert(is_valid(), "invalid register"); return value(); }
+  95   inline VMReg as_VMReg();
+  96   Register successor() const { return as_Register(encoding() + 1); }
+  97 
+  98   // testers
+  99   bool is_valid()       const { return ( 0 &lt;= (value()&amp;0x7F) &amp;&amp; (value()&amp;0x7F) &lt;  number_of_registers); }
+ 100   bool is_volatile()    const { return ( 0 &lt;= (value()&amp;0x7F) &amp;&amp; (value()&amp;0x7F) &lt;= 13 ); }
+ 101   bool is_nonvolatile() const { return (14 &lt;= (value()&amp;0x7F) &amp;&amp; (value()&amp;0x7F) &lt;= 31 ); }
+ 102 
+ 103   const char* name() const;
+ 104 };
+ 105 
+ 106 // The integer registers of the PPC architecture
+ 107 CONSTANT_REGISTER_DECLARATION(Register, noreg, (-1));
+ 108 
+ 109 CONSTANT_REGISTER_DECLARATION(Register, R0,   (0));
+ 110 CONSTANT_REGISTER_DECLARATION(Register, R1,   (1));
+ 111 CONSTANT_REGISTER_DECLARATION(Register, R2,   (2));
+ 112 CONSTANT_REGISTER_DECLARATION(Register, R3,   (3));
+ 113 CONSTANT_REGISTER_DECLARATION(Register, R4,   (4));
+ 114 CONSTANT_REGISTER_DECLARATION(Register, R5,   (5));
+ 115 CONSTANT_REGISTER_DECLARATION(Register, R6,   (6));
+ 116 CONSTANT_REGISTER_DECLARATION(Register, R7,   (7));
+ 117 CONSTANT_REGISTER_DECLARATION(Register, R8,   (8));
+ 118 CONSTANT_REGISTER_DECLARATION(Register, R9,   (9));
+ 119 CONSTANT_REGISTER_DECLARATION(Register, R10, (10));
+ 120 CONSTANT_REGISTER_DECLARATION(Register, R11, (11));
+ 121 CONSTANT_REGISTER_DECLARATION(Register, R12, (12));
+ 122 CONSTANT_REGISTER_DECLARATION(Register, R13, (13));
+ 123 CONSTANT_REGISTER_DECLARATION(Register, R14, (14));
+ 124 CONSTANT_REGISTER_DECLARATION(Register, R15, (15));
+ 125 CONSTANT_REGISTER_DECLARATION(Register, R16, (16));
+ 126 CONSTANT_REGISTER_DECLARATION(Register, R17, (17));
+ 127 CONSTANT_REGISTER_DECLARATION(Register, R18, (18));
+ 128 CONSTANT_REGISTER_DECLARATION(Register, R19, (19));
+ 129 CONSTANT_REGISTER_DECLARATION(Register, R20, (20));
+ 130 CONSTANT_REGISTER_DECLARATION(Register, R21, (21));
+ 131 CONSTANT_REGISTER_DECLARATION(Register, R22, (22));
+ 132 CONSTANT_REGISTER_DECLARATION(Register, R23, (23));
+ 133 CONSTANT_REGISTER_DECLARATION(Register, R24, (24));
+ 134 CONSTANT_REGISTER_DECLARATION(Register, R25, (25));
+ 135 CONSTANT_REGISTER_DECLARATION(Register, R26, (26));
+ 136 CONSTANT_REGISTER_DECLARATION(Register, R27, (27));
+ 137 CONSTANT_REGISTER_DECLARATION(Register, R28, (28));
+ 138 CONSTANT_REGISTER_DECLARATION(Register, R29, (29));
+ 139 CONSTANT_REGISTER_DECLARATION(Register, R30, (30));
+ 140 CONSTANT_REGISTER_DECLARATION(Register, R31, (31));
+ 141 
+ 142 
+ 143 //
+ 144 // Because Power has many registers, #define'ing values for them is
+ 145 // beneficial in code size and is worth the cost of some of the
+ 146 // dangers of defines. If a particular file has a problem with these
+ 147 // defines then it's possible to turn them off in that file by
+ 148 // defining DONT_USE_REGISTER_DEFINES. Register_definition_ppc.cpp
+ 149 // does that so that it's able to provide real definitions of these
+ 150 // registers for use in debuggers and such.
+ 151 //
+ 152 
+ 153 #ifndef DONT_USE_REGISTER_DEFINES
+ 154 #define noreg ((Register)(noreg_RegisterEnumValue))
+ 155 
+ 156 #define R0 ((Register)(R0_RegisterEnumValue))
+ 157 #define R1 ((Register)(R1_RegisterEnumValue))
+ 158 #define R2 ((Register)(R2_RegisterEnumValue))
+ 159 #define R3 ((Register)(R3_RegisterEnumValue))
+ 160 #define R4 ((Register)(R4_RegisterEnumValue))
+ 161 #define R5 ((Register)(R5_RegisterEnumValue))
+ 162 #define R6 ((Register)(R6_RegisterEnumValue))
+ 163 #define R7 ((Register)(R7_RegisterEnumValue))
+ 164 #define R8 ((Register)(R8_RegisterEnumValue))
+ 165 #define R9 ((Register)(R9_RegisterEnumValue))
+ 166 #define R10 ((Register)(R10_RegisterEnumValue))
+ 167 #define R11 ((Register)(R11_RegisterEnumValue))
+ 168 #define R12 ((Register)(R12_RegisterEnumValue))
+ 169 #define R13 ((Register)(R13_RegisterEnumValue))
+ 170 #define R14 ((Register)(R14_RegisterEnumValue))
+ 171 #define R15 ((Register)(R15_RegisterEnumValue))
+ 172 #define R16 ((Register)(R16_RegisterEnumValue))
+ 173 #define R17 ((Register)(R17_RegisterEnumValue))
+ 174 #define R18 ((Register)(R18_RegisterEnumValue))
+ 175 #define R19 ((Register)(R19_RegisterEnumValue))
+ 176 #define R20 ((Register)(R20_RegisterEnumValue))
+ 177 #define R21 ((Register)(R21_RegisterEnumValue))
+ 178 #define R22 ((Register)(R22_RegisterEnumValue))
+ 179 #define R23 ((Register)(R23_RegisterEnumValue))
+ 180 #define R24 ((Register)(R24_RegisterEnumValue))
+ 181 #define R25 ((Register)(R25_RegisterEnumValue))
+ 182 #define R26 ((Register)(R26_RegisterEnumValue))
+ 183 #define R27 ((Register)(R27_RegisterEnumValue))
+ 184 #define R28 ((Register)(R28_RegisterEnumValue))
+ 185 #define R29 ((Register)(R29_RegisterEnumValue))
+ 186 #define R30 ((Register)(R30_RegisterEnumValue))
+ 187 #define R31 ((Register)(R31_RegisterEnumValue))
+ 188 #endif
+ 189 
+ 190 // Use ConditionRegister as shortcut
+ 191 class ConditionRegisterImpl;
+ 192 typedef ConditionRegisterImpl* ConditionRegister;
+ 193 
+ 194 inline ConditionRegister as_ConditionRegister(int encoding) {
+ 195   assert(encoding &gt;= 0 &amp;&amp; encoding &lt; 8, "bad condition register encoding");
+ 196   return (ConditionRegister)(intptr_t)encoding;
+ 197 }
+ 198 
+ 199 // The implementation of condition register(s) for the PPC architecture
+ 200 class ConditionRegisterImpl: public AbstractRegisterImpl {
+ 201  public:
+ 202   enum {
+ 203     number_of_registers = 8
+ 204   };
+ 205 
+ 206   // construction.
+ 207   inline friend ConditionRegister as_ConditionRegister(int encoding);
+ 208 
+ 209   // accessors
+ 210   int encoding() const { assert(is_valid(), "invalid register"); return value(); }
+ 211   inline VMReg as_VMReg();
+ 212 
+ 213   // testers
+ 214   bool is_valid()       const { return  (0 &lt;= value()        &amp;&amp;  value() &lt; number_of_registers); }
+ 215   bool is_nonvolatile() const { return  (2 &lt;= (value()&amp;0x7F) &amp;&amp; (value()&amp;0x7F) &lt;= 4 );  }
+ 216 
+ 217   const char* name() const;
+ 218 };
+ 219 
+ 220 // The (parts of the) condition register(s) of the PPC architecture
+ 221 // sys/ioctl.h on AIX defines CR0-CR3, so I name these CCR.
+ 222 CONSTANT_REGISTER_DECLARATION(ConditionRegister, CCR0,   (0));
+ 223 CONSTANT_REGISTER_DECLARATION(ConditionRegister, CCR1,   (1));
+ 224 CONSTANT_REGISTER_DECLARATION(ConditionRegister, CCR2,   (2));
+ 225 CONSTANT_REGISTER_DECLARATION(ConditionRegister, CCR3,   (3));
+ 226 CONSTANT_REGISTER_DECLARATION(ConditionRegister, CCR4,   (4));
+ 227 CONSTANT_REGISTER_DECLARATION(ConditionRegister, CCR5,   (5));
+ 228 CONSTANT_REGISTER_DECLARATION(ConditionRegister, CCR6,   (6));
+ 229 CONSTANT_REGISTER_DECLARATION(ConditionRegister, CCR7,   (7));
+ 230 
+ 231 #ifndef DONT_USE_REGISTER_DEFINES
+ 232 
+ 233 #define CCR0 ((ConditionRegister)(CCR0_ConditionRegisterEnumValue))
+ 234 #define CCR1 ((ConditionRegister)(CCR1_ConditionRegisterEnumValue))
+ 235 #define CCR2 ((ConditionRegister)(CCR2_ConditionRegisterEnumValue))
+ 236 #define CCR3 ((ConditionRegister)(CCR3_ConditionRegisterEnumValue))
+ 237 #define CCR4 ((ConditionRegister)(CCR4_ConditionRegisterEnumValue))
+ 238 #define CCR5 ((ConditionRegister)(CCR5_ConditionRegisterEnumValue))
+ 239 #define CCR6 ((ConditionRegister)(CCR6_ConditionRegisterEnumValue))
+ 240 #define CCR7 ((ConditionRegister)(CCR7_ConditionRegisterEnumValue))
+ 241 
+ 242 #endif // DONT_USE_REGISTER_DEFINES
+ 243 
+ 244 
+ 245 // Use FloatRegister as shortcut
+ 246 class FloatRegisterImpl;
+ 247 typedef FloatRegisterImpl* FloatRegister;
+ 248 
+ 249 inline FloatRegister as_FloatRegister(int encoding) {
+ 250   assert(encoding &gt;= -1 &amp;&amp; encoding &lt; 32, "bad float register encoding");
+ 251   return (FloatRegister)(intptr_t)encoding;
+ 252 }
+ 253 
+ 254 // The implementation of float registers for the PPC architecture
+ 255 class FloatRegisterImpl: public AbstractRegisterImpl {
+ 256  public:
+ 257   enum {
+ 258     number_of_registers = 32
+ 259   };
+ 260 
+ 261   // construction
+ 262   inline friend FloatRegister as_FloatRegister(int encoding);
+ 263 
+ 264   // accessors
+ 265   int           encoding() const { assert(is_valid(), "invalid register"); return value(); }
+ 266   inline VMReg  as_VMReg();
+ 267   FloatRegister successor() const { return as_FloatRegister(encoding() + 1); }
+ 268 
+ 269   // testers
+ 270   bool is_valid() const { return (0 &lt;= value() &amp;&amp; value() &lt; number_of_registers); }
+ 271 
+ 272   const char* name() const;
+ 273 };
+ 274 
+ 275 // The float registers of the PPC architecture
+ 276 CONSTANT_REGISTER_DECLARATION(FloatRegister, fnoreg, (-1));
+ 277 
+ 278 CONSTANT_REGISTER_DECLARATION(FloatRegister, F0,  ( 0));
+ 279 CONSTANT_REGISTER_DECLARATION(FloatRegister, F1,  ( 1));
+ 280 CONSTANT_REGISTER_DECLARATION(FloatRegister, F2,  ( 2));
+ 281 CONSTANT_REGISTER_DECLARATION(FloatRegister, F3,  ( 3));
+ 282 CONSTANT_REGISTER_DECLARATION(FloatRegister, F4,  ( 4));
+ 283 CONSTANT_REGISTER_DECLARATION(FloatRegister, F5,  ( 5));
+ 284 CONSTANT_REGISTER_DECLARATION(FloatRegister, F6,  ( 6));
+ 285 CONSTANT_REGISTER_DECLARATION(FloatRegister, F7,  ( 7));
+ 286 CONSTANT_REGISTER_DECLARATION(FloatRegister, F8,  ( 8));
+ 287 CONSTANT_REGISTER_DECLARATION(FloatRegister, F9,  ( 9));
+ 288 CONSTANT_REGISTER_DECLARATION(FloatRegister, F10, (10));
+ 289 CONSTANT_REGISTER_DECLARATION(FloatRegister, F11, (11));
+ 290 CONSTANT_REGISTER_DECLARATION(FloatRegister, F12, (12));
+ 291 CONSTANT_REGISTER_DECLARATION(FloatRegister, F13, (13));
+ 292 CONSTANT_REGISTER_DECLARATION(FloatRegister, F14, (14));
+ 293 CONSTANT_REGISTER_DECLARATION(FloatRegister, F15, (15));
+ 294 CONSTANT_REGISTER_DECLARATION(FloatRegister, F16, (16));
+ 295 CONSTANT_REGISTER_DECLARATION(FloatRegister, F17, (17));
+ 296 CONSTANT_REGISTER_DECLARATION(FloatRegister, F18, (18));
+ 297 CONSTANT_REGISTER_DECLARATION(FloatRegister, F19, (19));
+ 298 CONSTANT_REGISTER_DECLARATION(FloatRegister, F20, (20));
+ 299 CONSTANT_REGISTER_DECLARATION(FloatRegister, F21, (21));
+ 300 CONSTANT_REGISTER_DECLARATION(FloatRegister, F22, (22));
+ 301 CONSTANT_REGISTER_DECLARATION(FloatRegister, F23, (23));
+ 302 CONSTANT_REGISTER_DECLARATION(FloatRegister, F24, (24));
+ 303 CONSTANT_REGISTER_DECLARATION(FloatRegister, F25, (25));
+ 304 CONSTANT_REGISTER_DECLARATION(FloatRegister, F26, (26));
+ 305 CONSTANT_REGISTER_DECLARATION(FloatRegister, F27, (27));
+ 306 CONSTANT_REGISTER_DECLARATION(FloatRegister, F28, (28));
+ 307 CONSTANT_REGISTER_DECLARATION(FloatRegister, F29, (29));
+ 308 CONSTANT_REGISTER_DECLARATION(FloatRegister, F30, (30));
+ 309 CONSTANT_REGISTER_DECLARATION(FloatRegister, F31, (31));
+ 310 
+ 311 #ifndef DONT_USE_REGISTER_DEFINES
+ 312 #define fnoreg ((FloatRegister)(fnoreg_FloatRegisterEnumValue))
+ 313 #define F0     ((FloatRegister)(    F0_FloatRegisterEnumValue))
+ 314 #define F1     ((FloatRegister)(    F1_FloatRegisterEnumValue))
+ 315 #define F2     ((FloatRegister)(    F2_FloatRegisterEnumValue))
+ 316 #define F3     ((FloatRegister)(    F3_FloatRegisterEnumValue))
+ 317 #define F4     ((FloatRegister)(    F4_FloatRegisterEnumValue))
+ 318 #define F5     ((FloatRegister)(    F5_FloatRegisterEnumValue))
+ 319 #define F6     ((FloatRegister)(    F6_FloatRegisterEnumValue))
+ 320 #define F7     ((FloatRegister)(    F7_FloatRegisterEnumValue))
+ 321 #define F8     ((FloatRegister)(    F8_FloatRegisterEnumValue))
+ 322 #define F9     ((FloatRegister)(    F9_FloatRegisterEnumValue))
+ 323 #define F10    ((FloatRegister)(   F10_FloatRegisterEnumValue))
+ 324 #define F11    ((FloatRegister)(   F11_FloatRegisterEnumValue))
+ 325 #define F12    ((FloatRegister)(   F12_FloatRegisterEnumValue))
+ 326 #define F13    ((FloatRegister)(   F13_FloatRegisterEnumValue))
+ 327 #define F14    ((FloatRegister)(   F14_FloatRegisterEnumValue))
+ 328 #define F15    ((FloatRegister)(   F15_FloatRegisterEnumValue))
+ 329 #define F16    ((FloatRegister)(   F16_FloatRegisterEnumValue))
+ 330 #define F17    ((FloatRegister)(   F17_FloatRegisterEnumValue))
+ 331 #define F18    ((FloatRegister)(   F18_FloatRegisterEnumValue))
+ 332 #define F19    ((FloatRegister)(   F19_FloatRegisterEnumValue))
+ 333 #define F20    ((FloatRegister)(   F20_FloatRegisterEnumValue))
+ 334 #define F21    ((FloatRegister)(   F21_FloatRegisterEnumValue))
+ 335 #define F22    ((FloatRegister)(   F22_FloatRegisterEnumValue))
+ 336 #define F23    ((FloatRegister)(   F23_FloatRegisterEnumValue))
+ 337 #define F24    ((FloatRegister)(   F24_FloatRegisterEnumValue))
+ 338 #define F25    ((FloatRegister)(   F25_FloatRegisterEnumValue))
+ 339 #define F26    ((FloatRegister)(   F26_FloatRegisterEnumValue))
+ 340 #define F27    ((FloatRegister)(   F27_FloatRegisterEnumValue))
+ 341 #define F28    ((FloatRegister)(   F28_FloatRegisterEnumValue))
+ 342 #define F29    ((FloatRegister)(   F29_FloatRegisterEnumValue))
+ 343 #define F30    ((FloatRegister)(   F30_FloatRegisterEnumValue))
+ 344 #define F31    ((FloatRegister)(   F31_FloatRegisterEnumValue))
+ 345 #endif // DONT_USE_REGISTER_DEFINES
+ 346 
+ 347 // Use SpecialRegister as shortcut
+ 348 class SpecialRegisterImpl;
+ 349 typedef SpecialRegisterImpl* SpecialRegister;
+ 350 
+ 351 inline SpecialRegister as_SpecialRegister(int encoding) {
+ 352   return (SpecialRegister)(intptr_t)encoding;
+ 353 }
+ 354 
+ 355 // The implementation of special registers for the Power architecture (LR, CTR and friends)
+ 356 class SpecialRegisterImpl: public AbstractRegisterImpl {
+ 357  public:
+ 358   enum {
+ 359     number_of_registers = 6
+ 360   };
+ 361 
+ 362   // construction
+ 363   inline friend SpecialRegister as_SpecialRegister(int encoding);
+ 364 
+ 365   // accessors
+ 366   int             encoding()  const { assert(is_valid(), "invalid register"); return value(); }
+ 367   inline VMReg    as_VMReg();
+ 368 
+ 369   // testers
+ 370   bool is_valid()       const { return 0 &lt;= value() &amp;&amp; value() &lt; number_of_registers; }
+ 371 
+ 372   const char* name() const;
+ 373 };
+ 374 
+ 375 // The special registers of the PPC architecture
+ 376 CONSTANT_REGISTER_DECLARATION(SpecialRegister, SR_XER,     (0));
+ 377 CONSTANT_REGISTER_DECLARATION(SpecialRegister, SR_LR,      (1));
+ 378 CONSTANT_REGISTER_DECLARATION(SpecialRegister, SR_CTR,     (2));
+ 379 CONSTANT_REGISTER_DECLARATION(SpecialRegister, SR_VRSAVE,  (3));
+ 380 CONSTANT_REGISTER_DECLARATION(SpecialRegister, SR_SPEFSCR, (4));
+ 381 CONSTANT_REGISTER_DECLARATION(SpecialRegister, SR_PPR,     (5));
+ 382 
+ 383 #ifndef DONT_USE_REGISTER_DEFINES
+ 384 #define SR_XER     ((SpecialRegister)(SR_XER_SpecialRegisterEnumValue))
+ 385 #define SR_LR      ((SpecialRegister)(SR_LR_SpecialRegisterEnumValue))
+ 386 #define SR_CTR     ((SpecialRegister)(SR_CTR_SpecialRegisterEnumValue))
+ 387 #define SR_VRSAVE  ((SpecialRegister)(SR_VRSAVE_SpecialRegisterEnumValue))
+ 388 #define SR_SPEFSCR ((SpecialRegister)(SR_SPEFSCR_SpecialRegisterEnumValue))
+ 389 #define SR_PPR     ((SpecialRegister)(SR_PPR_SpecialRegisterEnumValue))
+ 390 #endif // DONT_USE_REGISTER_DEFINES
+ 391 
+ 392 
+ 393 // Use VectorRegister as shortcut
+ 394 class VectorRegisterImpl;
+ 395 typedef VectorRegisterImpl* VectorRegister;
+ 396 
+ 397 inline VectorRegister as_VectorRegister(int encoding) {
+ 398   return (VectorRegister)(intptr_t)encoding;
+ 399 }
+ 400 
+ 401 // Forward declaration
+ 402 // Use VectorSRegister as a shortcut.
+ 403 class VectorSRegisterImpl;
+ 404 typedef VectorSRegisterImpl* VectorSRegister;
+ 405 
+ 406 // The implementation of vector registers for the Power architecture
+ 407 class VectorRegisterImpl: public AbstractRegisterImpl {
+ 408  public:
+ 409   enum {
+ 410     number_of_registers = 32
+ 411   };
+ 412 
+ 413   // construction
+ 414   inline friend VectorRegister as_VectorRegister(int encoding);
+ 415 
+ 416   // accessors
+ 417   int            encoding()  const { assert(is_valid(), "invalid register"); return value(); }
+ 418 
+ 419   // testers
+ 420   bool is_valid()       const { return   0 &lt;=  value()       &amp;&amp;  value() &lt; number_of_registers; }
+ 421 
+ 422   const char* name() const;
+ 423 
+ 424   // convert to VSR
+ 425   VectorSRegister to_vsr() const;
+ 426 };
+ 427 
+ 428 // The Vector registers of the Power architecture
+ 429 
+ 430 CONSTANT_REGISTER_DECLARATION(VectorRegister, vnoreg, (-1));
+ 431 
+ 432 CONSTANT_REGISTER_DECLARATION(VectorRegister, VR0,  ( 0));
+ 433 CONSTANT_REGISTER_DECLARATION(VectorRegister, VR1,  ( 1));
+ 434 CONSTANT_REGISTER_DECLARATION(VectorRegister, VR2,  ( 2));
+ 435 CONSTANT_REGISTER_DECLARATION(VectorRegister, VR3,  ( 3));
+ 436 CONSTANT_REGISTER_DECLARATION(VectorRegister, VR4,  ( 4));
+ 437 CONSTANT_REGISTER_DECLARATION(VectorRegister, VR5,  ( 5));
+ 438 CONSTANT_REGISTER_DECLARATION(VectorRegister, VR6,  ( 6));
+ 439 CONSTANT_REGISTER_DECLARATION(VectorRegister, VR7,  ( 7));
+ 440 CONSTANT_REGISTER_DECLARATION(VectorRegister, VR8,  ( 8));
+ 441 CONSTANT_REGISTER_DECLARATION(VectorRegister, VR9,  ( 9));
+ 442 CONSTANT_REGISTER_DECLARATION(VectorRegister, VR10, (10));
+ 443 CONSTANT_REGISTER_DECLARATION(VectorRegister, VR11, (11));
+ 444 CONSTANT_REGISTER_DECLARATION(VectorRegister, VR12, (12));
+ 445 CONSTANT_REGISTER_DECLARATION(VectorRegister, VR13, (13));
+ 446 CONSTANT_REGISTER_DECLARATION(VectorRegister, VR14, (14));
+ 447 CONSTANT_REGISTER_DECLARATION(VectorRegister, VR15, (15));
+ 448 CONSTANT_REGISTER_DECLARATION(VectorRegister, VR16, (16));
+ 449 CONSTANT_REGISTER_DECLARATION(VectorRegister, VR17, (17));
+ 450 CONSTANT_REGISTER_DECLARATION(VectorRegister, VR18, (18));
+ 451 CONSTANT_REGISTER_DECLARATION(VectorRegister, VR19, (19));
+ 452 CONSTANT_REGISTER_DECLARATION(VectorRegister, VR20, (20));
+ 453 CONSTANT_REGISTER_DECLARATION(VectorRegister, VR21, (21));
+ 454 CONSTANT_REGISTER_DECLARATION(VectorRegister, VR22, (22));
+ 455 CONSTANT_REGISTER_DECLARATION(VectorRegister, VR23, (23));
+ 456 CONSTANT_REGISTER_DECLARATION(VectorRegister, VR24, (24));
+ 457 CONSTANT_REGISTER_DECLARATION(VectorRegister, VR25, (25));
+ 458 CONSTANT_REGISTER_DECLARATION(VectorRegister, VR26, (26));
+ 459 CONSTANT_REGISTER_DECLARATION(VectorRegister, VR27, (27));
+ 460 CONSTANT_REGISTER_DECLARATION(VectorRegister, VR28, (28));
+ 461 CONSTANT_REGISTER_DECLARATION(VectorRegister, VR29, (29));
+ 462 CONSTANT_REGISTER_DECLARATION(VectorRegister, VR30, (30));
+ 463 CONSTANT_REGISTER_DECLARATION(VectorRegister, VR31, (31));
+ 464 
+ 465 #ifndef DONT_USE_REGISTER_DEFINES
+ 466 #define vnoreg ((VectorRegister)(vnoreg_VectorRegisterEnumValue))
+ 467 #define VR0    ((VectorRegister)(   VR0_VectorRegisterEnumValue))
+ 468 #define VR1    ((VectorRegister)(   VR1_VectorRegisterEnumValue))
+ 469 #define VR2    ((VectorRegister)(   VR2_VectorRegisterEnumValue))
+ 470 #define VR3    ((VectorRegister)(   VR3_VectorRegisterEnumValue))
+ 471 #define VR4    ((VectorRegister)(   VR4_VectorRegisterEnumValue))
+ 472 #define VR5    ((VectorRegister)(   VR5_VectorRegisterEnumValue))
+ 473 #define VR6    ((VectorRegister)(   VR6_VectorRegisterEnumValue))
+ 474 #define VR7    ((VectorRegister)(   VR7_VectorRegisterEnumValue))
+ 475 #define VR8    ((VectorRegister)(   VR8_VectorRegisterEnumValue))
+ 476 #define VR9    ((VectorRegister)(   VR9_VectorRegisterEnumValue))
+ 477 #define VR10   ((VectorRegister)(  VR10_VectorRegisterEnumValue))
+ 478 #define VR11   ((VectorRegister)(  VR11_VectorRegisterEnumValue))
+ 479 #define VR12   ((VectorRegister)(  VR12_VectorRegisterEnumValue))
+ 480 #define VR13   ((VectorRegister)(  VR13_VectorRegisterEnumValue))
+ 481 #define VR14   ((VectorRegister)(  VR14_VectorRegisterEnumValue))
+ 482 #define VR15   ((VectorRegister)(  VR15_VectorRegisterEnumValue))
+ 483 #define VR16   ((VectorRegister)(  VR16_VectorRegisterEnumValue))
+ 484 #define VR17   ((VectorRegister)(  VR17_VectorRegisterEnumValue))
+ 485 #define VR18   ((VectorRegister)(  VR18_VectorRegisterEnumValue))
+ 486 #define VR19   ((VectorRegister)(  VR19_VectorRegisterEnumValue))
+ 487 #define VR20   ((VectorRegister)(  VR20_VectorRegisterEnumValue))
+ 488 #define VR21   ((VectorRegister)(  VR21_VectorRegisterEnumValue))
+ 489 #define VR22   ((VectorRegister)(  VR22_VectorRegisterEnumValue))
+ 490 #define VR23   ((VectorRegister)(  VR23_VectorRegisterEnumValue))
+ 491 #define VR24   ((VectorRegister)(  VR24_VectorRegisterEnumValue))
+ 492 #define VR25   ((VectorRegister)(  VR25_VectorRegisterEnumValue))
+ 493 #define VR26   ((VectorRegister)(  VR26_VectorRegisterEnumValue))
+ 494 #define VR27   ((VectorRegister)(  VR27_VectorRegisterEnumValue))
+ 495 #define VR28   ((VectorRegister)(  VR28_VectorRegisterEnumValue))
+ 496 #define VR29   ((VectorRegister)(  VR29_VectorRegisterEnumValue))
+ 497 #define VR30   ((VectorRegister)(  VR30_VectorRegisterEnumValue))
+ 498 #define VR31   ((VectorRegister)(  VR31_VectorRegisterEnumValue))
+ 499 #endif // DONT_USE_REGISTER_DEFINES
+ 500 
+ 501 
+ 502 inline VectorSRegister as_VectorSRegister(int encoding) {
+ 503   return (VectorSRegister)(intptr_t)encoding;
+ 504 }
+ 505 
+ 506 // The implementation of Vector-Scalar (VSX) registers on POWER architecture.
+ 507 class VectorSRegisterImpl: public AbstractRegisterImpl {
+ 508  public:
+ 509   enum {
+ 510     number_of_registers = 64
+ 511   };
+ 512 
+ 513   // construction
+ 514   inline friend VectorSRegister as_VectorSRegister(int encoding);
+ 515 
+ 516   // accessors
+ 517   int encoding() const { assert(is_valid(), "invalid register"); return value(); }
+ 518 
+ 519   // testers
+ 520   bool is_valid() const { return 0 &lt;=  value() &amp;&amp;  value() &lt; number_of_registers; }
+ 521 
+ 522   const char* name() const;
+ 523 };
+ 524 
+ 525 // The Vector-Scalar (VSX) registers of the POWER architecture.
+ 526 
+ 527 CONSTANT_REGISTER_DECLARATION(VectorSRegister, vsnoreg, (-1));
+ 528 
+ 529 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR0,  ( 0));
+ 530 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR1,  ( 1));
+ 531 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR2,  ( 2));
+ 532 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR3,  ( 3));
+ 533 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR4,  ( 4));
+ 534 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR5,  ( 5));
+ 535 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR6,  ( 6));
+ 536 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR7,  ( 7));
+ 537 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR8,  ( 8));
+ 538 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR9,  ( 9));
+ 539 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR10, (10));
+ 540 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR11, (11));
+ 541 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR12, (12));
+ 542 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR13, (13));
+ 543 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR14, (14));
+ 544 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR15, (15));
+ 545 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR16, (16));
+ 546 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR17, (17));
+ 547 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR18, (18));
+ 548 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR19, (19));
+ 549 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR20, (20));
+ 550 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR21, (21));
+ 551 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR22, (22));
+ 552 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR23, (23));
+ 553 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR24, (24));
+ 554 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR25, (25));
+ 555 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR26, (26));
+ 556 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR27, (27));
+ 557 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR28, (28));
+ 558 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR29, (29));
+ 559 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR30, (30));
+ 560 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR31, (31));
+ 561 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR32, (32));
+ 562 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR33, (33));
+ 563 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR34, (34));
+ 564 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR35, (35));
+ 565 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR36, (36));
+ 566 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR37, (37));
+ 567 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR38, (38));
+ 568 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR39, (39));
+ 569 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR40, (40));
+ 570 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR41, (41));
+ 571 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR42, (42));
+ 572 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR43, (43));
+ 573 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR44, (44));
+ 574 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR45, (45));
+ 575 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR46, (46));
+ 576 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR47, (47));
+ 577 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR48, (48));
+ 578 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR49, (49));
+ 579 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR50, (50));
+ 580 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR51, (51));
+ 581 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR52, (52));
+ 582 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR53, (53));
+ 583 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR54, (54));
+ 584 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR55, (55));
+ 585 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR56, (56));
+ 586 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR57, (57));
+ 587 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR58, (58));
+ 588 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR59, (59));
+ 589 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR60, (60));
+ 590 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR61, (61));
+ 591 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR62, (62));
+ 592 CONSTANT_REGISTER_DECLARATION(VectorSRegister, VSR63, (63));
+ 593 
+ 594 #ifndef DONT_USE_REGISTER_DEFINES
+ 595 #define vsnoregi ((VectorSRegister)(vsnoreg_VectorSRegisterEnumValue))
+ 596 #define VSR0    ((VectorSRegister)(   VSR0_VectorSRegisterEnumValue))
+ 597 #define VSR1    ((VectorSRegister)(   VSR1_VectorSRegisterEnumValue))
+ 598 #define VSR2    ((VectorSRegister)(   VSR2_VectorSRegisterEnumValue))
+ 599 #define VSR3    ((VectorSRegister)(   VSR3_VectorSRegisterEnumValue))
+ 600 #define VSR4    ((VectorSRegister)(   VSR4_VectorSRegisterEnumValue))
+ 601 #define VSR5    ((VectorSRegister)(   VSR5_VectorSRegisterEnumValue))
+ 602 #define VSR6    ((VectorSRegister)(   VSR6_VectorSRegisterEnumValue))
+ 603 #define VSR7    ((VectorSRegister)(   VSR7_VectorSRegisterEnumValue))
+ 604 #define VSR8    ((VectorSRegister)(   VSR8_VectorSRegisterEnumValue))
+ 605 #define VSR9    ((VectorSRegister)(   VSR9_VectorSRegisterEnumValue))
+ 606 #define VSR10   ((VectorSRegister)(  VSR10_VectorSRegisterEnumValue))
+ 607 #define VSR11   ((VectorSRegister)(  VSR11_VectorSRegisterEnumValue))
+ 608 #define VSR12   ((VectorSRegister)(  VSR12_VectorSRegisterEnumValue))
+ 609 #define VSR13   ((VectorSRegister)(  VSR13_VectorSRegisterEnumValue))
+ 610 #define VSR14   ((VectorSRegister)(  VSR14_VectorSRegisterEnumValue))
+ 611 #define VSR15   ((VectorSRegister)(  VSR15_VectorSRegisterEnumValue))
+ 612 #define VSR16   ((VectorSRegister)(  VSR16_VectorSRegisterEnumValue))
+ 613 #define VSR17   ((VectorSRegister)(  VSR17_VectorSRegisterEnumValue))
+ 614 #define VSR18   ((VectorSRegister)(  VSR18_VectorSRegisterEnumValue))
+ 615 #define VSR19   ((VectorSRegister)(  VSR19_VectorSRegisterEnumValue))
+ 616 #define VSR20   ((VectorSRegister)(  VSR20_VectorSRegisterEnumValue))
+ 617 #define VSR21   ((VectorSRegister)(  VSR21_VectorSRegisterEnumValue))
+ 618 #define VSR22   ((VectorSRegister)(  VSR22_VectorSRegisterEnumValue))
+ 619 #define VSR23   ((VectorSRegister)(  VSR23_VectorSRegisterEnumValue))
+ 620 #define VSR24   ((VectorSRegister)(  VSR24_VectorSRegisterEnumValue))
+ 621 #define VSR25   ((VectorSRegister)(  VSR25_VectorSRegisterEnumValue))
+ 622 #define VSR26   ((VectorSRegister)(  VSR26_VectorSRegisterEnumValue))
+ 623 #define VSR27   ((VectorSRegister)(  VSR27_VectorSRegisterEnumValue))
+ 624 #define VSR28   ((VectorSRegister)(  VSR28_VectorSRegisterEnumValue))
+ 625 #define VSR29   ((VectorSRegister)(  VSR29_VectorSRegisterEnumValue))
+ 626 #define VSR30   ((VectorSRegister)(  VSR30_VectorSRegisterEnumValue))
+ 627 #define VSR31   ((VectorSRegister)(  VSR31_VectorSRegisterEnumValue))
+ 628 #define VSR32   ((VectorSRegister)(  VSR32_VectorSRegisterEnumValue))
+ 629 #define VSR33   ((VectorSRegister)(  VSR33_VectorSRegisterEnumValue))
+ 630 #define VSR34   ((VectorSRegister)(  VSR34_VectorSRegisterEnumValue))
+ 631 #define VSR35   ((VectorSRegister)(  VSR35_VectorSRegisterEnumValue))
+ 632 #define VSR36   ((VectorSRegister)(  VSR36_VectorSRegisterEnumValue))
+ 633 #define VSR37   ((VectorSRegister)(  VSR37_VectorSRegisterEnumValue))
+ 634 #define VSR38   ((VectorSRegister)(  VSR38_VectorSRegisterEnumValue))
+ 635 #define VSR39   ((VectorSRegister)(  VSR39_VectorSRegisterEnumValue))
+ 636 #define VSR40   ((VectorSRegister)(  VSR40_VectorSRegisterEnumValue))
+ 637 #define VSR41   ((VectorSRegister)(  VSR41_VectorSRegisterEnumValue))
+ 638 #define VSR42   ((VectorSRegister)(  VSR42_VectorSRegisterEnumValue))
+ 639 #define VSR43   ((VectorSRegister)(  VSR43_VectorSRegisterEnumValue))
+ 640 #define VSR44   ((VectorSRegister)(  VSR44_VectorSRegisterEnumValue))
+ 641 #define VSR45   ((VectorSRegister)(  VSR45_VectorSRegisterEnumValue))
+ 642 #define VSR46   ((VectorSRegister)(  VSR46_VectorSRegisterEnumValue))
+ 643 #define VSR47   ((VectorSRegister)(  VSR47_VectorSRegisterEnumValue))
+ 644 #define VSR48   ((VectorSRegister)(  VSR48_VectorSRegisterEnumValue))
+ 645 #define VSR49   ((VectorSRegister)(  VSR49_VectorSRegisterEnumValue))
+ 646 #define VSR50   ((VectorSRegister)(  VSR50_VectorSRegisterEnumValue))
+ 647 #define VSR51   ((VectorSRegister)(  VSR51_VectorSRegisterEnumValue))
+ 648 #define VSR52   ((VectorSRegister)(  VSR52_VectorSRegisterEnumValue))
+ 649 #define VSR53   ((VectorSRegister)(  VSR53_VectorSRegisterEnumValue))
+ 650 #define VSR54   ((VectorSRegister)(  VSR54_VectorSRegisterEnumValue))
+ 651 #define VSR55   ((VectorSRegister)(  VSR55_VectorSRegisterEnumValue))
+ 652 #define VSR56   ((VectorSRegister)(  VSR56_VectorSRegisterEnumValue))
+ 653 #define VSR57   ((VectorSRegister)(  VSR57_VectorSRegisterEnumValue))
+ 654 #define VSR58   ((VectorSRegister)(  VSR58_VectorSRegisterEnumValue))
+ 655 #define VSR59   ((VectorSRegister)(  VSR59_VectorSRegisterEnumValue))
+ 656 #define VSR60   ((VectorSRegister)(  VSR60_VectorSRegisterEnumValue))
+ 657 #define VSR61   ((VectorSRegister)(  VSR61_VectorSRegisterEnumValue))
+ 658 #define VSR62   ((VectorSRegister)(  VSR62_VectorSRegisterEnumValue))
+ 659 #define VSR63   ((VectorSRegister)(  VSR63_VectorSRegisterEnumValue))
+ 660 #endif // DONT_USE_REGISTER_DEFINES
+ 661 
+ 662 // Maximum number of incoming arguments that can be passed in i registers.
+ 663 const int PPC_ARGS_IN_REGS_NUM = 8;
+ 664 
+ 665 
+ 666 // Need to know the total number of registers of all sorts for SharedInfo.
+ 667 // Define a class that exports it.
+ 668 class ConcreteRegisterImpl : public AbstractRegisterImpl {
+ 669  public:
+ 670   enum {
+ 671     // This number must be large enough to cover REG_COUNT (defined by c2) registers.
+ 672     // There is no requirement that any ordering here matches any ordering c2 gives
+ 673     // it's optoregs.
+ 674     number_of_registers =
+ 675       ( RegisterImpl::number_of_registers +
+ 676         FloatRegisterImpl::number_of_registers )
+ 677       * 2                                          // register halves
+ 678       + ConditionRegisterImpl::number_of_registers // condition code registers
+ 679       + SpecialRegisterImpl::number_of_registers   // special registers
+ 680       + VectorRegisterImpl::number_of_registers    // VSX registers
+ 681   };
+ 682 
+ 683   static const int max_gpr;
+ 684   static const int max_fpr;
+ 685   static const int max_cnd;
+ 686 };
+ 687 
+ 688 // Common register declarations used in assembler code.
+ 689 REGISTER_DECLARATION(Register,      R0_SCRATCH, R0);  // volatile
+ 690 REGISTER_DECLARATION(Register,      R1_SP,      R1);  // non-volatile
+ 691 REGISTER_DECLARATION(Register,      R2_TOC,     R2);  // volatile
+ 692 REGISTER_DECLARATION(Register,      R3_RET,     R3);  // volatile
+ 693 REGISTER_DECLARATION(Register,      R3_ARG1,    R3);  // volatile
+ 694 REGISTER_DECLARATION(Register,      R4_ARG2,    R4);  // volatile
+ 695 REGISTER_DECLARATION(Register,      R5_ARG3,    R5);  // volatile
+ 696 REGISTER_DECLARATION(Register,      R6_ARG4,    R6);  // volatile
+ 697 REGISTER_DECLARATION(Register,      R7_ARG5,    R7);  // volatile
+ 698 REGISTER_DECLARATION(Register,      R8_ARG6,    R8);  // volatile
+ 699 REGISTER_DECLARATION(Register,      R9_ARG7,    R9);  // volatile
+ 700 REGISTER_DECLARATION(Register,      R10_ARG8,   R10); // volatile
+ 701 REGISTER_DECLARATION(FloatRegister, F0_SCRATCH, F0);  // volatile
+ 702 REGISTER_DECLARATION(FloatRegister, F1_RET,     F1);  // volatile
+ 703 REGISTER_DECLARATION(FloatRegister, F1_ARG1,    F1);  // volatile
+ 704 REGISTER_DECLARATION(FloatRegister, F2_ARG2,    F2);  // volatile
+ 705 REGISTER_DECLARATION(FloatRegister, F3_ARG3,    F3);  // volatile
+ 706 REGISTER_DECLARATION(FloatRegister, F4_ARG4,    F4);  // volatile
+ 707 REGISTER_DECLARATION(FloatRegister, F5_ARG5,    F5);  // volatile
+ 708 REGISTER_DECLARATION(FloatRegister, F6_ARG6,    F6);  // volatile
+ 709 REGISTER_DECLARATION(FloatRegister, F7_ARG7,    F7);  // volatile
+ 710 REGISTER_DECLARATION(FloatRegister, F8_ARG8,    F8);  // volatile
+ 711 REGISTER_DECLARATION(FloatRegister, F9_ARG9,    F9);  // volatile
+ 712 REGISTER_DECLARATION(FloatRegister, F10_ARG10,  F10); // volatile
+ 713 REGISTER_DECLARATION(FloatRegister, F11_ARG11,  F11); // volatile
+ 714 REGISTER_DECLARATION(FloatRegister, F12_ARG12,  F12); // volatile
+ 715 REGISTER_DECLARATION(FloatRegister, F13_ARG13,  F13); // volatile
+ 716 
+ 717 #ifndef DONT_USE_REGISTER_DEFINES
+ 718 #define R0_SCRATCH         AS_REGISTER(Register, R0)
+ 719 #define R1_SP              AS_REGISTER(Register, R1)
+ 720 #define R2_TOC             AS_REGISTER(Register, R2)
+ 721 #define R3_RET             AS_REGISTER(Register, R3)
+ 722 #define R3_ARG1            AS_REGISTER(Register, R3)
+ 723 #define R4_ARG2            AS_REGISTER(Register, R4)
+ 724 #define R5_ARG3            AS_REGISTER(Register, R5)
+ 725 #define R6_ARG4            AS_REGISTER(Register, R6)
+ 726 #define R7_ARG5            AS_REGISTER(Register, R7)
+ 727 #define R8_ARG6            AS_REGISTER(Register, R8)
+ 728 #define R9_ARG7            AS_REGISTER(Register, R9)
+ 729 #define R10_ARG8           AS_REGISTER(Register, R10)
+ 730 #define F0_SCRATCH         AS_REGISTER(FloatRegister, F0)
+ 731 #define F1_RET             AS_REGISTER(FloatRegister, F1)
+ 732 #define F1_ARG1            AS_REGISTER(FloatRegister, F1)
+ 733 #define F2_ARG2            AS_REGISTER(FloatRegister, F2)
+ 734 #define F3_ARG3            AS_REGISTER(FloatRegister, F3)
+ 735 #define F4_ARG4            AS_REGISTER(FloatRegister, F4)
+ 736 #define F5_ARG5            AS_REGISTER(FloatRegister, F5)
+ 737 #define F6_ARG6            AS_REGISTER(FloatRegister, F6)
+ 738 #define F7_ARG7            AS_REGISTER(FloatRegister, F7)
+ 739 #define F8_ARG8            AS_REGISTER(FloatRegister, F8)
+ 740 #define F9_ARG9            AS_REGISTER(FloatRegister, F9)
+ 741 #define F10_ARG10          AS_REGISTER(FloatRegister, F10)
+ 742 #define F11_ARG11          AS_REGISTER(FloatRegister, F11)
+ 743 #define F12_ARG12          AS_REGISTER(FloatRegister, F12)
+ 744 #define F13_ARG13          AS_REGISTER(FloatRegister, F13)
+ 745 #endif
+ 746 
+ 747 // Register declarations to be used in frame manager assembly code.
+ 748 // Use only non-volatile registers in order to keep values across C-calls.
+ 749 REGISTER_DECLARATION(Register, R14_bcp,        R14);
+ 750 REGISTER_DECLARATION(Register, R15_esp,        R15);
+ 751 REGISTER_DECLARATION(FloatRegister, F15_ftos,  F15);
+ 752 REGISTER_DECLARATION(Register, R16_thread,     R16);      // address of current thread
+ 753 REGISTER_DECLARATION(Register, R17_tos,        R17);      // address of Java tos (prepushed).
+ 754 REGISTER_DECLARATION(Register, R18_locals,     R18);      // address of first param slot (receiver).
+ 755 REGISTER_DECLARATION(Register, R19_method,     R19);      // address of current method
+ 756 #ifndef DONT_USE_REGISTER_DEFINES
+ 757 #define R14_bcp           AS_REGISTER(Register, R14)
+ 758 #define R15_esp           AS_REGISTER(Register, R15)
+ 759 #define F15_ftos          AS_REGISTER(FloatRegister, F15)
+ 760 #define R16_thread        AS_REGISTER(Register, R16)
+ 761 #define R17_tos           AS_REGISTER(Register, R17)
+ 762 #define R18_locals        AS_REGISTER(Register, R18)
+ 763 #define R19_method        AS_REGISTER(Register, R19)
+ 764 #define R21_sender_SP     AS_REGISTER(Register, R21)
+ 765 #define R23_method_handle AS_REGISTER(Register, R23)
+ 766 #endif
+ 767 
+ 768 // Temporary registers to be used within frame manager. We can use
+ 769 // the non-volatiles because the call stub has saved them.
+ 770 // Use only non-volatile registers in order to keep values across C-calls.
+ 771 REGISTER_DECLARATION(Register, R21_tmp1, R21);
+ 772 REGISTER_DECLARATION(Register, R22_tmp2, R22);
+ 773 REGISTER_DECLARATION(Register, R23_tmp3, R23);
+ 774 REGISTER_DECLARATION(Register, R24_tmp4, R24);
+ 775 REGISTER_DECLARATION(Register, R25_tmp5, R25);
+ 776 REGISTER_DECLARATION(Register, R26_tmp6, R26);
+ 777 REGISTER_DECLARATION(Register, R27_tmp7, R27);
+ 778 REGISTER_DECLARATION(Register, R28_tmp8, R28);
+ 779 REGISTER_DECLARATION(Register, R29_tmp9, R29);
+ 780 REGISTER_DECLARATION(Register, R24_dispatch_addr,     R24);
+ 781 REGISTER_DECLARATION(Register, R25_templateTableBase, R25);
+ 782 REGISTER_DECLARATION(Register, R26_monitor,           R26);
+ 783 REGISTER_DECLARATION(Register, R27_constPoolCache,    R27);
+ 784 REGISTER_DECLARATION(Register, R28_mdx,               R28);
+ 785 
+ 786 REGISTER_DECLARATION(Register, R19_inline_cache_reg, R19);
+ 787 REGISTER_DECLARATION(Register, R29_TOC, R29);
+ 788 
+ 789 #ifndef DONT_USE_REGISTER_DEFINES
+ 790 #define R21_tmp1         AS_REGISTER(Register, R21)
+ 791 #define R22_tmp2         AS_REGISTER(Register, R22)
+ 792 #define R23_tmp3         AS_REGISTER(Register, R23)
+ 793 #define R24_tmp4         AS_REGISTER(Register, R24)
+ 794 #define R25_tmp5         AS_REGISTER(Register, R25)
+ 795 #define R26_tmp6         AS_REGISTER(Register, R26)
+ 796 #define R27_tmp7         AS_REGISTER(Register, R27)
+ 797 #define R28_tmp8         AS_REGISTER(Register, R28)
+ 798 #define R29_tmp9         AS_REGISTER(Register, R29)
+ 799 //    Lmonitors  : monitor pointer
+ 800 //    LcpoolCache: constant pool cache
+ 801 //    mdx: method data index
+ 802 #define R24_dispatch_addr     AS_REGISTER(Register, R24)
+ 803 #define R25_templateTableBase AS_REGISTER(Register, R25)
+ 804 #define R26_monitor           AS_REGISTER(Register, R26)
+ 805 #define R27_constPoolCache    AS_REGISTER(Register, R27)
+ 806 #define R28_mdx               AS_REGISTER(Register, R28)
+ 807 
+ 808 #define R19_inline_cache_reg AS_REGISTER(Register, R19)
+ 809 #define R29_TOC AS_REGISTER(Register, R29)
+ 810 #endif
+ 811 
+ 812 // Scratch registers are volatile.
+ 813 REGISTER_DECLARATION(Register, R11_scratch1, R11);
+ 814 REGISTER_DECLARATION(Register, R12_scratch2, R12);
+ 815 #ifndef DONT_USE_REGISTER_DEFINES
+ 816 #define R11_scratch1   AS_REGISTER(Register, R11)
+ 817 #define R12_scratch2   AS_REGISTER(Register, R12)
+ 818 #endif
+ 819 
+ 820 #endif // CPU_PPC_VM_REGISTER_PPC_HPP
+</pre></body></html>

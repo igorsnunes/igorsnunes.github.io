@@ -1,0 +1,487 @@
+<?xml version="1.0"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+    "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head><meta charset="utf-8">
+<meta http-equiv="cache-control" content="no-cache" />
+<meta http-equiv="Pragma" content="no-cache" />
+<meta http-equiv="Expires" content="-1" />
+<!--
+   Note to customizers: the body of the webrev is IDed as SUNWwebrev
+   to allow easy overriding by users of webrev via the userContent.css
+   mechanism available in some browsers.
+
+   For example, to have all "removed" information be red instead of
+   brown, set a rule in your userContent.css file like:
+
+       body#SUNWwebrev span.removed { color: red ! important; }
+-->
+<style type="text/css" media="screen">
+body {
+    background-color: #eeeeee;
+}
+hr {
+    border: none 0;
+    border-top: 1px solid #aaa;
+    height: 1px;
+}
+div.summary {
+    font-size: .8em;
+    border-bottom: 1px solid #aaa;
+    padding-left: 1em;
+    padding-right: 1em;
+}
+div.summary h2 {
+    margin-bottom: 0.3em;
+}
+div.summary table th {
+    text-align: right;
+    vertical-align: top;
+    white-space: nowrap;
+}
+span.lineschanged {
+    font-size: 0.7em;
+}
+span.oldmarker {
+    color: red;
+    font-size: large;
+    font-weight: bold;
+}
+span.newmarker {
+    color: green;
+    font-size: large;
+    font-weight: bold;
+}
+span.removed {
+    color: brown;
+}
+span.changed {
+    color: blue;
+}
+span.new {
+    color: blue;
+    font-weight: bold;
+}
+a.print { font-size: x-small; }
+
+</style>
+
+<style type="text/css" media="print">
+pre { font-size: 0.8em; font-family: courier, monospace; }
+span.removed { color: #444; font-style: italic }
+span.changed { font-weight: bold; }
+span.new { font-weight: bold; }
+span.newmarker { font-size: 1.2em; font-weight: bold; }
+span.oldmarker { font-size: 1.2em; font-weight: bold; }
+a.print {display: none}
+hr { border: none 0; border-top: 1px solid #aaa; height: 1px; }
+</style>
+
+<title>hotspot Sdiff src/cpu/ppc/vm </title>
+</head><body id="SUNWwebrev">
+<center><a href='../../../../src/cpu/ppc/vm/register_ppc.hpp.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/cpu/ppc/vm/vm_version_ppc.cpp.sdiff.html' target='_top'>next &gt</a></center>
+<h2>src/cpu/ppc/vm/stubGenerator_ppc.cpp</h2>
+<a class="print" href="javascript:print()">Print this page</a>
+<pre>rev <a href="https://bugs.openjdk.java.net/browse/JDK-12651">12651</a> : Sha2 intrinsics implementation</pre>
+
+<table><tr valign="top">
+<td><pre>
+
+</pre><hr></hr><pre>
+2711     __ li              (hex, 16);
+2712     __ li              (fifteen, 15);
+2713     __ vspltisb        (fSplt, 0x0f);
+2714 
+2715     // load unaligned from[0-15] to vsRet
+2716     __ lvx             (vRet, from);
+2717     __ lvx             (vTmp1, fifteen, from);
+2718     __ lvsl            (fromPerm, from);
+2719     __ vxor            (fromPerm, fromPerm, fSplt);
+2720     __ vperm           (vRet, vRet, vTmp1, fromPerm);
+2721 
+2722     // load keylen (44 or 52 or 60)
+2723     __ lwz             (keylen, arrayOopDesc::length_offset_in_bytes() - arrayOopDesc::base_offset_in_bytes(T_INT), key);
+2724 
+2725     // to load keys
+2726     __ lvsr            (keyPerm, key);
+2727     __ vxor            (vTmp2, vTmp2, vTmp2);
+2728     __ vspltisb        (vTmp2, -16);
+2729     __ vrld            (keyPerm, keyPerm, vTmp2);
+2730     __ vrld            (keyPerm, keyPerm, vTmp2);
+<span class="changed">2731     __ vsldoi          (keyPerm, keyPerm, keyPerm, -8);</span>
+2732 
+2733     // load the 1st round key to vKey1
+2734     __ li              (keypos, 0);
+2735     __ lvx             (vKey1, keypos, key);
+2736     __ addi            (keypos, keypos, 16);
+2737     __ lvx             (vTmp1, keypos, key);
+2738     __ vperm           (vKey1, vTmp1, vKey1, keyPerm);
+2739 
+2740     // 1st round
+2741     __ vxor (vRet, vRet, vKey1);
+2742 
+2743     // load the 2nd round key to vKey1
+2744     __ addi            (keypos, keypos, 16);
+2745     __ lvx             (vTmp2, keypos, key);
+2746     __ vperm           (vKey1, vTmp2, vTmp1, keyPerm);
+2747 
+2748     // load the 3rd round key to vKey2
+2749     __ addi            (keypos, keypos, 16);
+2750     __ lvx             (vTmp1, keypos, key);
+2751     __ vperm           (vKey2, vTmp1, vTmp2, keyPerm);
+
+</pre><hr></hr><pre>
+2911     __ li              (hex, 16);
+2912     __ li              (fifteen, 15);
+2913     __ vspltisb        (fSplt, 0x0f);
+2914 
+2915     // load unaligned from[0-15] to vsRet
+2916     __ lvx             (vRet, from);
+2917     __ lvx             (vTmp1, fifteen, from);
+2918     __ lvsl            (fromPerm, from);
+2919     __ vxor            (fromPerm, fromPerm, fSplt);
+2920     __ vperm           (vRet, vRet, vTmp1, fromPerm); // align [and byte swap in LE]
+2921 
+2922     // load keylen (44 or 52 or 60)
+2923     __ lwz             (keylen, arrayOopDesc::length_offset_in_bytes() - arrayOopDesc::base_offset_in_bytes(T_INT), key);
+2924 
+2925     // to load keys
+2926     __ lvsr            (keyPerm, key);
+2927     __ vxor            (vTmp2, vTmp2, vTmp2);
+2928     __ vspltisb        (vTmp2, -16);
+2929     __ vrld            (keyPerm, keyPerm, vTmp2);
+2930     __ vrld            (keyPerm, keyPerm, vTmp2);
+<span class="changed">2931     __ vsldoi          (keyPerm, keyPerm, keyPerm, -8);</span>
+2932 
+2933     __ cmpwi           (CCR0, keylen, 44);
+2934     __ beq             (CCR0, L_do44);
+2935 
+2936     __ cmpwi           (CCR0, keylen, 52);
+2937     __ beq             (CCR0, L_do52);
+2938 
+2939     // load the 15th round key to vKey11
+2940     __ li              (keypos, 240);
+2941     __ lvx             (vTmp1, keypos, key);
+2942     __ addi            (keypos, keypos, -16);
+2943     __ lvx             (vTmp2, keypos, key);
+2944     __ vperm           (vKey1, vTmp1, vTmp2, keyPerm);
+2945 
+2946     // load the 14th round key to vKey10
+2947     __ addi            (keypos, keypos, -16);
+2948     __ lvx             (vTmp1, keypos, key);
+2949     __ vperm           (vKey2, vTmp2, vTmp1, keyPerm);
+2950 
+2951     // load the 13th round key to vKey10
+
+</pre><hr></hr><pre>
+3077     __ vncipherlast    (vRet, vRet, vKey5);
+3078 
+3079     __ neg             (temp, to);
+3080     __ lvsr            (toPerm, temp);
+3081     __ vspltisb        (vTmp2, -1);
+3082     __ vxor            (vTmp1, vTmp1, vTmp1);
+3083     __ vperm           (vTmp2, vTmp2, vTmp1, toPerm);
+3084     __ vxor            (toPerm, toPerm, fSplt);
+3085     __ lvx             (vTmp1, to);
+3086     __ vperm           (vRet, vRet, vRet, toPerm);
+3087     __ vsel            (vTmp1, vTmp1, vRet, vTmp2);
+3088     __ lvx             (vTmp4, fifteen, to);
+3089     __ stvx            (vTmp1, to);
+3090     __ vsel            (vRet, vRet, vTmp4, vTmp2);
+3091     __ stvx            (vRet, fifteen, to);
+3092 
+3093     __ blr();
+3094      return start;
+3095   }
+3096 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+3097   void generate_arraycopy_stubs() {
+3098     // Note: the disjoint stubs must be generated first, some of
+3099     // the conjoint stubs use them.
+3100 
+3101     // non-aligned disjoint versions
+3102     StubRoutines::_jbyte_disjoint_arraycopy       = generate_disjoint_byte_copy(false, "jbyte_disjoint_arraycopy");
+3103     StubRoutines::_jshort_disjoint_arraycopy      = generate_disjoint_short_copy(false, "jshort_disjoint_arraycopy");
+3104     StubRoutines::_jint_disjoint_arraycopy        = generate_disjoint_int_copy(false, "jint_disjoint_arraycopy");
+3105     StubRoutines::_jlong_disjoint_arraycopy       = generate_disjoint_long_copy(false, "jlong_disjoint_arraycopy");
+3106     StubRoutines::_oop_disjoint_arraycopy         = generate_disjoint_oop_copy(false, "oop_disjoint_arraycopy", false);
+3107     StubRoutines::_oop_disjoint_arraycopy_uninit  = generate_disjoint_oop_copy(false, "oop_disjoint_arraycopy_uninit", true);
+3108 
+3109     // aligned disjoint versions
+3110     StubRoutines::_arrayof_jbyte_disjoint_arraycopy      = generate_disjoint_byte_copy(true, "arrayof_jbyte_disjoint_arraycopy");
+3111     StubRoutines::_arrayof_jshort_disjoint_arraycopy     = generate_disjoint_short_copy(true, "arrayof_jshort_disjoint_arraycopy");
+3112     StubRoutines::_arrayof_jint_disjoint_arraycopy       = generate_disjoint_int_copy(true, "arrayof_jint_disjoint_arraycopy");
+3113     StubRoutines::_arrayof_jlong_disjoint_arraycopy      = generate_disjoint_long_copy(true, "arrayof_jlong_disjoint_arraycopy");
+3114     StubRoutines::_arrayof_oop_disjoint_arraycopy        = generate_disjoint_oop_copy(true, "arrayof_oop_disjoint_arraycopy", false);
+3115     StubRoutines::_arrayof_oop_disjoint_arraycopy_uninit = generate_disjoint_oop_copy(true, "oop_disjoint_arraycopy_uninit", true);
+3116 
+
+</pre><hr></hr><pre>
+3412 #ifdef COMPILER2
+3413     if (UseMultiplyToLenIntrinsic) {
+3414       StubRoutines::_multiplyToLen = generate_multiplyToLen();
+3415     }
+3416 #endif
+3417 
+3418     if (UseMontgomeryMultiplyIntrinsic) {
+3419       StubRoutines::_montgomeryMultiply
+3420         = CAST_FROM_FN_PTR(address, SharedRuntime::montgomery_multiply);
+3421     }
+3422     if (UseMontgomerySquareIntrinsic) {
+3423       StubRoutines::_montgomerySquare
+3424         = CAST_FROM_FN_PTR(address, SharedRuntime::montgomery_square);
+3425     }
+3426 
+3427     if (UseAESIntrinsics) {
+3428       StubRoutines::_aescrypt_encryptBlock = generate_aescrypt_encryptBlock();
+3429       StubRoutines::_aescrypt_decryptBlock = generate_aescrypt_decryptBlock();
+3430     }
+3431 
+
+
+
+
+
+
+
+
+3432   }
+3433 
+3434  public:
+3435   StubGenerator(CodeBuffer* code, bool all) : StubCodeGenerator(code) {
+3436     // replace the standard masm with a special one:
+3437     _masm = new MacroAssembler(code);
+3438     if (all) {
+3439       generate_all();
+3440     } else {
+3441       generate_initial();
+3442     }
+3443   }
+3444 };
+3445 
+3446 void StubGenerator_generate(CodeBuffer* code, bool all) {
+3447   StubGenerator g(code, all);
+3448 }
+</pre></td><td><pre>
+
+</pre><hr></hr><pre>
+2711     __ li              (hex, 16);
+2712     __ li              (fifteen, 15);
+2713     __ vspltisb        (fSplt, 0x0f);
+2714 
+2715     // load unaligned from[0-15] to vsRet
+2716     __ lvx             (vRet, from);
+2717     __ lvx             (vTmp1, fifteen, from);
+2718     __ lvsl            (fromPerm, from);
+2719     __ vxor            (fromPerm, fromPerm, fSplt);
+2720     __ vperm           (vRet, vRet, vTmp1, fromPerm);
+2721 
+2722     // load keylen (44 or 52 or 60)
+2723     __ lwz             (keylen, arrayOopDesc::length_offset_in_bytes() - arrayOopDesc::base_offset_in_bytes(T_INT), key);
+2724 
+2725     // to load keys
+2726     __ lvsr            (keyPerm, key);
+2727     __ vxor            (vTmp2, vTmp2, vTmp2);
+2728     __ vspltisb        (vTmp2, -16);
+2729     __ vrld            (keyPerm, keyPerm, vTmp2);
+2730     __ vrld            (keyPerm, keyPerm, vTmp2);
+<span class="changed">2731     __ vsldoi          (keyPerm, keyPerm, keyPerm, 8);</span>
+2732 
+2733     // load the 1st round key to vKey1
+2734     __ li              (keypos, 0);
+2735     __ lvx             (vKey1, keypos, key);
+2736     __ addi            (keypos, keypos, 16);
+2737     __ lvx             (vTmp1, keypos, key);
+2738     __ vperm           (vKey1, vTmp1, vKey1, keyPerm);
+2739 
+2740     // 1st round
+2741     __ vxor (vRet, vRet, vKey1);
+2742 
+2743     // load the 2nd round key to vKey1
+2744     __ addi            (keypos, keypos, 16);
+2745     __ lvx             (vTmp2, keypos, key);
+2746     __ vperm           (vKey1, vTmp2, vTmp1, keyPerm);
+2747 
+2748     // load the 3rd round key to vKey2
+2749     __ addi            (keypos, keypos, 16);
+2750     __ lvx             (vTmp1, keypos, key);
+2751     __ vperm           (vKey2, vTmp1, vTmp2, keyPerm);
+
+</pre><hr></hr><pre>
+2911     __ li              (hex, 16);
+2912     __ li              (fifteen, 15);
+2913     __ vspltisb        (fSplt, 0x0f);
+2914 
+2915     // load unaligned from[0-15] to vsRet
+2916     __ lvx             (vRet, from);
+2917     __ lvx             (vTmp1, fifteen, from);
+2918     __ lvsl            (fromPerm, from);
+2919     __ vxor            (fromPerm, fromPerm, fSplt);
+2920     __ vperm           (vRet, vRet, vTmp1, fromPerm); // align [and byte swap in LE]
+2921 
+2922     // load keylen (44 or 52 or 60)
+2923     __ lwz             (keylen, arrayOopDesc::length_offset_in_bytes() - arrayOopDesc::base_offset_in_bytes(T_INT), key);
+2924 
+2925     // to load keys
+2926     __ lvsr            (keyPerm, key);
+2927     __ vxor            (vTmp2, vTmp2, vTmp2);
+2928     __ vspltisb        (vTmp2, -16);
+2929     __ vrld            (keyPerm, keyPerm, vTmp2);
+2930     __ vrld            (keyPerm, keyPerm, vTmp2);
+<span class="changed">2931     __ vsldoi          (keyPerm, keyPerm, keyPerm, 8);</span>
+2932 
+2933     __ cmpwi           (CCR0, keylen, 44);
+2934     __ beq             (CCR0, L_do44);
+2935 
+2936     __ cmpwi           (CCR0, keylen, 52);
+2937     __ beq             (CCR0, L_do52);
+2938 
+2939     // load the 15th round key to vKey11
+2940     __ li              (keypos, 240);
+2941     __ lvx             (vTmp1, keypos, key);
+2942     __ addi            (keypos, keypos, -16);
+2943     __ lvx             (vTmp2, keypos, key);
+2944     __ vperm           (vKey1, vTmp1, vTmp2, keyPerm);
+2945 
+2946     // load the 14th round key to vKey10
+2947     __ addi            (keypos, keypos, -16);
+2948     __ lvx             (vTmp1, keypos, key);
+2949     __ vperm           (vKey2, vTmp2, vTmp1, keyPerm);
+2950 
+2951     // load the 13th round key to vKey10
+
+</pre><hr></hr><pre>
+3077     __ vncipherlast    (vRet, vRet, vKey5);
+3078 
+3079     __ neg             (temp, to);
+3080     __ lvsr            (toPerm, temp);
+3081     __ vspltisb        (vTmp2, -1);
+3082     __ vxor            (vTmp1, vTmp1, vTmp1);
+3083     __ vperm           (vTmp2, vTmp2, vTmp1, toPerm);
+3084     __ vxor            (toPerm, toPerm, fSplt);
+3085     __ lvx             (vTmp1, to);
+3086     __ vperm           (vRet, vRet, vRet, toPerm);
+3087     __ vsel            (vTmp1, vTmp1, vRet, vTmp2);
+3088     __ lvx             (vTmp4, fifteen, to);
+3089     __ stvx            (vTmp1, to);
+3090     __ vsel            (vRet, vRet, vTmp4, vTmp2);
+3091     __ stvx            (vRet, fifteen, to);
+3092 
+3093     __ blr();
+3094      return start;
+3095   }
+3096 
+<span class="new">3097   address generate_sha256_implCompress(bool multi_block, const char *name) {</span>
+<span class="new">3098     assert(UseSHA, "need SHA instructions");</span>
+<span class="new">3099     StubCodeMark mark(this, "StubRoutines", name);</span>
+<span class="new">3100     address start = __ function_entry();</span>
+<span class="new">3101 </span>
+<span class="new">3102     __ sha256 (multi_block);</span>
+<span class="new">3103 </span>
+<span class="new">3104     __ blr();</span>
+<span class="new">3105     return start;</span>
+<span class="new">3106   }</span>
+<span class="new">3107 </span>
+<span class="new">3108   address generate_sha512_implCompress(bool multi_block, const char *name) {</span>
+<span class="new">3109     assert(UseSHA, "need SHA instructions");</span>
+<span class="new">3110     StubCodeMark mark(this, "StubRoutines", name);</span>
+<span class="new">3111     address start = __ function_entry();</span>
+<span class="new">3112 </span>
+<span class="new">3113     __ sha512 (multi_block);</span>
+<span class="new">3114 </span>
+<span class="new">3115     __ blr();</span>
+<span class="new">3116     return start;</span>
+<span class="new">3117   }</span>
+<span class="new">3118 </span>
+3119   void generate_arraycopy_stubs() {
+3120     // Note: the disjoint stubs must be generated first, some of
+3121     // the conjoint stubs use them.
+3122 
+3123     // non-aligned disjoint versions
+3124     StubRoutines::_jbyte_disjoint_arraycopy       = generate_disjoint_byte_copy(false, "jbyte_disjoint_arraycopy");
+3125     StubRoutines::_jshort_disjoint_arraycopy      = generate_disjoint_short_copy(false, "jshort_disjoint_arraycopy");
+3126     StubRoutines::_jint_disjoint_arraycopy        = generate_disjoint_int_copy(false, "jint_disjoint_arraycopy");
+3127     StubRoutines::_jlong_disjoint_arraycopy       = generate_disjoint_long_copy(false, "jlong_disjoint_arraycopy");
+3128     StubRoutines::_oop_disjoint_arraycopy         = generate_disjoint_oop_copy(false, "oop_disjoint_arraycopy", false);
+3129     StubRoutines::_oop_disjoint_arraycopy_uninit  = generate_disjoint_oop_copy(false, "oop_disjoint_arraycopy_uninit", true);
+3130 
+3131     // aligned disjoint versions
+3132     StubRoutines::_arrayof_jbyte_disjoint_arraycopy      = generate_disjoint_byte_copy(true, "arrayof_jbyte_disjoint_arraycopy");
+3133     StubRoutines::_arrayof_jshort_disjoint_arraycopy     = generate_disjoint_short_copy(true, "arrayof_jshort_disjoint_arraycopy");
+3134     StubRoutines::_arrayof_jint_disjoint_arraycopy       = generate_disjoint_int_copy(true, "arrayof_jint_disjoint_arraycopy");
+3135     StubRoutines::_arrayof_jlong_disjoint_arraycopy      = generate_disjoint_long_copy(true, "arrayof_jlong_disjoint_arraycopy");
+3136     StubRoutines::_arrayof_oop_disjoint_arraycopy        = generate_disjoint_oop_copy(true, "arrayof_oop_disjoint_arraycopy", false);
+3137     StubRoutines::_arrayof_oop_disjoint_arraycopy_uninit = generate_disjoint_oop_copy(true, "oop_disjoint_arraycopy_uninit", true);
+3138 
+
+</pre><hr></hr><pre>
+3434 #ifdef COMPILER2
+3435     if (UseMultiplyToLenIntrinsic) {
+3436       StubRoutines::_multiplyToLen = generate_multiplyToLen();
+3437     }
+3438 #endif
+3439 
+3440     if (UseMontgomeryMultiplyIntrinsic) {
+3441       StubRoutines::_montgomeryMultiply
+3442         = CAST_FROM_FN_PTR(address, SharedRuntime::montgomery_multiply);
+3443     }
+3444     if (UseMontgomerySquareIntrinsic) {
+3445       StubRoutines::_montgomerySquare
+3446         = CAST_FROM_FN_PTR(address, SharedRuntime::montgomery_square);
+3447     }
+3448 
+3449     if (UseAESIntrinsics) {
+3450       StubRoutines::_aescrypt_encryptBlock = generate_aescrypt_encryptBlock();
+3451       StubRoutines::_aescrypt_decryptBlock = generate_aescrypt_decryptBlock();
+3452     }
+3453 
+<span class="new">3454     if (UseSHA256Intrinsics) {</span>
+<span class="new">3455       StubRoutines::_sha256_implCompress   = generate_sha256_implCompress(false, "sha256_implCompress");</span>
+<span class="new">3456       StubRoutines::_sha256_implCompressMB = generate_sha256_implCompress(true,  "sha256_implCompressMB");</span>
+<span class="new">3457     }</span>
+<span class="new">3458     if (UseSHA512Intrinsics) {</span>
+<span class="new">3459       StubRoutines::_sha512_implCompress   = generate_sha512_implCompress(false, "sha512_implCompress");</span>
+<span class="new">3460       StubRoutines::_sha512_implCompressMB = generate_sha512_implCompress(true, "sha512_implCompressMB");</span>
+<span class="new">3461     }</span>
+3462   }
+3463 
+3464  public:
+3465   StubGenerator(CodeBuffer* code, bool all) : StubCodeGenerator(code) {
+3466     // replace the standard masm with a special one:
+3467     _masm = new MacroAssembler(code);
+3468     if (all) {
+3469       generate_all();
+3470     } else {
+3471       generate_initial();
+3472     }
+3473   }
+3474 };
+3475 
+3476 void StubGenerator_generate(CodeBuffer* code, bool all) {
+3477   StubGenerator g(code, all);
+3478 }
+</pre></td>
+</tr></table>
+<center><a href='../../../../src/cpu/ppc/vm/register_ppc.hpp.sdiff.html' target='_top'>&lt prev</a> <a href='../../../../index.html' target='_top'>index</a> <a href='../../../../src/cpu/ppc/vm/vm_version_ppc.cpp.sdiff.html' target='_top'>next &gt</a></center>
+</body></html>
